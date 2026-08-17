@@ -3695,7 +3695,7 @@ function createSlider(name, min, max, default, callback, parent, configKey)
     return card, setSliderValue
 end
 
-function createButton(name, callback, parent)
+function createButton(name, callback, parent, customBtnText, isDanger)
     local card = createCard(parent, 0, 42)
 
     local title = Instance.new("TextLabel")
@@ -3710,25 +3710,36 @@ function createButton(name, callback, parent)
     title.ZIndex = 8
     title.Parent = card
 
+    local isUnload = isDanger or (string.find(string.lower(name), "unload") ~= nil) or (customBtnText and string.lower(customBtnText) == "unload")
+    local btnLabel = customBtnText or (isUnload and "Unload" or "Lancer")
+
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 64, 0, 24)
     btn.Position = UDim2.new(1, -74, 0.5, -12)
-    btn.BackgroundColor3 = theme.cardHover
+    btn.BackgroundColor3 = isUnload and Color3.fromRGB(42, 18, 22) or theme.cardHover
     btn.BorderSizePixel = 0
-    btn.Text = "Lancer"
-    btn.TextColor3 = theme.text
+    btn.Text = btnLabel
+    btn.TextColor3 = isUnload and Color3.fromRGB(255, 75, 75) or theme.text
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 9
     btn.ZIndex = 9
     btn.Parent = card
     makeCorner(btn, 7)
-    makeStroke(btn, theme.border, 1)
+    makeStroke(btn, isUnload and Color3.fromRGB(150, 35, 45) or theme.border, 1)
 
     btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = theme.accent, TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        if isUnload then
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(215, 45, 55), TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        else
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = theme.accent, TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        end
     end)
     btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = theme.cardHover, TextColor3 = theme.text}):Play()
+        if isUnload then
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(42, 18, 22), TextColor3 = Color3.fromRGB(255, 75, 75)}):Play()
+        else
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = theme.cardHover, TextColor3 = theme.text}):Play()
+        end
     end)
 
     btn.MouseButton1Click:Connect(function()
@@ -3738,7 +3749,7 @@ function createButton(name, callback, parent)
         end
     end)
 
-    return card
+    return card, btn
 end
 
 function createLabel(text, parent)
@@ -8836,24 +8847,33 @@ do
     end)
 end
 
+createToggle("Bulles Animées (Background)", true, function(enabled)
+    V.BubblesEnabled = enabled
+    if BubblesContainer then
+        BubblesContainer.Visible = enabled
+    end
+end, SettingsContent,"BubblesEnabled")
+
+createToggle("Fond Sombre (Opacité / Dimmer)", true, function(enabled)
+    V.DimmerEnabled = enabled
+    if BackgroundDimmer then
+        BackgroundDimmer.Visible = enabled
+    end
+end, SettingsContent,"DimmerEnabled")
+
+createSlider("Opacité Fond Sombre (Dimmer)", 0, 100, 80, function(val)
+    V.DimmerOpacity = val
+    if BackgroundDimmer then
+        BackgroundDimmer.BackgroundTransparency = 1 - (val / 100)
+    end
+end, SettingsContent,"DimmerOpacity")
+
 createSlider("UI Opacity / Transparency", 0, 80, 0, function(val)
     V.UITransparency = val
     if BloxFruitsPanel then
         BloxFruitsPanel.BackgroundTransparency = val / 100
     end
 end, SettingsContent,"UITransparency")
-
-createSlider("Opacité Fond Sombre (Dimmer)", 0, 100, 80, function(val)
-    if BackgroundDimmer then
-        BackgroundDimmer.BackgroundTransparency = 1 - (val / 100)
-    end
-end, SettingsContent,"DimmerOpacity")
-
-createToggle("Bulles Animées (Background)", true, function(enabled)
-    if BubblesContainer then
-        BubblesContainer.Visible = enabled
-    end
-end, SettingsContent,"BubblesEnabled")
 
 createToggle("Anti-Cheat Notification Alert", false, function(enabled)
     V.AntiCheatAlert = enabled
@@ -8910,69 +8930,90 @@ end, SettingsContent,"Notif")
 
 do
     local WatermarkFrame = Instance.new("Frame")
-    WatermarkFrame.Size = UDim2.new(0, 400, 0, 30)
-    WatermarkFrame.Position = UDim2.new(1, 460, 0, 10)
-    WatermarkFrame.AnchorPoint = Vector2.new(1, 0)
-    WatermarkFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 21)
+    WatermarkFrame.Name = "WatermarkFrame"
+    WatermarkFrame.AnchorPoint = Vector2.new(0.5, 0)
+    WatermarkFrame.Position = UDim2.new(0.5, 0, 0, 10)
+    WatermarkFrame.Size = UDim2.new(0, 0, 0, 24)
+    WatermarkFrame.AutomaticSize = Enum.AutomaticSize.X
+    WatermarkFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
     WatermarkFrame.BackgroundTransparency = 0.15
     WatermarkFrame.BorderSizePixel = 0
-    WatermarkFrame.Visible = false
+    WatermarkFrame.ZIndex = 50
+    WatermarkFrame.Visible = true
     WatermarkFrame.Parent = ScreenGui
-    makeCorner(WatermarkFrame, 10)
-    makeStroke(WatermarkFrame, Color3.fromRGB(60, 60, 78), 1)
+    makeCorner(WatermarkFrame, 6)
+    makeStroke(WatermarkFrame, Color3.fromRGB(45, 45, 62), 1)
 
-    local WatermarkAccent = Instance.new("Frame")
-    WatermarkAccent.Size = UDim2.new(0, 3, 1, -8)
-    WatermarkAccent.Position = UDim2.new(0, 6, 0.5, 0)
-    WatermarkAccent.AnchorPoint = Vector2.new(0, 0.5)
-    WatermarkAccent.BackgroundColor3 = theme.accent
-    WatermarkAccent.BorderSizePixel = 0
-    WatermarkAccent.Parent = WatermarkFrame
-    makeCorner(WatermarkAccent, 2)
+    local watermarkPad = Instance.new("UIPadding")
+    watermarkPad.PaddingLeft = UDim.new(0, 12)
+    watermarkPad.PaddingRight = UDim.new(0, 12)
+    watermarkPad.PaddingTop = UDim.new(0, 2)
+    watermarkPad.PaddingBottom = UDim.new(0, 2)
+    watermarkPad.Parent = WatermarkFrame
 
     local WatermarkLabel = Instance.new("TextLabel")
-    WatermarkLabel.Size = UDim2.new(1, -24, 1, 0)
-    WatermarkLabel.Position = UDim2.new(0, 16, 0, 0)
+    WatermarkLabel.Name = "WatermarkLabel"
+    WatermarkLabel.Size = UDim2.new(0, 0, 1, 0)
+    WatermarkLabel.AutomaticSize = Enum.AutomaticSize.X
     WatermarkLabel.BackgroundTransparency = 1
-    WatermarkLabel.Text = "Nebula V2.0"
-    WatermarkLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    WatermarkLabel.TextStrokeTransparency = 0.4
-    WatermarkLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    WatermarkLabel.Font = Enum.Font.GothamBold
-    WatermarkLabel.TextSize = 13
-    WatermarkLabel.TextXAlignment = Enum.TextXAlignment.Left
-    WatermarkLabel.TextYAlignment = Enum.TextYAlignment.Center
+    WatermarkLabel.RichText = true
+    WatermarkLabel.Text = '<font color="rgb(145,120,255)"><b>NEBULA</b></font>  <font color="rgb(70,75,98)">|</font>  <font color="rgb(240,242,250)"><b>V2</b></font>  <font color="rgb(70,75,98)">|</font>  <font color="rgb(165,145,255)">-- FPS</font>  <font color="rgb(70,75,98)">|</font>  <font color="rgb(165,145,255)">-- ms</font>  <font color="rgb(70,75,98)">|</font>  <font color="rgb(140,146,168)">[Insert]</font>'
+    WatermarkLabel.Font = Enum.Font.GothamMedium
+    WatermarkLabel.TextSize = 11
+    WatermarkLabel.ZIndex = 51
     WatermarkLabel.Parent = WatermarkFrame
 
     local function showWatermark(visible)
         if visible then
             WatermarkFrame.Visible = true
-            TweenService:Create(WatermarkFrame, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(1, -12, 0, 10)}):Play()
+            TweenService:Create(WatermarkFrame, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, 0, 0, 10)}):Play()
         else
-            TweenService:Create(WatermarkFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(1, 460, 0, 10)}):Play()
-            task.delay(0.3, function()
-                WatermarkFrame.Visible = false
+            TweenService:Create(WatermarkFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(0.5, 0, 0, -35)}):Play()
+            task.delay(0.25, function()
+                if not V.Watermark then
+                    WatermarkFrame.Visible = false
+                end
             end)
         end
     end
 
-    createToggle("Watermark (HUD)", false, function(enabled)
+    V.Watermark = true
+    createToggle("Afficher Watermark", true, function(enabled)
         V.Watermark = enabled
         showWatermark(enabled)
-        if enabled then
-            notify("Settings","Watermark ON", Color3.fromRGB(80, 200, 120))
-        end
-    end, SettingsContent,"Watermark")
+        notify("Settings", "Watermark " .. (enabled and "ON" or "OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+    end, SettingsContent, "ShowWatermark")
 
-    task.spawn(function()
-        while task.wait(0.5) do
-            if V.Watermark then
-                local ping = math.floor(LocalPlayer:GetNetworkPing() * 1000)
-                local playerCount = #Players:GetPlayers()
-                WatermarkLabel.Text = string.format("Nebula V2.0  |  FPS: %d  |  Ping: %d ms  |  Joueurs: %d", currentFPS, ping, playerCount)
+    local wmFrameCount = 0
+    local wmLastTime = tick()
+    local wmFPS = 60
+    local wmPing = 0
+
+    local wmConn = RunService.RenderStepped:Connect(function()
+        wmFrameCount = wmFrameCount + 1
+        local now = tick()
+        if now - wmLastTime >= 0.4 then
+            wmFPS = math.floor(wmFrameCount / (now - wmLastTime))
+            wmFrameCount = 0
+            wmLastTime = now
+
+            pcall(function()
+                local stats = game:GetService("Stats")
+                local pingItem = stats and stats.Network and stats.Network.ServerStatsItem and stats.Network.ServerStatsItem["Data Ping"]
+                if pingItem then
+                    wmPing = math.floor(pingItem:GetValue())
+                else
+                    wmPing = math.floor(LocalPlayer:GetNetworkPing() * 1000)
+                end
+            end)
+
+            if WatermarkLabel and WatermarkFrame and WatermarkFrame.Visible then
+                local keyName = (Keybinds and Keybinds.Menu and Keybinds.Menu.Name) or "Insert"
+                WatermarkLabel.Text = string.format('<font color="rgb(145,120,255)"><b>NEBULA</b></font>  <font color="rgb(70,75,98)">|</font>  <font color="rgb(240,242,250)"><b>V2</b></font>  <font color="rgb(70,75,98)">|</font>  <font color="rgb(165,145,255)">%d FPS</font>  <font color="rgb(70,75,98)">|</font>  <font color="rgb(165,145,255)">%d ms</font>  <font color="rgb(70,75,98)">|</font>  <font color="rgb(140,146,168)">[%s]</font>', wmFPS, wmPing, keyName)
             end
         end
     end)
+    if C and C.All then table.insert(C.All, wmConn) end
 end
 
 do
@@ -9106,9 +9147,9 @@ do
 end
 
 createLabel("UNLOAD", SettingsContent)
-createButton("Unload Nebula Hub", function()
+createButton("Unload le Hub", function()
     performFullUnload()
-end, SettingsContent)
+end, SettingsContent, "Unload", true)
 
 initStep = "cablage Config/Code"
 createLabel("CONFIGURATION", ConfigContent)
