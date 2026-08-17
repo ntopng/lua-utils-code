@@ -59,7 +59,75 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name ="EternalFlick_GUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 9999
 ScreenGui.Parent = game:GetService("CoreGui")
+
+local BackgroundDimmer = Instance.new("Frame")
+BackgroundDimmer.Name = "BackgroundDimmer"
+BackgroundDimmer.Size = UDim2.new(1, 0, 1, 0)
+BackgroundDimmer.Position = UDim2.new(0, 0, 0, 0)
+BackgroundDimmer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+BackgroundDimmer.BackgroundTransparency = 0.2
+BackgroundDimmer.BorderSizePixel = 0
+BackgroundDimmer.ZIndex = 1
+BackgroundDimmer.Active = false
+BackgroundDimmer.Parent = ScreenGui
+
+local BubblesContainer = Instance.new("Frame")
+BubblesContainer.Name = "BubblesContainer"
+BubblesContainer.Size = UDim2.new(1, 0, 1, 0)
+BubblesContainer.Position = UDim2.new(0, 0, 0, 0)
+BubblesContainer.BackgroundTransparency = 1
+BubblesContainer.ClipsDescendants = true
+BubblesContainer.ZIndex = 2
+BubblesContainer.Active = false
+BubblesContainer.Parent = ScreenGui
+
+local bubbles = {}
+local numBubbles = 26
+for i = 1, numBubbles do
+    local b = Instance.new("Frame")
+    local size = math.random(8, 26)
+    b.Size = UDim2.new(0, size, 0, size)
+    b.BackgroundColor3 = (math.random() > 0.45) and Color3.fromRGB(60, 160, 255) or Color3.fromRGB(120, 200, 255)
+    b.BackgroundTransparency = math.random(60, 85) / 100
+    b.BorderSizePixel = 0
+    b.ZIndex = 2
+    b.Parent = BubblesContainer
+    local bc = Instance.new("UICorner")
+    bc.CornerRadius = UDim.new(1, 0)
+    bc.Parent = b
+    local bs = Instance.new("UIStroke")
+    bs.Color = Color3.fromRGB(255, 255, 255)
+    bs.Transparency = math.random(75, 92) / 100
+    bs.Thickness = 1
+    bs.Parent = b
+    local bubbleData = {
+        frame = b,
+        x = math.random(),
+        y = math.random(),
+        speed = math.random(35, 95) / 1000,
+        swaySpeed = math.random(12, 28) / 10,
+        swayAmp = math.random(6, 20) / 1000,
+        offset = math.random() * math.pi * 2
+    }
+    b.Position = UDim2.new(bubbleData.x, 0, bubbleData.y, 0)
+    table.insert(bubbles, bubbleData)
+end
+
+RunService.RenderStepped:Connect(function(dt)
+    if not guiVisible then return end
+    local t = tick()
+    for _, b in ipairs(bubbles) do
+        b.y = b.y + b.speed * dt
+        if b.y > 1.05 then
+            b.y = -0.05
+            b.x = math.random()
+        end
+        local curX = b.x + math.sin(t * b.swaySpeed + b.offset) * b.swayAmp
+        b.frame.Position = UDim2.new(curX, 0, b.y, 0)
+    end
+end)
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 480, 0, 420)
@@ -67,7 +135,18 @@ MainFrame.Position = UDim2.new(0.5, -240, 0.5, -210)
 MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
+MainFrame.ZIndex = 5
 MainFrame.Parent = ScreenGui
+
+local MainFrameCorner = Instance.new("UICorner")
+MainFrameCorner.CornerRadius = UDim.new(0, 12)
+MainFrameCorner.Parent = MainFrame
+
+local MainFrameStroke = Instance.new("UIStroke")
+MainFrameStroke.Color = Color3.fromRGB(40, 40, 58)
+MainFrameStroke.Thickness = 1.5
+MainFrameStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+MainFrameStroke.Parent = MainFrame
 
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 30)
@@ -143,9 +222,37 @@ VersionLabel.TextSize = 11
 VersionLabel.TextXAlignment = Enum.TextXAlignment.Left
 VersionLabel.Parent = SidebarHeader
 
+local NavMenu = Instance.new("Frame")
+NavMenu.Size = UDim2.new(1, -12, 0, 128)
+NavMenu.Position = UDim2.new(0, 6, 0, 60)
+NavMenu.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+NavMenu.BorderSizePixel = 0
+NavMenu.Parent = Sidebar
+
+local NavMenuCorner = Instance.new("UICorner")
+NavMenuCorner.CornerRadius = UDim.new(0, 8)
+NavMenuCorner.Parent = NavMenu
+
+local NavMenuStroke = Instance.new("UIStroke")
+NavMenuStroke.Color = Color3.fromRGB(38, 38, 54)
+NavMenuStroke.Thickness = 1
+NavMenuStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+NavMenuStroke.Parent = NavMenu
+
+local NavMenuPad = Instance.new("UIPadding")
+NavMenuPad.PaddingTop = UDim.new(0, 4)
+NavMenuPad.PaddingBottom = UDim.new(0, 4)
+NavMenuPad.PaddingLeft = UDim.new(0, 4)
+NavMenuPad.PaddingRight = UDim.new(0, 4)
+NavMenuPad.Parent = NavMenu
+
+local NavMenuLayout = Instance.new("UIListLayout")
+NavMenuLayout.Padding = UDim.new(0, 3)
+NavMenuLayout.SortOrder = Enum.SortOrder.LayoutOrder
+NavMenuLayout.Parent = NavMenu
+
 local AimNavBtn = Instance.new("TextButton")
-AimNavBtn.Size = UDim2.new(1, 0, 0, 36)
-AimNavBtn.Position = UDim2.new(0, 0, 0, 57)
+AimNavBtn.Size = UDim2.new(1, 0, 0, 34)
 AimNavBtn.BackgroundColor3 = Color3.fromRGB(60, 160, 255)
 AimNavBtn.BackgroundTransparency = 0.88
 AimNavBtn.BorderSizePixel = 0
@@ -154,7 +261,11 @@ AimNavBtn.TextColor3 = Color3.fromRGB(60, 160, 255)
 AimNavBtn.Font = Enum.Font.Code
 AimNavBtn.TextSize = 12
 AimNavBtn.TextXAlignment = Enum.TextXAlignment.Left
-AimNavBtn.Parent = Sidebar
+AimNavBtn.LayoutOrder = 1
+AimNavBtn.Parent = NavMenu
+local AimNavCorner = Instance.new("UICorner")
+AimNavCorner.CornerRadius = UDim.new(0, 6)
+AimNavCorner.Parent = AimNavBtn
 
 local AimNavAccent = Instance.new("Frame")
 AimNavAccent.Size = UDim2.new(0, 2, 1, 0)
@@ -168,8 +279,7 @@ AimNavPad.PaddingLeft = UDim.new(0, 14)
 AimNavPad.Parent = AimNavBtn
 
 local VisualNavBtn = Instance.new("TextButton")
-VisualNavBtn.Size = UDim2.new(1, 0, 0, 36)
-VisualNavBtn.Position = UDim2.new(0, 0, 0, 93)
+VisualNavBtn.Size = UDim2.new(1, 0, 0, 34)
 VisualNavBtn.BackgroundTransparency = 1
 VisualNavBtn.BorderSizePixel = 0
 VisualNavBtn.Text ="VISUAL"
@@ -177,7 +287,11 @@ VisualNavBtn.TextColor3 = Color3.fromRGB(140, 140, 160)
 VisualNavBtn.Font = Enum.Font.Code
 VisualNavBtn.TextSize = 12
 VisualNavBtn.TextXAlignment = Enum.TextXAlignment.Left
-VisualNavBtn.Parent = Sidebar
+VisualNavBtn.LayoutOrder = 2
+VisualNavBtn.Parent = NavMenu
+local VisualNavCorner = Instance.new("UICorner")
+VisualNavCorner.CornerRadius = UDim.new(0, 6)
+VisualNavCorner.Parent = VisualNavBtn
 
 local VisualNavAccent = Instance.new("Frame")
 VisualNavAccent.Size = UDim2.new(0, 2, 1, 0)
@@ -192,8 +306,7 @@ VisualNavPad.PaddingLeft = UDim.new(0, 14)
 VisualNavPad.Parent = VisualNavBtn
 
 local WhitelistNavBtn = Instance.new("TextButton")
-WhitelistNavBtn.Size = UDim2.new(1, 0, 0, 36)
-WhitelistNavBtn.Position = UDim2.new(0, 0, 0, 129)
+WhitelistNavBtn.Size = UDim2.new(1, 0, 0, 34)
 WhitelistNavBtn.BackgroundTransparency = 1
 WhitelistNavBtn.BorderSizePixel = 0
 WhitelistNavBtn.Text ="WHITELIST"
@@ -201,7 +314,11 @@ WhitelistNavBtn.TextColor3 = Color3.fromRGB(140, 140, 160)
 WhitelistNavBtn.Font = Enum.Font.Code
 WhitelistNavBtn.TextSize = 12
 WhitelistNavBtn.TextXAlignment = Enum.TextXAlignment.Left
-WhitelistNavBtn.Parent = Sidebar
+WhitelistNavBtn.LayoutOrder = 3
+WhitelistNavBtn.Parent = NavMenu
+local WhitelistNavCorner = Instance.new("UICorner")
+WhitelistNavCorner.CornerRadius = UDim.new(0, 6)
+WhitelistNavCorner.Parent = WhitelistNavBtn
 
 local WhitelistNavAccent = Instance.new("Frame")
 WhitelistNavAccent.Size = UDim2.new(0, 2, 1, 0)
@@ -215,16 +332,79 @@ local WhitelistNavPad = Instance.new("UIPadding")
 WhitelistNavPad.PaddingLeft = UDim.new(0, 14)
 WhitelistNavPad.Parent = WhitelistNavBtn
 
+local AccountBlock = Instance.new("Frame")
+AccountBlock.Size = UDim2.new(1, 0, 0, 92)
+AccountBlock.Position = UDim2.new(0, 0, 1, -92)
+AccountBlock.BackgroundTransparency = 1
+AccountBlock.Parent = Sidebar
+
+local AvatarRing = Instance.new("Frame")
+AvatarRing.Size = UDim2.new(0, 46, 0, 46)
+AvatarRing.Position = UDim2.new(0.5, -23, 0, 4)
+AvatarRing.BackgroundColor3 = Color3.fromRGB(32, 32, 44)
+AvatarRing.BorderSizePixel = 0
+AvatarRing.Parent = AccountBlock
+local AvatarRingCorner = Instance.new("UICorner")
+AvatarRingCorner.CornerRadius = UDim.new(1, 0)
+AvatarRingCorner.Parent = AvatarRing
+local AvatarRingStroke = Instance.new("UIStroke")
+AvatarRingStroke.Color = Color3.fromRGB(60, 160, 255)
+AvatarRingStroke.Thickness = 2
+AvatarRingStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+AvatarRingStroke.Parent = AvatarRing
+
+local AvatarImage = Instance.new("ImageLabel")
+AvatarImage.Size = UDim2.new(1, -4, 1, -4)
+AvatarImage.Position = UDim2.new(0, 2, 0, 2)
+AvatarImage.BackgroundTransparency = 1
+AvatarImage.BorderSizePixel = 0
+AvatarImage.ScaleType = Enum.ScaleType.Crop
+AvatarImage.Parent = AvatarRing
+local AvatarImageCorner = Instance.new("UICorner")
+AvatarImageCorner.CornerRadius = UDim.new(1, 0)
+AvatarImageCorner.Parent = AvatarImage
+
+pcall(function()
+    local thumb = game:GetService("Thumbnails"):GetPlayerThumbnail(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+    if thumb and thumb ~= "" then
+        AvatarImage.Image = thumb
+    end
+end)
+
+local AccountName = Instance.new("TextLabel")
+AccountName.Size = UDim2.new(1, -8, 0, 16)
+AccountName.Position = UDim2.new(0, 4, 0, 54)
+AccountName.BackgroundTransparency = 1
+AccountName.Text = LocalPlayer.DisplayName or LocalPlayer.Name
+AccountName.TextColor3 = Color3.fromRGB(210, 210, 220)
+AccountName.Font = Enum.Font.Code
+AccountName.TextSize = 10
+AccountName.TextXAlignment = Enum.TextXAlignment.Center
+AccountName.TextTruncate = Enum.TextTruncate.AtEnd
+AccountName.Parent = AccountBlock
+
+local AccountUser = Instance.new("TextLabel")
+AccountUser.Size = UDim2.new(1, -8, 0, 13)
+AccountUser.Position = UDim2.new(0, 4, 0, 70)
+AccountUser.BackgroundTransparency = 1
+AccountUser.Text = "@" .. LocalPlayer.Name
+AccountUser.TextColor3 = Color3.fromRGB(70, 70, 90)
+AccountUser.Font = Enum.Font.Code
+AccountUser.TextSize = 9
+AccountUser.TextXAlignment = Enum.TextXAlignment.Center
+AccountUser.TextTruncate = Enum.TextTruncate.AtEnd
+AccountUser.Parent = AccountBlock
+
 local InsertHint = Instance.new("TextLabel")
 InsertHint.Size = UDim2.new(1, -10, 0, 14)
-InsertHint.Position = UDim2.new(0, 10, 1, -20)
+InsertHint.Position = UDim2.new(0, 5, 0, 0)
 InsertHint.BackgroundTransparency = 1
 InsertHint.Text ="INSERT = show/hide"
 InsertHint.TextColor3 = Color3.fromRGB(38, 38, 52)
 InsertHint.Font = Enum.Font.Code
-InsertHint.TextSize = 10
-InsertHint.TextXAlignment = Enum.TextXAlignment.Left
-InsertHint.Parent = Sidebar
+InsertHint.TextSize = 9
+InsertHint.TextXAlignment = Enum.TextXAlignment.Center
+InsertHint.Parent = AccountBlock
 
 local ContentArea = Instance.new("Frame")
 ContentArea.Size = UDim2.new(1, -118, 1, -2)
@@ -2625,33 +2805,39 @@ getgenv().BloxFruitsUILoaded = true
 local theme = {
     text = Color3.fromRGB(235, 235, 242),
     sub = Color3.fromRGB(130, 134, 152),
-    panel = Color3.fromRGB(15, 16, 21),
-    card = Color3.fromRGB(23, 24, 33),
-    cardHover = Color3.fromRGB(31, 33, 45),
-    border = Color3.fromRGB(46, 48, 62),
+    panel = Color3.fromRGB(14, 15, 22),
+    panel2 = Color3.fromRGB(18, 19, 28),
+    card = Color3.fromRGB(23, 24, 35),
+    cardHover = Color3.fromRGB(31, 33, 47),
+    border = Color3.fromRGB(44, 46, 62),
     accent = Color3.fromRGB(145, 120, 255),
     accent2 = Color3.fromRGB(90, 160, 255),
     danger = Color3.fromRGB(220, 60, 60),
 }
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BloxFruitsUI"
+ScreenGui.Name = "NebulaUpdateUI"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 9999
 ScreenGui.Parent = parent
 
 local function makeCorner(gui, radius)
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, radius)
     corner.Parent = gui
+    return corner
 end
 
-local function makeStroke(gui, color, thickness)
+local function makeStroke(gui, color, thickness, transparency)
     local stroke = Instance.new("UIStroke")
     stroke.Color = color or theme.border
     stroke.Thickness = thickness or 1
+    stroke.Transparency = transparency or 0
     stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     stroke.Parent = gui
+    return stroke
 end
 
 local function makeGradient(gui, from, to, rotation)
@@ -2662,6 +2848,71 @@ local function makeGradient(gui, from, to, rotation)
     })
     gradient.Rotation = rotation or 90
     gradient.Parent = gui
+    return gradient
+end
+
+-- ============================= BACKGROUND & BUBBLES =============================
+
+local BackgroundDimmer = Instance.new("Frame")
+BackgroundDimmer.Name = "BackgroundDimmer"
+BackgroundDimmer.Size = UDim2.new(1, 0, 1, 0)
+BackgroundDimmer.Position = UDim2.new(0, 0, 0, 0)
+BackgroundDimmer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+BackgroundDimmer.BackgroundTransparency = 0.2 -- 80% opacity deep black
+BackgroundDimmer.BorderSizePixel = 0
+BackgroundDimmer.ZIndex = 1
+BackgroundDimmer.Active = false
+BackgroundDimmer.Parent = ScreenGui
+
+local BubblesContainer = Instance.new("Frame")
+BubblesContainer.Name = "BubblesContainer"
+BubblesContainer.Size = UDim2.new(1, 0, 1, 0)
+BubblesContainer.Position = UDim2.new(0, 0, 0, 0)
+BubblesContainer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+BubblesContainer.BackgroundTransparency = 1
+BubblesContainer.ClipsDescendants = true
+BubblesContainer.ZIndex = 2
+BubblesContainer.Active = false
+BubblesContainer.Parent = ScreenGui
+
+local bubbles = {}
+local numBubbles = 60
+
+for i = 1, numBubbles do
+    local b = Instance.new("Frame")
+    local size = math.random(7, 30)
+    b.Size = UDim2.new(0, size, 0, size)
+    local randCol = math.random()
+    if randCol > 0.65 then
+        b.BackgroundColor3 = theme.accent -- Color3.fromRGB(145, 120, 255)
+    elseif randCol > 0.35 then
+        b.BackgroundColor3 = Color3.fromRGB(175, 145, 255)
+    else
+        b.BackgroundColor3 = Color3.fromRGB(125, 95, 245)
+    end
+    b.BackgroundTransparency = math.random(55, 80) / 100
+    b.BorderSizePixel = 0
+    b.ZIndex = 2
+    b.Parent = BubblesContainer
+    makeCorner(b, 50)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Transparency = math.random(70, 90) / 100
+    stroke.Thickness = 1
+    stroke.Parent = b
+
+    local bubbleData = {
+        frame = b,
+        x = math.random(),
+        y = math.random(),
+        speed = math.random(30, 95) / 1000,
+        swaySpeed = math.random(10, 28) / 10,
+        swayAmp = math.random(6, 22) / 1000,
+        offset = math.random() * math.pi * 2
+    }
+    b.Position = UDim2.new(bubbleData.x, 0, bubbleData.y, 0)
+    table.insert(bubbles, bubbleData)
 end
 
 local menuSound = nil
@@ -2684,6 +2935,7 @@ NotificationContainer.Name = "NotificationContainer"
 NotificationContainer.Size = UDim2.new(0, 300, 1, -24)
 NotificationContainer.Position = UDim2.new(1, -316, 0, 12)
 NotificationContainer.BackgroundTransparency = 1
+NotificationContainer.ZIndex = 50
 NotificationContainer.Parent = ScreenGui
 
 local NotifLayout = Instance.new("UIListLayout")
@@ -2701,6 +2953,7 @@ local function notify(title, text, color)
     card.BackgroundColor3 = theme.panel
     card.BackgroundTransparency = 0.04
     card.BorderSizePixel = 0
+    card.ZIndex = 51
     card.Parent = NotificationContainer
     makeCorner(card, 10)
     makeStroke(card, theme.border, 1)
@@ -2709,6 +2962,7 @@ local function notify(title, text, color)
     bar.Size = UDim2.new(0, 2, 1, 0)
     bar.BackgroundColor3 = color
     bar.BorderSizePixel = 0
+    bar.ZIndex = 52
     bar.Parent = card
 
     local titleLabel = Instance.new("TextLabel")
@@ -2720,6 +2974,7 @@ local function notify(title, text, color)
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.TextSize = 12
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.ZIndex = 52
     titleLabel.Parent = card
 
     local textLabel = Instance.new("TextLabel")
@@ -2732,6 +2987,7 @@ local function notify(title, text, color)
     textLabel.TextSize = 10
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
     textLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    textLabel.ZIndex = 52
     textLabel.Parent = card
 
     TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
@@ -2746,86 +3002,272 @@ local function notify(title, text, color)
     end)
 end
 
-local Rail = Instance.new("ScrollingFrame")
-Rail.Name = "Rail"
-Rail.Size = UDim2.new(0, 88, 0, 500)
-Rail.Position = UDim2.new(0, 6, 0.5, -250)
-Rail.BackgroundTransparency = 1
-Rail.BorderSizePixel = 0
-Rail.ScrollBarThickness = 3
-Rail.ScrollBarImageColor3 = theme.border
-Rail.ScrollBarImageTransparency = 1
-Rail.AutomaticCanvasSize = Enum.AutomaticSize.Y
-Rail.CanvasSize = UDim2.new(0, 0, 0, 0)
-Rail.Parent = ScreenGui
+-- ============================= MAIN PANEL & SIDEBAR =============================
 
-local RailLayout = Instance.new("UIListLayout")
-RailLayout.Padding = UDim.new(0, 8)
-RailLayout.SortOrder = Enum.SortOrder.LayoutOrder
-RailLayout.Parent = Rail
-
-local RailH = Instance.new("ScrollingFrame")
-RailH.Name = "RailH"
-RailH.Size = UDim2.new(0, 410, 0, 54)
-RailH.Position = UDim2.new(0.5, -205, 0, 6)
-RailH.BackgroundTransparency = 1
-RailH.BorderSizePixel = 0
-RailH.ScrollBarThickness = 3
-RailH.ScrollBarImageColor3 = theme.border
-RailH.ScrollBarImageTransparency = 1
-RailH.CanvasSize = UDim2.new(0, 1208, 1, 0)
-RailH.Visible = false
-RailH.Parent = ScreenGui
+local defaultWindowSize = UDim2.new(0, 780, 0, 530)
+local defaultWindowPos = UDim2.new(0.5, -390, 0.5, -265)
 
 local Panel = Instance.new("Frame")
 Panel.Name = "Panel"
-Panel.Size = UDim2.new(0, 720, 0, 700)
-Panel.Position = UDim2.new(0, 110, 0.5, -350)
+Panel.Size = defaultWindowSize
+Panel.Position = defaultWindowPos
 Panel.BackgroundColor3 = theme.panel
 Panel.BackgroundTransparency = 0
 Panel.BorderSizePixel = 0
 Panel.ClipsDescendants = true
 Panel.Visible = false
+Panel.Active = true
+Panel.ZIndex = 5
 Panel.Parent = ScreenGui
-makeCorner(Panel, 16)
-makeStroke(Panel, theme.border, 1)
+makeCorner(Panel, 14)
+makeStroke(Panel, theme.border, 1.2)
+
+local PanelScale = Instance.new("UIScale")
+PanelScale.Scale = 1
+PanelScale.Parent = Panel
 
 BloxFruitsPanel = Panel
 
+local Sidebar = Instance.new("Frame")
+Sidebar.Name = "Sidebar"
+Sidebar.Size = UDim2.new(0, 195, 1, 0)
+Sidebar.Position = UDim2.new(0, 0, 0, 0)
+Sidebar.BackgroundColor3 = theme.panel2
+Sidebar.BorderSizePixel = 0
+Sidebar.ZIndex = 6
+Sidebar.Parent = Panel
+makeCorner(Sidebar, 14)
+
+local SidebarDivider = Instance.new("Frame")
+SidebarDivider.Name = "SidebarDivider"
+SidebarDivider.Size = UDim2.new(0, 1, 1, 0)
+SidebarDivider.Position = UDim2.new(1, -1, 0, 0)
+SidebarDivider.BackgroundColor3 = theme.border
+SidebarDivider.BackgroundTransparency = 0.4
+SidebarDivider.BorderSizePixel = 0
+SidebarDivider.ZIndex = 7
+SidebarDivider.Parent = Sidebar
+
+local LogoFrame = Instance.new("Frame")
+LogoFrame.Name = "LogoFrame"
+LogoFrame.Size = UDim2.new(1, 0, 0, 56)
+LogoFrame.Position = UDim2.new(0, 0, 0, 0)
+LogoFrame.BackgroundTransparency = 1
+LogoFrame.ZIndex = 7
+LogoFrame.Parent = Sidebar
+
+local Logo = Instance.new("TextLabel")
+Logo.Size = UDim2.new(1, -20, 0, 24)
+Logo.Position = UDim2.new(0, 14, 0, 12)
+Logo.BackgroundTransparency = 1
+Logo.Text = "NEBULA"
+Logo.TextColor3 = theme.accent
+Logo.Font = Enum.Font.GothamBlack
+Logo.TextSize = 20
+Logo.TextXAlignment = Enum.TextXAlignment.Left
+Logo.ZIndex = 8
+Logo.Parent = LogoFrame
+
+local LogoSub = Instance.new("TextLabel")
+LogoSub.Size = UDim2.new(1, -20, 0, 14)
+LogoSub.Position = UDim2.new(0, 14, 0, 36)
+LogoSub.BackgroundTransparency = 1
+LogoSub.Text = "ROBLOX HUB v2.0"
+LogoSub.TextColor3 = theme.sub
+LogoSub.Font = Enum.Font.Code
+LogoSub.TextSize = 9
+LogoSub.TextXAlignment = Enum.TextXAlignment.Left
+LogoSub.ZIndex = 8
+LogoSub.Parent = LogoFrame
+
+local LogoSep = Instance.new("Frame")
+LogoSep.Size = UDim2.new(1, -20, 0, 1)
+LogoSep.Position = UDim2.new(0, 10, 1, -1)
+LogoSep.BackgroundColor3 = theme.border
+LogoSep.BackgroundTransparency = 0.5
+LogoSep.BorderSizePixel = 0
+LogoSep.ZIndex = 7
+LogoSep.Parent = LogoFrame
+
+-- Scrollable Navigation Container
+local NavScroll = Instance.new("ScrollingFrame")
+NavScroll.Name = "NavScroll"
+NavScroll.Size = UDim2.new(1, -12, 1, -146)
+NavScroll.Position = UDim2.new(0, 6, 0, 62)
+NavScroll.BackgroundTransparency = 1
+NavScroll.BorderSizePixel = 0
+NavScroll.ScrollBarThickness = 3
+NavScroll.ScrollBarImageColor3 = theme.border
+NavScroll.ScrollBarImageTransparency = 0.3
+NavScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+NavScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+NavScroll.ZIndex = 7
+NavScroll.Parent = Sidebar
+
+local NavLayout = Instance.new("UIListLayout")
+NavLayout.Padding = UDim.new(0, 4)
+NavLayout.SortOrder = Enum.SortOrder.LayoutOrder
+NavLayout.Parent = NavScroll
+
+local NavPad = Instance.new("UIPadding")
+NavPad.PaddingTop = UDim.new(0, 4)
+NavPad.PaddingBottom = UDim.new(0, 6)
+NavPad.PaddingLeft = UDim.new(0, 2)
+NavPad.PaddingRight = UDim.new(0, 4)
+NavPad.Parent = NavScroll
+
+-- Account Profile Block at Bottom of Sidebar
+local AccountBlock = Instance.new("Frame")
+AccountBlock.Name = "AccountBlock"
+AccountBlock.Size = UDim2.new(1, -12, 0, 68)
+AccountBlock.Position = UDim2.new(0, 6, 1, -74)
+AccountBlock.BackgroundColor3 = theme.card
+AccountBlock.BorderSizePixel = 0
+AccountBlock.ZIndex = 7
+AccountBlock.Parent = Sidebar
+makeCorner(AccountBlock, 10)
+makeStroke(AccountBlock, theme.border, 1)
+
+local AvatarRing = Instance.new("Frame")
+AvatarRing.Name = "AvatarRing"
+AvatarRing.Size = UDim2.new(0, 42, 0, 42)
+AvatarRing.Position = UDim2.new(0, 8, 0.5, -21)
+AvatarRing.BackgroundColor3 = theme.cardHover
+AvatarRing.BorderSizePixel = 0
+AvatarRing.ZIndex = 8
+AvatarRing.Parent = AccountBlock
+makeCorner(AvatarRing, 50)
+makeStroke(AvatarRing, theme.accent, 1.5, 0.2)
+
+local AvatarImage = Instance.new("ImageLabel")
+AvatarImage.Name = "AvatarImage"
+AvatarImage.Size = UDim2.new(1, -4, 1, -4)
+AvatarImage.Position = UDim2.new(0, 2, 0, 2)
+AvatarImage.BackgroundTransparency = 1
+AvatarImage.BorderSizePixel = 0
+AvatarImage.ScaleType = Enum.ScaleType.Crop
+AvatarImage.Image = "rbxthumb://type=AvatarHeadShot&id=" .. LocalPlayer.UserId .. "&w=150&h=150"
+AvatarImage.ZIndex = 9
+AvatarImage.Parent = AvatarRing
+makeCorner(AvatarImage, 50)
+
+pcall(function()
+    local thumb = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+    if thumb and thumb ~= "" then
+        AvatarImage.Image = thumb
+    end
+end)
+
+local AccountName = Instance.new("TextLabel")
+AccountName.Name = "AccountName"
+AccountName.Size = UDim2.new(1, -62, 0, 16)
+AccountName.Position = UDim2.new(0, 56, 0, 14)
+AccountName.BackgroundTransparency = 1
+AccountName.Text = LocalPlayer.DisplayName or LocalPlayer.Name
+AccountName.TextColor3 = theme.text
+AccountName.Font = Enum.Font.GothamBold
+AccountName.TextSize = 11
+AccountName.TextXAlignment = Enum.TextXAlignment.Left
+AccountName.TextTruncate = Enum.TextTruncate.AtEnd
+AccountName.ZIndex = 8
+AccountName.Parent = AccountBlock
+
+local AccountUser = Instance.new("TextLabel")
+AccountUser.Name = "AccountUser"
+AccountUser.Size = UDim2.new(1, -62, 0, 14)
+AccountUser.Position = UDim2.new(0, 56, 0, 32)
+AccountUser.BackgroundTransparency = 1
+AccountUser.Text = "@" .. LocalPlayer.Name
+AccountUser.TextColor3 = theme.sub
+AccountUser.Font = Enum.Font.Code
+AccountUser.TextSize = 9
+AccountUser.TextXAlignment = Enum.TextXAlignment.Left
+AccountUser.TextTruncate = Enum.TextTruncate.AtEnd
+AccountUser.ZIndex = 8
+AccountUser.Parent = AccountBlock
+
+local StatusDot = Instance.new("Frame")
+StatusDot.Name = "StatusDot"
+StatusDot.Size = UDim2.new(0, 8, 0, 8)
+StatusDot.Position = UDim2.new(1, -14, 0, 8)
+StatusDot.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
+StatusDot.BorderSizePixel = 0
+StatusDot.ZIndex = 9
+StatusDot.Parent = AccountBlock
+makeCorner(StatusDot, 50)
+
+-- TopBar / Header of Content
 local PanelHeader = Instance.new("Frame")
-PanelHeader.Size = UDim2.new(1, 0, 0, 46)
+PanelHeader.Name = "PanelHeader"
+PanelHeader.Size = UDim2.new(1, -195, 0, 44)
+PanelHeader.Position = UDim2.new(0, 195, 0, 0)
 PanelHeader.BackgroundTransparency = 1
+PanelHeader.Active = true
+PanelHeader.ZIndex = 8
 PanelHeader.Parent = Panel
 
 local PanelTitle = Instance.new("TextLabel")
-PanelTitle.Size = UDim2.new(1, -100, 1, 0)
+PanelTitle.Size = UDim2.new(1, -120, 1, 0)
 PanelTitle.Position = UDim2.new(0, 16, 0, 0)
 PanelTitle.BackgroundTransparency = 1
-PanelTitle.Text = ""
+PanelTitle.Text = "MOVEMENT"
 PanelTitle.TextColor3 = theme.text
 PanelTitle.Font = Enum.Font.GothamBold
-PanelTitle.TextSize = 15
+PanelTitle.TextSize = 14
 PanelTitle.TextXAlignment = Enum.TextXAlignment.Left
+PanelTitle.ZIndex = 9
 PanelTitle.Parent = PanelHeader
 
 local MinBtn = Instance.new("TextButton")
-MinBtn.Size = UDim2.new(0, 30, 0, 26)
-MinBtn.Position = UDim2.new(1, -40, 0.5, -13)
+MinBtn.Size = UDim2.new(0, 28, 0, 26)
+MinBtn.Position = UDim2.new(1, -66, 0.5, -13)
 MinBtn.BackgroundColor3 = theme.card
 MinBtn.BorderSizePixel = 0
 MinBtn.Text = "-"
 MinBtn.TextColor3 = theme.sub
 MinBtn.Font = Enum.Font.GothamBold
 MinBtn.TextSize = 14
-MinBtn.ZIndex = 3
+MinBtn.ZIndex = 10
 MinBtn.Parent = PanelHeader
 makeCorner(MinBtn, 7)
 makeStroke(MinBtn, theme.border, 1)
 
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 28, 0, 26)
+CloseBtn.Position = UDim2.new(1, -34, 0.5, -13)
+CloseBtn.BackgroundColor3 = theme.card
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = theme.sub
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 11
+CloseBtn.ZIndex = 10
+CloseBtn.Parent = PanelHeader
+makeCorner(CloseBtn, 7)
+makeStroke(CloseBtn, theme.border, 1)
+
+CloseBtn.MouseEnter:Connect(function()
+    TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.danger, TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+end)
+CloseBtn.MouseLeave:Connect(function()
+    TweenService:Create(CloseBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.card, TextColor3 = theme.sub}):Play()
+end)
+
+local HeaderDivider = Instance.new("Frame")
+HeaderDivider.Size = UDim2.new(1, 0, 0, 1)
+HeaderDivider.Position = UDim2.new(0, 0, 1, -1)
+HeaderDivider.BackgroundColor3 = theme.border
+HeaderDivider.BackgroundTransparency = 0.5
+HeaderDivider.BorderSizePixel = 0
+HeaderDivider.ZIndex = 7
+HeaderDivider.Parent = PanelHeader
+
 local ContentArea = Instance.new("Frame")
-ContentArea.Size = UDim2.new(1, -24, 1, -58)
-ContentArea.Position = UDim2.new(0, 12, 0, 46)
+ContentArea.Name = "ContentArea"
+ContentArea.Size = UDim2.new(1, -207, 1, -48)
+ContentArea.Position = UDim2.new(0, 199, 0, 44)
 ContentArea.BackgroundTransparency = 1
+ContentArea.ZIndex = 6
 ContentArea.Parent = Panel
 
 local panels = {}
@@ -2841,6 +3283,7 @@ local function createPanel(name)
     panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
     panel.CanvasSize = UDim2.new(1, 0, 0, 0)
     panel.Visible = false
+    panel.ZIndex = 6
     panel.Parent = ContentArea
 
     local layout = Instance.new("UIListLayout")
@@ -2850,8 +3293,8 @@ local function createPanel(name)
 
     local pad = Instance.new("UIPadding")
     pad.PaddingTop = UDim.new(0, 10)
-    pad.PaddingLeft = UDim.new(0, 12)
-    pad.PaddingRight = UDim.new(0, 12)
+    pad.PaddingLeft = UDim.new(0, 10)
+    pad.PaddingRight = UDim.new(0, 10)
     pad.PaddingBottom = UDim.new(0, 12)
     pad.Parent = panel
 
@@ -2865,6 +3308,7 @@ local function createCard(parent, order, height)
     card.BackgroundColor3 = theme.card
     card.BorderSizePixel = 0
     card.LayoutOrder = order or 0
+    card.ZIndex = 7
     card.Parent = parent
     makeCorner(card, 10)
     makeStroke(card, theme.border, 1)
@@ -2884,6 +3328,7 @@ local function createSectionHeader(parent, title, order)
     header.Size = UDim2.new(1, 0, 0, 24)
     header.BackgroundTransparency = 1
     header.LayoutOrder = order or 0
+    header.ZIndex = 7
     header.Parent = parent
 
     local lbl = Instance.new("TextLabel")
@@ -2894,6 +3339,7 @@ local function createSectionHeader(parent, title, order)
     lbl.Font = Enum.Font.GothamBold
     lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 8
     lbl.Parent = header
 
     return header
@@ -2920,6 +3366,7 @@ local function createToggleCard(parent, text, subtext, order, getter, setter)
     title.Font = Enum.Font.GothamMedium
     title.TextSize = 11
     title.TextXAlignment = Enum.TextXAlignment.Left
+    title.ZIndex = 8
     title.Parent = card
 
     if subtext then
@@ -2932,6 +3379,7 @@ local function createToggleCard(parent, text, subtext, order, getter, setter)
         sub.Font = Enum.Font.Gotham
         sub.TextSize = 9
         sub.TextXAlignment = Enum.TextXAlignment.Left
+        sub.ZIndex = 8
         sub.Parent = card
     end
 
@@ -2944,6 +3392,7 @@ local function createToggleCard(parent, text, subtext, order, getter, setter)
     btn.TextColor3 = theme.sub
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 11
+    btn.ZIndex = 9
     btn.Parent = card
     makeCorner(btn, 9)
     makeStroke(btn, theme.border, 1)
@@ -2979,12 +3428,9 @@ local categories = {
 }
 
 local minimized = false
-local panelPos = Panel.Position
+local panelPos = defaultWindowPos
 local setMinimized = nil
 local currentCategory = "Movement"
-local currentSide = "left"
-local railHOffset = 0
-
 local railButtons = {}
 
 local function switchCategory(key)
@@ -2992,8 +3438,8 @@ local function switchCategory(key)
     for name, panel in pairs(panels) do
         if name == key then
             panel.Visible = true
-            panel.Position = UDim2.new(0, 16, 0, 0)
-            TweenService:Create(panel, TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
+            panel.Position = UDim2.new(0, 14, 0, 0)
+            TweenService:Create(panel, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
         else
             panel.Visible = false
         end
@@ -3003,9 +3449,12 @@ local function switchCategory(key)
         if data then
             local isActive = cat.key == key
             TweenService:Create(data.btn, TweenInfo.new(0.2), {
-                BackgroundColor3 = isActive and theme.accent or Color3.fromRGB(22, 23, 31),
+                BackgroundColor3 = isActive and theme.accent or Color3.fromRGB(24, 25, 36),
                 TextColor3 = isActive and Color3.fromRGB(255, 255, 255) or theme.sub,
             }):Play()
+            if data.accent then
+                data.accent.Visible = isActive
+            end
         end
     end
     for _, cat in ipairs(categories) do
@@ -3016,34 +3465,50 @@ local function switchCategory(key)
     end
 end
 
-local function createRailButton(cat, index, parentRail)
+local function createCategoryButton(cat, index, parentContainer)
     local btn = Instance.new("TextButton")
-    if parentRail == Rail then
-        btn.Size = UDim2.new(1, -10, 0, 34)
-        btn.Position = UDim2.new(0, 0, 0, 0)
-    else
-        btn.Size = UDim2.new(0, 78, 0, 34)
-        btn.Position = UDim2.new(0, 6 + (index - 1) * 86, 0, 0)
-    end
-    btn.BackgroundColor3 = Color3.fromRGB(22, 23, 31)
+    btn.Size = UDim2.new(1, 0, 0, 34)
+    btn.BackgroundColor3 = (cat.key == currentCategory) and theme.accent or Color3.fromRGB(24, 25, 36)
     btn.BorderSizePixel = 0
     btn.Text = cat.title
-    btn.TextColor3 = theme.sub
+    btn.TextColor3 = (cat.key == currentCategory) and Color3.fromRGB(255, 255, 255) or theme.sub
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 11
+    btn.TextXAlignment = Enum.TextXAlignment.Left
     btn.LayoutOrder = index
-    btn.Parent = parentRail
-    makeCorner(btn, 10)
-    makeStroke(btn, theme.border, 1)
+    btn.ZIndex = 8
+    btn.Parent = parentContainer
+    makeCorner(btn, 8)
+    makeStroke(btn, theme.border, 1, 0.5)
+
+    local btnPad = Instance.new("UIPadding")
+    btnPad.PaddingLeft = UDim.new(0, 14)
+    btnPad.Parent = btn
+
+    local accentBar = Instance.new("Frame")
+    accentBar.Size = UDim2.new(0, 3, 0.6, 0)
+    accentBar.Position = UDim2.new(0, -10, 0.2, 0)
+    accentBar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    accentBar.BorderSizePixel = 0
+    accentBar.Visible = (cat.key == currentCategory)
+    accentBar.ZIndex = 9
+    accentBar.Parent = btn
+    makeCorner(accentBar, 2)
 
     local scale = Instance.new("UIScale")
     scale.Parent = btn
 
     btn.MouseEnter:Connect(function()
-        TweenService:Create(scale, TweenInfo.new(0.18), {Scale = 1.06}):Play()
+        if cat.key ~= currentCategory then
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = theme.cardHover, TextColor3 = theme.text}):Play()
+        end
+        TweenService:Create(scale, TweenInfo.new(0.15), {Scale = 1.02}):Play()
     end)
     btn.MouseLeave:Connect(function()
-        TweenService:Create(scale, TweenInfo.new(0.18), {Scale = 1}):Play()
+        if cat.key ~= currentCategory then
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(24, 25, 36), TextColor3 = theme.sub}):Play()
+        end
+        TweenService:Create(scale, TweenInfo.new(0.15), {Scale = 1}):Play()
     end)
 
     btn.MouseButton1Click:Connect(function()
@@ -3054,141 +3519,29 @@ local function createRailButton(cat, index, parentRail)
         switchCategory(cat.key)
     end)
 
-    railButtons[cat.key] = { btn = btn, index = index }
+    railButtons[cat.key] = { btn = btn, accent = accentBar, index = index }
     return btn
 end
 
 for index, cat in ipairs(categories) do
-    createRailButton(cat, index, Rail)
+    createCategoryButton(cat, index, NavScroll)
     createPanel(cat.key)
 end
 
 function setAccentColor(col)
     theme.accent = col
     PanelTitle.TextColor3 = col
+    Logo.TextColor3 = col
+    AvatarRing.UIStroke.Color = col
     local data = railButtons[currentCategory]
     if data and data.btn then
         data.btn.BackgroundColor3 = col
     end
 end
 
-local function setRailSide(side)
-    for _, cat in ipairs(categories) do
-        local data = railButtons[cat.key]
-        if data and data.btn then
-            data.btn:Destroy()
-        end
-        railButtons[cat.key] = nil
-    end
-    currentSide = side
-    local target
-    if side == "left" then
-        target = Rail
-        Rail.Size = UDim2.new(0, 88, 0, 500)
-        Rail.Position = UDim2.new(0, 6, 0.5, -250)
-        Rail.Visible = true
-        RailH.Visible = false
-        Rail.CanvasPosition = Vector2.new(0, 0)
-    elseif side == "right" then
-        target = Rail
-        Rail.Size = UDim2.new(0, 88, 0, 500)
-        Rail.Position = UDim2.new(1, -94, 0.5, -250)
-        Rail.Visible = true
-        RailH.Visible = false
-        Rail.CanvasPosition = Vector2.new(0, 0)
-    elseif side == "top" then
-        target = RailH
-        railHOffset = 0
-        RailH.Size = UDim2.new(0, 410, 0, 54)
-        RailH.Position = UDim2.new(0.5, -205, 0, 6)
-        RailH.Visible = true
-        Rail.Visible = false
-    else
-        target = RailH
-        railHOffset = 0
-        RailH.Size = UDim2.new(0, 410, 0, 54)
-        RailH.Position = UDim2.new(0.5, -205, 1, -60)
-        RailH.Visible = true
-        Rail.Visible = false
-    end
-    for index, cat in ipairs(categories) do
-        createRailButton(cat, index, target)
-    end
-    for _, cat in ipairs(categories) do
-        local data = railButtons[cat.key]
-        if data then
-            local isActive = cat.key == currentCategory
-            TweenService:Create(data.btn, TweenInfo.new(0.2), {
-                BackgroundColor3 = isActive and theme.accent or Color3.fromRGB(22, 23, 31),
-                TextColor3 = isActive and Color3.fromRGB(255, 255, 255) or theme.sub,
-            }):Play()
-        end
-    end
-end
-
-currentSide = "left"
-
-local function scrollRailH(delta)
-    local maxOffset = math.max(0, 6 + (#categories - 1) * 86 + 78 + 6 - 410)
-    railHOffset = math.clamp(railHOffset + delta, 0, maxOffset)
-    RailH.CanvasPosition = Vector2.new(railHOffset, 0)
-end
-
-local lastWheelScroll = 0
-
-local function wheelScroll(delta)
-    if os.clock() - lastWheelScroll < 0.05 then return end
-    lastWheelScroll = os.clock()
-    scrollRailH(delta)
-end
-
-RailH.MouseWheelForward:Connect(function()
-    wheelScroll(-200)
-end)
-RailH.MouseWheelBackward:Connect(function()
-    wheelScroll(200)
-end)
-
-if V.RailHWheelConn then V.RailHWheelConn:Disconnect() end
-V.RailHWheelConn = UserInputService.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseWheel and RailH.Visible then
-        local mousePos = UserInputService:GetMouseLocation()
-        local railPos = RailH.AbsolutePosition
-        local railSize = RailH.AbsoluteSize
-        if mousePos.X >= railPos.X and mousePos.X <= railPos.X + railSize.X and mousePos.Y >= railPos.Y and mousePos.Y <= railPos.Y + railSize.Y then
-            local z = input.Position.Z
-            if z == 0 then z = input.Delta.Z end
-            if z > 0 then
-                wheelScroll(-200)
-            else
-                wheelScroll(200)
-            end
-        end
-    end
-end)
-
-if V.RailHHeartbeatConn then V.RailHHeartbeatConn:Disconnect() end
-V.RailHHeartbeatConn = RunService.Heartbeat:Connect(function()
-    if RailH.Visible and RailH.CanvasPosition.Y ~= 0 then
-        RailH.CanvasPosition = Vector2.new(RailH.CanvasPosition.X, 0)
-    end
-end)
-
 ContentFrames = {}
-
 for _, cat in ipairs(categories) do
     local panel = panels[cat.key]
-
-    local header = Instance.new("TextLabel")
-    header.Size = UDim2.new(1, 0, 0, 24)
-    header.BackgroundTransparency = 1
-    header.Text = cat.key:upper()
-    header.TextColor3 = theme.accent
-    header.Font = Enum.Font.GothamBold
-    header.TextSize = 11
-    header.TextXAlignment = Enum.TextXAlignment.Left
-    header.Parent = panel
-
     ContentFrames[cat.key] = panel
 end
 
@@ -3206,6 +3559,7 @@ function createToggle(name, default, callback, parent, configKey)
     title.Font = Enum.Font.GothamMedium
     title.TextSize = 11
     title.TextXAlignment = Enum.TextXAlignment.Left
+    title.ZIndex = 8
     title.Parent = card
 
     local btn = Instance.new("TextButton")
@@ -3217,6 +3571,7 @@ function createToggle(name, default, callback, parent, configKey)
     btn.TextColor3 = theme.sub
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 10
+    btn.ZIndex = 9
     btn.Parent = card
     makeCorner(btn, 8)
     makeStroke(btn, theme.border, 1)
@@ -3258,6 +3613,7 @@ function createSlider(name, min, max, default, callback, parent, configKey)
     title.Font = Enum.Font.GothamMedium
     title.TextSize = 11
     title.TextXAlignment = Enum.TextXAlignment.Left
+    title.ZIndex = 8
     title.Parent = card
 
     local valLbl = Instance.new("TextLabel")
@@ -3269,6 +3625,7 @@ function createSlider(name, min, max, default, callback, parent, configKey)
     valLbl.Font = Enum.Font.Code
     valLbl.TextSize = 10
     valLbl.TextXAlignment = Enum.TextXAlignment.Right
+    valLbl.ZIndex = 8
     valLbl.Parent = card
 
     local track = Instance.new("Frame")
@@ -3276,6 +3633,7 @@ function createSlider(name, min, max, default, callback, parent, configKey)
     track.Position = UDim2.new(0, 12, 0, 38)
     track.BackgroundColor3 = theme.cardHover
     track.BorderSizePixel = 0
+    track.ZIndex = 8
     track.Parent = card
     makeCorner(track, 2)
 
@@ -3283,6 +3641,7 @@ function createSlider(name, min, max, default, callback, parent, configKey)
     fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     fill.BackgroundColor3 = theme.accent
     fill.BorderSizePixel = 0
+    fill.ZIndex = 9
     fill.Parent = track
     makeCorner(fill, 2)
 
@@ -3291,6 +3650,7 @@ function createSlider(name, min, max, default, callback, parent, configKey)
     thumb.Position = UDim2.new((default - min) / (max - min), -5, 0.5, -5)
     thumb.BackgroundColor3 = theme.text
     thumb.BorderSizePixel = 0
+    thumb.ZIndex = 10
     thumb.Parent = track
     makeCorner(thumb, 5)
 
@@ -3347,6 +3707,7 @@ function createButton(name, callback, parent)
     title.Font = Enum.Font.GothamMedium
     title.TextSize = 11
     title.TextXAlignment = Enum.TextXAlignment.Left
+    title.ZIndex = 8
     title.Parent = card
 
     local btn = Instance.new("TextButton")
@@ -3358,6 +3719,7 @@ function createButton(name, callback, parent)
     btn.TextColor3 = theme.text
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 9
+    btn.ZIndex = 9
     btn.Parent = card
     makeCorner(btn, 7)
     makeStroke(btn, theme.border, 1)
@@ -3388,6 +3750,7 @@ function createLabel(text, parent)
     Label.Font = Enum.Font.GothamBold
     Label.TextSize = 9
     Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.ZIndex = 8
     Label.Parent = parent
     return Label
 end
@@ -3403,109 +3766,101 @@ nSliderEndConn = UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
-settingsPanel = panels["Settings"]
 
-createButton("Menu à gauche", function() setRailSide("left") end, settingsPanel)
-createButton("Menu en haut", function() setRailSide("top") end, settingsPanel)
-createButton("Menu à droite", function() setRailSide("right") end, settingsPanel)
-createButton("Menu en bas", function() setRailSide("bottom") end, settingsPanel)
 
-railAttached = false
-railAttachFrame = createButton("Catégories : Séparées", function() toggleRailAttach() end, settingsPanel)
-railAttachTitle = railAttachFrame:FindFirstChildOfClass("TextLabel")
-railAttachBtn = railAttachFrame:FindFirstChildOfClass("TextButton")
-if railAttachBtn then
-    railAttachBtn.Text = "Changer"
-end
+local savedWindowSize = defaultWindowSize
+local savedWindowPos = defaultWindowPos
+local menuOpen = true
 
-function toggleRailAttach()
-    railAttached = not railAttached
-    if railAttachTitle then
-        railAttachTitle.Text = "Catégories : " .. (railAttached and "Collées au menu" or "Séparées")
-    end
-    if railAttached then
-        if not V.RailFollowConn then
-            V.RailFollowConn = RunService.RenderStepped:Connect(function()
-                if railAttached and Rail.Visible then
-                    if Panel.Visible then
-                        local pX = Panel.AbsolutePosition.X
-                        local pY = Panel.AbsolutePosition.Y
-                        local pW = Panel.AbsoluteSize.X
-                        local pH = Panel.AbsoluteSize.Y
-                        if currentSide == "left" then
-                            Rail.Position = UDim2.new(0, pX - 94, 0, pY + pH / 2 - 250)
-                        elseif currentSide == "right" then
-                            Rail.Position = UDim2.new(0, pX + pW + 6, 0, pY + pH / 2 - 250)
-                        end
-                    else
-                        if currentSide == "left" then
-                            Rail.Position = UDim2.new(0, 6, 0.5, -250)
-                        elseif currentSide == "right" then
-                            Rail.Position = UDim2.new(1, -94, 0.5, -250)
-                        end
-                    end
-                end
-            end)
-        end
+function toggleMenu(forceState)
+    if forceState ~= nil then
+        menuOpen = forceState
     else
-        if V.RailFollowConn then V.RailFollowConn:Disconnect() V.RailFollowConn = nil end
-        setRailSide(currentSide)
+        menuOpen = not menuOpen
+    end
+
+    if menuOpen then
+        minimized = false
+        Panel.Visible = true
+        Sidebar.Visible = true
+        ContentArea.Visible = true
+        PanelHeader.Size = UDim2.new(1, -195, 0, 44)
+        PanelHeader.Position = UDim2.new(0, 195, 0, 0)
+        PanelTitle.Text = currentCategory
+        BubblesContainer.Visible = true
+        BubblesContainer.BackgroundTransparency = 1
+        BackgroundDimmer.Visible = true
+        BackgroundDimmer.BackgroundTransparency = 1
+        TweenService:Create(BackgroundDimmer, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2}):Play()
+        local restorePos = savedWindowPos or defaultWindowPos
+        local restoreSize = savedWindowSize or defaultWindowSize
+        Panel.Size = restoreSize
+        Panel.Position = restorePos + UDim2.new(0, 0, 0, 16)
+        PanelScale.Scale = 0.88
+        TweenService:Create(PanelScale, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+        TweenService:Create(Panel, TweenInfo.new(0.32, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            Position = restorePos
+        }):Play()
+    else
+        minimized = false
+        TweenService:Create(BackgroundDimmer, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(PanelScale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0.85}):Play()
+        TweenService:Create(Panel, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+            Position = (savedWindowPos or defaultWindowPos) + UDim2.new(0, 0, 0, 16)
+        }):Play()
+        task.delay(0.22, function()
+            if not menuOpen then
+                Panel.Visible = false
+                BubblesContainer.Visible = false
+                BackgroundDimmer.Visible = false
+            end
+        end)
     end
 end
-
-createSectionHeader(settingsPanel, "Réglages", 1)
-
-unloadCard = createCard(settingsPanel, 2, 54)
-unloadTitle = Instance.new("TextLabel")
-unloadTitle.Size = UDim2.new(1, -80, 0, 16)
-unloadTitle.Position = UDim2.new(0, 12, 0, 6)
-unloadTitle.BackgroundTransparency = 1
-unloadTitle.Text = "Unload le menu"
-unloadTitle.TextColor3 = theme.text
-unloadTitle.Font = Enum.Font.GothamMedium
-unloadTitle.TextSize = 11
-unloadTitle.TextXAlignment = Enum.TextXAlignment.Left
-unloadTitle.Parent = unloadCard
-
-unloadSub = Instance.new("TextLabel")
-unloadSub.Size = UDim2.new(1, -80, 0, 13)
-unloadSub.Position = UDim2.new(0, 12, 0, 24)
-unloadSub.BackgroundTransparency = 1
-unloadSub.Text = "Stoppe toutes les features et supprime le menu"
-unloadSub.TextColor3 = theme.sub
-unloadSub.Font = Enum.Font.Gotham
-unloadSub.TextSize = 9
-unloadSub.TextXAlignment = Enum.TextXAlignment.Left
-unloadSub.Parent = unloadCard
-
-unloadBtn = Instance.new("TextButton")
-unloadBtn.Size = UDim2.new(0, 64, 0, 24)
-unloadBtn.Position = UDim2.new(1, -74, 0.5, -12)
-unloadBtn.BackgroundColor3 = theme.danger
-unloadBtn.BorderSizePixel = 0
-unloadBtn.Text = "Unload"
-unloadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-unloadBtn.Font = Enum.Font.GothamBold
-unloadBtn.TextSize = 9
-unloadBtn.Parent = unloadCard
-makeCorner(unloadBtn, 7)
-
-unloadBtn.MouseButton1Click:Connect(function()
-    playClick()
-    task.spawn(function()
-        pcall(function() if unloadNebula then unloadNebula() end end)
-        unloadMenu()
-    end)
-end)
+_G.toggleNebulaMenu = toggleMenu
 
 setMinimized = function(value)
     minimized = value
     if value then
-        Panel.Visible = false
+        savedWindowSize = Panel.Size
+        savedWindowPos = Panel.Position
+        Sidebar.Visible = false
+        ContentArea.Visible = false
+        PanelHeader.Size = UDim2.new(1, 0, 1, 0)
+        PanelHeader.Position = UDim2.new(0, 0, 0, 0)
+        PanelTitle.Text = "NEBULA  |  " .. currentCategory
+
+        BubblesContainer.Visible = false
+        TweenService:Create(BackgroundDimmer, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+        task.delay(0.2, function()
+            if minimized then
+                BackgroundDimmer.Visible = false
+            end
+        end)
+        TweenService:Create(PanelScale, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Scale = 1}):Play()
+        TweenService:Create(Panel, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 230, 0, 44),
+            Position = UDim2.new(0.5, -115, 1, -56)
+        }):Play()
     else
-        Panel.Visible = true
-        Panel.Position = panelPos + UDim2.new(0, 12, 0, 0)
-        TweenService:Create(Panel, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = panelPos}):Play()
+        PanelHeader.Size = UDim2.new(1, -195, 0, 44)
+        PanelHeader.Position = UDim2.new(0, 195, 0, 0)
+        PanelTitle.Text = currentCategory
+        Sidebar.Visible = true
+        ContentArea.Visible = true
+        BubblesContainer.Visible = true
+        BubblesContainer.BackgroundTransparency = 1
+        BackgroundDimmer.Visible = true
+        BackgroundDimmer.BackgroundTransparency = 1
+        TweenService:Create(BackgroundDimmer, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2}):Play()
+        local restorePos = savedWindowPos or defaultWindowPos
+        local restoreSize = savedWindowSize or defaultWindowSize
+        PanelScale.Scale = 0.92
+        TweenService:Create(PanelScale, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+        TweenService:Create(Panel, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = restoreSize,
+            Position = restorePos
+        }):Play()
     end
 end
 
@@ -3520,31 +3875,71 @@ MinBtn.MouseLeave:Connect(function()
     TweenService:Create(MinBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.card, TextColor3 = theme.sub}):Play()
 end)
 
-local dragging = false
-local dragOffset = Vector2.new()
+CloseBtn.MouseButton1Click:Connect(function()
+    playClick()
+    toggleMenu(false)
+end)
 
-PanelHeader.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragOffset = Vector2.new(input.Position.X, input.Position.Y) - Vector2.new(Panel.AbsolutePosition.X, Panel.AbsolutePosition.Y)
+-- Bubble animation RenderStepped loop
+local bubbleRenderConn = RunService.RenderStepped:Connect(function(dt)
+    if menuOpen and not minimized and Panel.Visible then
+        local t = tick()
+        for _, b in ipairs(bubbles) do
+            b.y = b.y + b.speed * dt
+            if b.y > 1.05 then
+                b.y = -0.05
+                b.x = math.random()
+            end
+            local curX = b.x + math.sin(t * b.swaySpeed + b.offset) * b.swayAmp
+            b.frame.Position = UDim2.new(curX, 0, b.y, 0)
+        end
     end
 end)
-local dragMousePos = nil
-local inputChangedDragConn = UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragMousePos = input.Position
+
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    Panel.Position = UDim2.new(
+        startPos.X.Scale,
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale,
+        startPos.Y.Offset + delta.Y
+    )
+    if not minimized then
+        savedWindowPos = Panel.Position
     end
-end)
-local dragApplyConn = RunService.RenderStepped:Connect(function()
-    if dragging and dragMousePos then
-        Panel.Position = UDim2.new(0, dragMousePos.X - dragOffset.X, 0, dragMousePos.Y - dragOffset.Y)
-        panelPos = Panel.Position
-    end
-end)
-local inputEndedDragConn = UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-        dragMousePos = nil
+end
+
+local function enableDrag(frame)
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = Panel.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+end
+
+enableDrag(PanelHeader)
+enableDrag(LogoFrame)
+
+local dragConn = UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        updateDrag(input)
     end
 end)
 
@@ -3554,58 +3949,224 @@ ResizeHandle.Position = UDim2.new(1, -26, 1, -26)
 ResizeHandle.BackgroundTransparency = 1
 ResizeHandle.BorderSizePixel = 0
 ResizeHandle.Text = ""
-ResizeHandle.ZIndex = 5
+ResizeHandle.ZIndex = 15
 ResizeHandle.Parent = Panel
 
 local resizing = false
 
 ResizeHandle.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not minimized then
         resizing = true
     end
 end)
 local resizeChangedConn = UserInputService.InputChanged:Connect(function(input)
-    if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local newWidth = math.max(520, input.Position.X - Panel.AbsolutePosition.X)
+    if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local newWidth = math.max(620, input.Position.X - Panel.AbsolutePosition.X)
         local newHeight = math.max(420, input.Position.Y - Panel.AbsolutePosition.Y)
         Panel.Size = UDim2.new(0, newWidth, 0, newHeight)
+        savedWindowSize = Panel.Size
     end
 end)
 local resizeEndedConn = UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         resizing = false
     end
 end)
 
-function unloadMenu()
+function performFullUnload()
     pcall(function() RunService:UnbindFromRenderStep("NebulaAimlock") end)
-    if inputChangedDragConn then inputChangedDragConn:Disconnect() end
-    if dragApplyConn then dragApplyConn:Disconnect() end
-    if inputEndedDragConn then inputEndedDragConn:Disconnect() end
-    if resizeChangedConn then resizeChangedConn:Disconnect() end
-    if resizeEndedConn then resizeEndedConn:Disconnect() end
-    if inputBeganToggleConn then inputBeganToggleConn:Disconnect() end
-    if nSliderMoveConn then nSliderMoveConn:Disconnect() end
-    if nSliderEndConn then nSliderEndConn:Disconnect() end
-    getgenv().BloxFruitsUILoaded = false
-    pcall(function() ScreenGui:Destroy() end)
-end
+    pcall(function() RunService:UnbindFromRenderStep("NebulaFreecam") end)
 
-local inputBeganToggleConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.M then
-        if Panel.Visible then
-            setMinimized(true)
-        else
-            setMinimized(false)
+    pcall(function() if V and V.Fly and stopFly then stopFly() end end)
+    pcall(function() if V and V.DesyncFly and stopDesyncFly then stopDesyncFly() end end)
+    pcall(function() if V and V.Noclip and stopNoclip then stopNoclip() end end)
+    pcall(function() if V and V.Invis and toggleInvisibility then toggleInvisibility(false) end end)
+    pcall(function() if V and V.NoAnim and disableNoAnim then disableNoAnim() end end)
+    pcall(function() if V and V.Flinging and stopFling then stopFling() end end)
+    pcall(function() if V and V.Spectate and stopSpectate then stopSpectate() end end)
+    pcall(function() if V and V.InfRange and toggleInfiniteRange then toggleInfiniteRange(false) end end)
+    pcall(function() if V and V.FPSBoost and toggleFPSBooster then toggleFPSBooster(false) end end)
+    pcall(function() if V and V.Fullbright and toggleFullbright then toggleFullbright(false) end end)
+    pcall(function() if V and V.ClickTP and toggleClickTP then toggleClickTP(false) end end)
+
+    pcall(function()
+        if V then V.ESP = false end
+        if clearESP then clearESP() end
+        if ClearESP then ClearESP() end
+        if ESPGui then ESPGui:Destroy() end
+    end)
+
+    pcall(function()
+        if V and V.HitboxConn then V.HitboxConn:Disconnect(); V.HitboxConn = nil end
+        if V then V.HitboxExtender = false end
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character then
+                for _, desc in pairs(p.Character:GetDescendants()) do
+                    if desc:IsA("BasePart") then
+                        if desc.Name == "HumanoidRootPart" then
+                            desc.Size = Vector3.new(2, 2, 1)
+                            desc.Transparency = 1
+                            desc.Material = Enum.Material.Plastic
+                            desc.CanCollide = false
+                        elseif desc.Name == "Head" then
+                            desc.Size = Vector3.new(2, 1, 1)
+                            desc.Transparency = 0
+                            desc.Material = Enum.Material.Plastic
+                            local mesh = desc:FindFirstChildOfClass("SpecialMesh")
+                            if mesh then mesh.Scale = Vector3.new(1.25, 1.25, 1.25) end
+                        else
+                            desc.Transparency = 0
+                            desc.Material = Enum.Material.Plastic
+                        end
+                    elseif desc:IsA("Highlight") or desc:IsA("SelectionBox") or desc:IsA("BoxHandleAdornment") then
+                        desc:Destroy()
+                    end
+                end
+                local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    local hs = hum:FindFirstChild("HeadScale")
+                    if hs then hs.Value = 1 end
+                    local bws = hum:FindFirstChild("BodyWidthScale")
+                    if bws then bws.Value = 1 end
+                    local bhs = hum:FindFirstChild("BodyHeightScale")
+                    if bhs then bhs.Value = 1 end
+                    local bds = hum:FindFirstChild("BodyDepthScale")
+                    if bds then bds.Value = 1 end
+                end
+            end
         end
-    end
-end)
+    end)
+
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+                hum.AutoRotate = true
+                hum.Sit = false
+                hum.WalkSpeed = 16
+                hum.JumpPower = 50
+                hum.JumpHeight = 7.2
+                hum.UseJumpPower = true
+                hum.HipHeight = 0
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.Anchored = false
+                hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                hrp.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                for _, obj in pairs(hrp:GetChildren()) do
+                    if obj:IsA("BodyGyro") or obj:IsA("BodyVelocity") or obj:IsA("BodyPosition") or obj:IsA("LinearVelocity") or obj:IsA("VectorForce") then
+                        obj:Destroy()
+                    end
+                end
+            end
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.CanCollide = true
+                    part.Transparency = 0
+                end
+            end
+        end
+    end)
+
+    pcall(function()
+        workspace.Gravity = 196.2
+        if Camera then
+            Camera.FieldOfView = 70
+            Camera.CameraType = Enum.CameraType.Custom
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then Camera.CameraSubject = hum end
+        end
+        LocalPlayer.CameraMode = Enum.CameraMode.Classic
+        LocalPlayer.CameraMaxZoomDistance = 128
+        LocalPlayer.CameraMinZoomDistance = 0.5
+    end)
+
+    pcall(function()
+        Lighting.GlobalShadows = true
+        Lighting.Brightness = 1
+        Lighting.Ambient = Color3.fromRGB(128, 128, 128)
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        Lighting.FogEnd = 100000
+        Lighting.FogStart = 0
+        Lighting.ClockTime = 14
+        Lighting.ExposureCompensation = 0
+        for _, effect in pairs(Lighting:GetChildren()) do
+            if effect:IsA("PostEffect") then effect.Enabled = true end
+        end
+    end)
+
+    pcall(function()
+        if bubbleRenderConn then bubbleRenderConn:Disconnect() end
+        if dragConn then dragConn:Disconnect() end
+        if resizeChangedConn then resizeChangedConn:Disconnect() end
+        if resizeEndedConn then resizeEndedConn:Disconnect() end
+        if nSliderMoveConn then nSliderMoveConn:Disconnect() end
+        if nSliderEndConn then nSliderEndConn:Disconnect() end
+        if V and V.UnifiedInputConn then V.UnifiedInputConn:Disconnect(); V.UnifiedInputConn = nil end
+        if V and V.InspectorClickConn then V.InspectorClickConn:Disconnect(); V.InspectorClickConn = nil end
+        if V and V.RailHWheelConn then V.RailHWheelConn:Disconnect(); V.RailHWheelConn = nil end
+        if V and V.RailHHeartbeatConn then V.RailHHeartbeatConn:Disconnect(); V.RailHHeartbeatConn = nil end
+        if V and V.VehicleBoostHoldConn then V.VehicleBoostHoldConn:Disconnect(); V.VehicleBoostHoldConn = nil end
+        if V and V.VehicleBoostEndConn then V.VehicleBoostEndConn:Disconnect(); V.VehicleBoostEndConn = nil end
+        if V and V.SpinConn then V.SpinConn:Disconnect(); V.SpinConn = nil end
+        if V and V.AttachConn then V.AttachConn:Disconnect(); V.AttachConn = nil end
+        if V and V.BhopConn then V.BhopConn:Disconnect(); V.BhopConn = nil end
+
+        for _, conn in pairs(C and C.All or {}) do
+            pcall(function() conn:Disconnect() end)
+        end
+        if C then C.All = {} end
+        for _, conn in pairs(V and V.Connections or {}) do
+            pcall(function() conn:Disconnect() end)
+        end
+        if V then V.Connections = {} end
+    end)
+
+    pcall(function()
+        if ScreenGui then ScreenGui:Destroy() end
+    end)
+    pcall(function()
+        for _, child in pairs(parentTarget:GetChildren()) do
+            if child:IsA("ScreenGui") and (child.Name == "NebulaUpdateUI" or child.Name == "EternalFlick_GUI" or child.Name == "NebulaFreecamMenu" or child.Name == "NebulaFreecamCrosshair" or child.Name == "NebulaPlayerInspector" or child.Name == "NebulaESP") then
+                child:Destroy()
+            end
+        end
+    end)
+
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.Health = 0
+            end
+            char:BreakJoints()
+        end
+    end)
+
+    getgenv().BloxFruitsUILoaded = false
+    _G.NebulaLoaded = false
+    _G.toggleNebulaMenu = nil
+end
+unloadMenu = performFullUnload
+unloadNebula = performFullUnload
 
 task.delay(0.3, function()
+    menuOpen = true
     Panel.Visible = true
-    Panel.Position = panelPos + UDim2.new(0, 14, 0, 0)
-    TweenService:Create(Panel, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = panelPos}):Play()
+    BubblesContainer.Visible = true
+    BubblesContainer.BackgroundTransparency = 1
+    BackgroundDimmer.Visible = true
+    BackgroundDimmer.BackgroundTransparency = 1
+    TweenService:Create(BackgroundDimmer, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2}):Play()
+    PanelScale.Scale = 0.88
+    Panel.Position = panelPos + UDim2.new(0, 0, 0, 16)
+    TweenService:Create(PanelScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+    TweenService:Create(Panel, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = panelPos}):Play()
     switchCategory("Movement")
 end)
 
@@ -5034,41 +5595,95 @@ createToggle("Auto-Bhop (Bunny Hop)", false, function(enabled)
     notify("Movement","Auto-Bhop".. (enabled and"ON"or"OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
 end, MovementContent,"AutoBhop")
 
-HitboxOrigSizes = {}
+local function cleanAndResetAllBodies()
+    pcall(function()
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                for _, desc in pairs(player.Character:GetDescendants()) do
+                    if desc:IsA("BasePart") then
+                        if desc.Name == "HumanoidRootPart" then
+                            if not V.HitboxExtender then
+                                desc.Size = Vector3.new(2, 2, 1)
+                                desc.Transparency = 1
+                                desc.Material = Enum.Material.Plastic
+                            end
+                        elseif desc.Name == "Head" then
+                            desc.Size = Vector3.new(2, 1, 1)
+                            desc.Transparency = 0
+                            desc.Material = Enum.Material.Plastic
+                            local mesh = desc:FindFirstChildOfClass("SpecialMesh")
+                            if mesh then
+                                mesh.Scale = Vector3.new(1.25, 1.25, 1.25)
+                            end
+                        else
+                            desc.Transparency = 0
+                            desc.Material = Enum.Material.Plastic
+                        end
+                    elseif desc:IsA("Highlight") and desc.Name ~= "Nebula_Highlight" then
+                        desc:Destroy()
+                    end
+                end
+                local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    local hs = hum:FindFirstChild("HeadScale")
+                    if hs then hs.Value = 1 end
+                    local bws = hum:FindFirstChild("BodyWidthScale")
+                    if bws then bws.Value = 1 end
+                    local bhs = hum:FindFirstChild("BodyHeightScale")
+                    if bhs then bhs.Value = 1 end
+                    local bds = hum:FindFirstChild("BodyDepthScale")
+                    if bds then bds.Value = 1 end
+                end
+            end
+        end
+    end)
+end
+
+cleanAndResetAllBodies()
+
 if V.HitboxConn then V.HitboxConn:Disconnect() end
 V.HitboxConn = RunService.RenderStepped:Connect(function()
     if V.HitboxExtender then
         pcall(function()
-            local size = V.HitboxSize or 6
+            local size = V.HitboxSize or 15
             for _, player in pairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer and player.Character then
-                    for _, part in pairs(player.Character:GetDescendants()) do
-                        if part:IsA("BasePart") and part.Name ~= "Head" and part.Name ~= "HumanoidRootPart" then
-                            if not HitboxOrigSizes[part] then
-                                HitboxOrigSizes[part] = part.Size
-                            end
-                            part.Size = Vector3.new(size, size, size)
-                            part.Transparency = 0.7
-                            part.Color = V.ESPColor
-                            part.Material = Enum.Material.Neon
-                            part.CanCollide = false
-                        end
+                    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        hrp.Size = Vector3.new(size, size, size)
+                        hrp.Transparency = 0.65
+                        hrp.Color = Color3.fromRGB(0, 145, 255) -- Carré bleu pur uniquement sur la racine
+                        hrp.Material = Enum.Material.Neon
+                        hrp.CanCollide = false
+                    end
+                    local head = player.Character:FindFirstChild("Head")
+                    if head and head.Size ~= Vector3.new(2, 1, 1) then
+                        head.Size = Vector3.new(2, 1, 1)
+                        head.Transparency = 0
+                        head.Material = Enum.Material.Plastic
                     end
                 end
             end
         end)
     else
         pcall(function()
-            for part, origSize in pairs(HitboxOrigSizes) do
-                if part and part.Parent then
-                    part.Size = origSize
-                    part.Transparency = 0
-                    part.Material = Enum.Material.Plastic
-                    part.CanCollide = true
-                    part.Color = Color3.fromRGB(255, 255, 255)
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp and (hrp.Size ~= Vector3.new(2, 2, 1) or hrp.Transparency ~= 1) then
+                        hrp.Size = Vector3.new(2, 2, 1)
+                        hrp.Transparency = 1
+                        hrp.Material = Enum.Material.Plastic
+                        hrp.CanCollide = false
+                    end
+                    local head = player.Character:FindFirstChild("Head")
+                    if head and head.Size ~= Vector3.new(2, 1, 1) then
+                        head.Size = Vector3.new(2, 1, 1)
+                        head.Transparency = 0
+                        head.Material = Enum.Material.Plastic
+                    end
                 end
             end
-            HitboxOrigSizes = {}
         end)
     end
 end)
@@ -8221,12 +8836,24 @@ do
     end)
 end
 
-createSlider("UI Opacity / Transparency", 0, 80, 3, function(val)
+createSlider("UI Opacity / Transparency", 0, 80, 0, function(val)
     V.UITransparency = val
     if BloxFruitsPanel then
         BloxFruitsPanel.BackgroundTransparency = val / 100
     end
 end, SettingsContent,"UITransparency")
+
+createSlider("Opacité Fond Sombre (Dimmer)", 0, 100, 80, function(val)
+    if BackgroundDimmer then
+        BackgroundDimmer.BackgroundTransparency = 1 - (val / 100)
+    end
+end, SettingsContent,"DimmerOpacity")
+
+createToggle("Bulles Animées (Background)", true, function(enabled)
+    if BubblesContainer then
+        BubblesContainer.Visible = enabled
+    end
+end, SettingsContent,"BubblesEnabled")
 
 createToggle("Anti-Cheat Notification Alert", false, function(enabled)
     V.AntiCheatAlert = enabled
@@ -8479,117 +9106,9 @@ do
 end
 
 createLabel("UNLOAD", SettingsContent)
-function unloadNebula()
-    pcall(function() RunService:UnbindFromRenderStep("NebulaAimlock") end)
-    pcall(function()
-        if V.Fly then stopFly() end
-        if V.DesyncFly then stopDesyncFly() end
-        if V.Noclip then stopNoclip() end
-        if V.Invis then toggleInvisibility(false) end
-        if V.NoAnim then disableNoAnim() end
-        if V.Attached then
-            V.Attached = nil
-            if V.AttachConn then V.AttachConn:Disconnect() V.AttachConn = nil end
-        end
-        if V.Flinging then stopFling() end
-        if V.Spectate then stopSpectate() end
-        if V.InfRange then toggleInfiniteRange(false) end
-        if V.FPSBoost then toggleFPSBooster(false) end
-        if V.Fullbright then toggleFullbright(false) end
-        if V.ESP then V.ESP = false clearESP() end
-        if ESP_Enabled then ESP_Enabled = false ClearESP() end
-        Skeleton_Enabled = false
-        Tracer_Enabled = false
-        HealthBar_Enabled = false
-        if espOverlayConnection then espOverlayConnection:Disconnect(); espOverlayConnection = nil end
-        if V.ClickTP then toggleClickTP(false) end
-        V.VehicleSpeed = 1
-        V.VehicleFly = false
-        V.VehicleNoclip = false
-        pcall(function()
-            local char = LocalPlayer.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            local seat = hum and hum.SeatPart
-            if seat and seat:IsA("VehicleSeat") then
-                local origSpeed = seat:GetAttribute("_NebulaOrigMaxSpeed")
-                local origTorque = seat:GetAttribute("_NebulaOrigTorque")
-                if origSpeed then seat.MaxSpeed = origSpeed end
-                if origTorque then seat.Torque = origTorque end
-            end
-        end)
-        if V.Spin then
-            if V.SpinConn then V.SpinConn:Disconnect() V.SpinConn = nil end
-            pcall(function()
-                local char = LocalPlayer.Character
-                local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-                if humanoid then humanoid.AutoRotate = true end
-            end)
-        end
-
-        if V.VehicleBoostVel then
-            pcall(function() V.VehicleBoostVel:Destroy() end)
-            V.VehicleBoostVel = nil
-        end
-
-        for _, conn in pairs(C.All) do
-            pcall(function() conn:Disconnect() end)
-        end
-        C.All = {}
-
-        pcall(function()
-            local char = LocalPlayer.Character
-            if char then
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    humanoid.PlatformStand = false
-                    humanoid.AutoRotate = true
-                    humanoid.Sit = false
-                    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-                    humanoid.WalkSpeed = 16
-                    humanoid.JumpPower = 50
-                end
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    hrp.Anchored = false
-                    hrp.AssemblyLinearVelocity = Vector3.new(0,0,0)
-                    hrp.AssemblyAngularVelocity = Vector3.new(0,0,0)
-                    for _, obj in pairs(hrp:GetChildren()) do
-                        if obj:IsA("BodyGyro") or obj:IsA("BodyVelocity") then obj:Destroy() 
-                        end
-                    end
-                end
-            end
-        end)
-
-        workspace.Gravity = 196
-        Camera.FieldOfView = 70
-        Camera.CameraType = Enum.CameraType.Custom
-        Lighting.GlobalShadows = true
-        Lighting.Brightness = 1
-        Lighting.Ambient = Color3.fromRGB(0,0,0)
-        LocalPlayer.CameraMode = Enum.CameraMode.Classic
-        LocalPlayer.CameraMaxZoomDistance = 128
-        ScreenGui:Destroy()
-        ESPGui:Destroy()
-
-        pcall(function()
-            for _, child in pairs(parentTarget:GetChildren()) do
-                if child:IsA("ScreenGui") and (child.Name == "EternalFlick_GUI" or child.Name == "NebulaFreecamMenu" or child.Name == "NebulaFreecamCrosshair" or child.Name == "NebulaPlayerInspector") then
-                    child:Destroy()
-                end
-            end
-        end)
-        if V.UnifiedInputConn then V.UnifiedInputConn:Disconnect() V.UnifiedInputConn = nil end
-        if V.InspectorClickConn then V.InspectorClickConn:Disconnect() V.InspectorClickConn = nil end
-        if V.RailHWheelConn then V.RailHWheelConn:Disconnect() V.RailHWheelConn = nil end
-        if V.RailHHeartbeatConn then V.RailHHeartbeatConn:Disconnect() V.RailHHeartbeatConn = nil end
-        if V.VehicleBoostHoldConn then V.VehicleBoostHoldConn:Disconnect() V.VehicleBoostHoldConn = nil end
-        if V.VehicleBoostEndConn then V.VehicleBoostEndConn:Disconnect() V.VehicleBoostEndConn = nil end
-        if V.HitboxConn then V.HitboxConn:Disconnect() V.HitboxConn = nil end
-
-        getgenv().BloxFruitsUILoaded = false
-    end)
-end
+createButton("Unload Nebula Hub", function()
+    performFullUnload()
+end, SettingsContent)
 
 initStep = "cablage Config/Code"
 createLabel("CONFIGURATION", ConfigContent)
@@ -9184,13 +9703,11 @@ V.UnifiedInputConn = UserInputService.InputBegan:Connect(function(input, gamePro
         end
 
         if not gameProcessed then
-            if input.KeyCode == Keybinds.Menu then
-                if BloxFruitsPanel then
-                    if BloxFruitsPanel.Visible then
-                        setMinimized(true)
-                    else
-                        setMinimized(false)
-                    end
+            if input.KeyCode == Keybinds.Menu or input.KeyCode == Enum.KeyCode.Insert or input.KeyCode == Enum.KeyCode.M then
+                if toggleMenu then
+                    toggleMenu()
+                elseif BloxFruitsPanel then
+                    BloxFruitsPanel.Visible = not BloxFruitsPanel.Visible
                 end
                 return
             end
@@ -9733,40 +10250,6 @@ RunService.Heartbeat:Connect(function(deltaTime)
                 end
             end
         end)
-    end
-end)
-
-task.spawn(function()
-    while task.wait(0.2) do
-        if V.HitboxExtender then
-            pcall(function()
-                local size = V.HitboxSize or 10
-                for _, player in pairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and player.Character then
-                        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-                        if hrp then
-                            hrp.Size = Vector3.new(size, size, size)
-                            hrp.Transparency = 0.75
-                            hrp.Color = V.AccentColor or Color3.fromRGB(180, 60, 255)
-                            hrp.Material = Enum.Material.Neon
-                            hrp.CanCollide = false
-                        end
-                    end
-                end
-            end)
-        else
-            pcall(function()
-                for _, player in pairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and player.Character then
-                        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-                        if hrp and hrp.Size ~= Vector3.new(2, 2, 1) then
-                            hrp.Size = Vector3.new(2, 2, 1)
-                            hrp.Transparency = 1
-                        end
-                    end
-                end
-            end)
-        end
     end
 end)
 
