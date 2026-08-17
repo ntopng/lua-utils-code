@@ -2745,8 +2745,8 @@ DefaultConfig = {
     Fullbright = false, FPSBoost = false,
     Force1st = false, Force3rd = false, UnlockZoom = false,
     FOV = 70,
-    SpinSpeed = 100, Spin = false, ClickTP = false,
-    AntiAFK = false, Notif = true, Watermark = false
+    AntiAFK = false, Notif = true, Watermark = true,
+    BubblesEnabled = true, DimmerEnabled = true, DimmerOpacity = 80
 }
 
 function getCharacter()
@@ -3798,11 +3798,23 @@ function toggleMenu(forceState)
         PanelHeader.Size = UDim2.new(1, -195, 0, 44)
         PanelHeader.Position = UDim2.new(0, 195, 0, 0)
         PanelTitle.Text = currentCategory
-        BubblesContainer.Visible = true
-        BubblesContainer.BackgroundTransparency = 1
-        BackgroundDimmer.Visible = true
-        BackgroundDimmer.BackgroundTransparency = 1
-        TweenService:Create(BackgroundDimmer, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2}):Play()
+
+        if V and V.BubblesEnabled then
+            BubblesContainer.Visible = true
+            BubblesContainer.BackgroundTransparency = 1
+        else
+            BubblesContainer.Visible = false
+        end
+
+        if V and V.DimmerEnabled then
+            local targetTrans = 1 - ((V.DimmerOpacity or 80) / 100)
+            BackgroundDimmer.Visible = true
+            BackgroundDimmer.BackgroundTransparency = 1
+            TweenService:Create(BackgroundDimmer, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = targetTrans}):Play()
+        else
+            BackgroundDimmer.Visible = false
+        end
+
         local restorePos = savedWindowPos or defaultWindowPos
         local restoreSize = savedWindowSize or defaultWindowSize
         Panel.Size = restoreSize
@@ -3814,7 +3826,9 @@ function toggleMenu(forceState)
         }):Play()
     else
         minimized = false
-        TweenService:Create(BackgroundDimmer, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
+        if BackgroundDimmer and BackgroundDimmer.Visible then
+            TweenService:Create(BackgroundDimmer, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
+        end
         TweenService:Create(PanelScale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0.85}):Play()
         TweenService:Create(Panel, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
             Position = (savedWindowPos or defaultWindowPos) + UDim2.new(0, 0, 0, 16)
@@ -3842,7 +3856,9 @@ setMinimized = function(value)
         PanelTitle.Text = "NEBULA  |  " .. currentCategory
 
         BubblesContainer.Visible = false
-        TweenService:Create(BackgroundDimmer, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+        if BackgroundDimmer and BackgroundDimmer.Visible then
+            TweenService:Create(BackgroundDimmer, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+        end
         task.delay(0.2, function()
             if minimized then
                 BackgroundDimmer.Visible = false
@@ -3859,11 +3875,23 @@ setMinimized = function(value)
         PanelTitle.Text = currentCategory
         Sidebar.Visible = true
         ContentArea.Visible = true
-        BubblesContainer.Visible = true
-        BubblesContainer.BackgroundTransparency = 1
-        BackgroundDimmer.Visible = true
-        BackgroundDimmer.BackgroundTransparency = 1
-        TweenService:Create(BackgroundDimmer, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2}):Play()
+
+        if V and V.BubblesEnabled then
+            BubblesContainer.Visible = true
+            BubblesContainer.BackgroundTransparency = 1
+        else
+            BubblesContainer.Visible = false
+        end
+
+        if V and V.DimmerEnabled then
+            local targetTrans = 1 - ((V.DimmerOpacity or 80) / 100)
+            BackgroundDimmer.Visible = true
+            BackgroundDimmer.BackgroundTransparency = 1
+            TweenService:Create(BackgroundDimmer, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = targetTrans}):Play()
+        else
+            BackgroundDimmer.Visible = false
+        end
+
         local restorePos = savedWindowPos or defaultWindowPos
         local restoreSize = savedWindowSize or defaultWindowSize
         PanelScale.Scale = 0.92
@@ -4169,11 +4197,20 @@ unloadNebula = performFullUnload
 task.delay(0.3, function()
     menuOpen = true
     Panel.Visible = true
-    BubblesContainer.Visible = true
-    BubblesContainer.BackgroundTransparency = 1
-    BackgroundDimmer.Visible = true
-    BackgroundDimmer.BackgroundTransparency = 1
-    TweenService:Create(BackgroundDimmer, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = 0.2}):Play()
+    if V and V.BubblesEnabled then
+        BubblesContainer.Visible = true
+        BubblesContainer.BackgroundTransparency = 1
+    else
+        BubblesContainer.Visible = false
+    end
+    if V and V.DimmerEnabled then
+        local targetTrans = 1 - ((V.DimmerOpacity or 80) / 100)
+        BackgroundDimmer.Visible = true
+        BackgroundDimmer.BackgroundTransparency = 1
+        TweenService:Create(BackgroundDimmer, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = targetTrans}):Play()
+    else
+        BackgroundDimmer.Visible = false
+    end
     PanelScale.Scale = 0.88
     Panel.Position = panelPos + UDim2.new(0, 0, 0, 16)
     TweenService:Create(PanelScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
@@ -4219,7 +4256,10 @@ V.AntiAFK = false
 V.NoAnim = false
 V.Spin = false
 V.SpinSpeed = 100
-V.Watermark = false
+V.Watermark = true
+V.BubblesEnabled = true
+V.DimmerEnabled = true
+V.DimmerOpacity = 80
 V.AntiRagdoll = false
 V.InstInteract = false
 V.InfRange = false
