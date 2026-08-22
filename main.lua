@@ -20,6 +20,8 @@ local _OrigLighting = {
     ExposureCompensation = Lighting.ExposureCompensation
 }
 local _OrigWalkSpeed = nil
+
+-- Metatable hooks removed as requested
 pcall(function()
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -3011,16 +3013,16 @@ V.INVISIBILITY_POSITION = Vector3.new(0, 100000, 0)
 V.FOV = 70
 
 DefaultConfig = {
+    KeyboardLayout = "AZERTY",
     Speed = 16, SpeedEnabled = false, SpeedMethod = "Humanoid", Jump = 50, JumpEnabled = false, 
     CFrameSpeed = false, WallClimb = false, AutoBhop = false,
-    AntiTP = true, VelocitySpoof = true,
     Fly = false, FlySpeed = 150, DesyncFly = false, DesyncFlySpeed = 150,
     AntiRagdoll = false, Noclip = false, NoAnim = false, Invis = false, InfJump = false, AntiVoid = false, Godmode = false,
     InstInteract = false, InfRange = false,
     ESP = false, ESPSelf = false, ESPTeamCheck = false, ESPBox = false, ESPFilled = false, ESPName = false, ESPDist = false,
     ESPSkeleton = false, ESPHealth = false, ESPWeapon = false, ESPDropped = false, ESPTracerOrigin ="Bottom",
     FreecamTPTargetMode = "Ground", FreecamCharVisible = false,
-    VehicleSpeed = 1, VehicleFly = false, VehicleFlySpeed = 150, VehicleNoclip = false, VehicleBoost = false, VehicleExplodeEnabled = false,
+    VehicleSpeed = 1, VehicleFly = false, VehicleFlySpeed = 150, VehicleNoclip = false, VehicleBoost = false, VehicleJumpPower = 80, VehicleAutoJump = true, VehicleExplodeEnabled = false,
     KeybindHUD = false, UITransparency = 3, AccentColor ="Blue", Streamproof = false,
     ChatTranslator = false, AntiCheatAlert = false, UncensoredChat = false, PlayerJoinLeaveNotifs = false,
     Fullbright = false, FPSBoost = false,
@@ -4377,16 +4379,14 @@ function performFullUnload()
         if V and V.AntiRagdollConn then V.AntiRagdollConn:Disconnect(); V.AntiRagdollConn = nil end
         if V and V.AntiFlingConn then V.AntiFlingConn:Disconnect(); V.AntiFlingConn = nil end
         if V and V.AntiVoidConn then V.AntiVoidConn:Disconnect(); V.AntiVoidConn = nil end
-        if V and V.AntiTPConn then V.AntiTPConn:Disconnect(); V.AntiTPConn = nil end
-        if V and V.HitboxConn then V.HitboxConn:Disconnect(); V.HitboxConn = nil end
+                if V and V.HitboxConn then V.HitboxConn:Disconnect(); V.HitboxConn = nil end
         if V and V.BhopConn then V.BhopConn:Disconnect(); V.BhopConn = nil end
         if V and V.AttachConn then V.AttachConn:Disconnect(); V.AttachConn = nil end
         if V and V.SpinConn then V.SpinConn:Disconnect(); V.SpinConn = nil end
         if V and V.InfRangeConn then V.InfRangeConn:Disconnect(); V.InfRangeConn = nil end
         if V and V.FPSConn then V.FPSConn:Disconnect(); V.FPSConn = nil end
         if V and V.AutoRejoinConn then V.AutoRejoinConn:Disconnect(); V.AutoRejoinConn = nil end
-        if V and V.AntiKickConn then V.AntiKickConn:Disconnect(); V.AntiKickConn = nil end
-        if V and V.UnifiedInputConn then V.UnifiedInputConn:Disconnect(); V.UnifiedInputConn = nil end
+                if V and V.UnifiedInputConn then V.UnifiedInputConn:Disconnect(); V.UnifiedInputConn = nil end
         if V and V.InspectorClickConn then V.InspectorClickConn:Disconnect(); V.InspectorClickConn = nil end
         if V and V.VehicleBoostHoldConn then V.VehicleBoostHoldConn:Disconnect(); V.VehicleBoostHoldConn = nil end
         if V and V.VehicleBoostEndConn then V.VehicleBoostEndConn:Disconnect(); V.VehicleBoostEndConn = nil end
@@ -4570,6 +4570,7 @@ local CodeContent = ContentFrames["Code"]
 
 -- Direct initialization of features
 initStep = "V defaults"
+V.KeyboardLayout = "AZERTY"
 V.Speed = 16
 V.SpeedEnabled = false
 V.SpeedMethod = "Humanoid"
@@ -4611,9 +4612,6 @@ V.ESPTeamCheck = false
 V.FreecamTPTargetMode = "Ground"
 V.FreecamCharVisible = false
 V.AntiFling = false
-V.AntiTP = true
-V.VelocitySpoof = true
-V.AntiTPConn = nil
 V.RapidFire = false
 V.InfAmmo = false
 V.FastReload = false
@@ -4812,8 +4810,17 @@ function notify(title, text, color)
 end
 
 initStep = "definitions fonctions"
+function toggleFlyAction(overrideState)
+    local target = (overrideState ~= nil) and overrideState or (not V.Fly)
+    if SetFlyToggle then
+        SetFlyToggle(target)
+    else
+        if target then startFly() else stopFly() end
+    end
+end
+
 function startFly()
-    if V.DesyncFly then SetDesyncToggle(false) end
+    if V.DesyncFly and SetDesyncToggle then SetDesyncToggle(false) end
     V.Fly = true
     pcall(function()
         local char = getCharacter()
@@ -4870,16 +4877,26 @@ function startFly()
             local moveVector = Vector3.new(0, 0, 0)
             local speed = V.FlySpeed or 150
 
-            if UserInputService:IsKeyDown(Enum.KeyCode.Z) then
-                moveVector = moveVector + camCF.LookVector
+            local isAZERTY = (V.KeyboardLayout == "AZERTY")
+            if isAZERTY then
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+                    moveVector = moveVector + camCF.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+                    moveVector = moveVector - camCF.RightVector
+                end
+            else
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+                    moveVector = moveVector + camCF.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+                    moveVector = moveVector - camCF.RightVector
+                end
             end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
                 moveVector = moveVector - camCF.LookVector
             end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Q) then
-                moveVector = moveVector - camCF.RightVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then
                 moveVector = moveVector + camCF.RightVector
             end
             if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
@@ -4952,92 +4969,102 @@ invisSound.SoundId ="rbxassetid://942127495"
 invisSound.Volume = 0.5
 invisSound.Parent = game:GetService("Workspace")
 
+local INVISIBILITY_SAFE_POS = Vector3.new(-25.95, 84, 3537.55)
+
 function toggleInvisibility(enabled)
     V.Invis = enabled
-    pcall(function()
-        local char = LocalPlayer.Character
-        if not char then return end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hum or not hrp then return end
+    task.spawn(function()
+        pcall(function()
+            local char = LocalPlayer.Character
+            if not char then return end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hum or not hrp then return end
 
-        invisSound:Play()
+            pcall(function() if invisSound then invisSound:Play() end end)
 
-        if V.Invis then
-            hum:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
-            hum.BreakJointsOnDeath = false
-            hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-            hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-            hum:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
-            
-            local savedPosition = hrp.CFrame
-            local INVISIBILITY_POSITION = (hrp and hrp.Position + Vector3.new(0, 10000, 0)) or Vector3.new(0, 10000, 0)
-            
-            char:MoveTo(INVISIBILITY_POSITION)
-            task.wait(0.15)
-            
-            local seat = Instance.new("Seat")
-            seat.Name ="NebulaInvisChair"
-            seat.Anchored = false
-            seat.CanCollide = false
-            seat.Transparency = 1
-            seat.Position = INVISIBILITY_POSITION
-            seat.Parent = workspace
-            
-            local weld = Instance.new("WeldConstraint")
-            weld.Part0 = seat
-            weld.Part1 = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or hrp
-            weld.Parent = seat
-            
-            task.wait()
-            seat.CFrame = savedPosition
-            
-            if V.InvisConn then V.InvisConn:Disconnect() end
-            V.InvisConn = RunService.RenderStepped:Connect(function()
-                local c = LocalPlayer.Character
-                if c and c:FindFirstChildOfClass("Humanoid") then
-                    local h = c:FindFirstChildOfClass("Humanoid")
-                    h.MaxHealth = 100
-                    if h.Health < 100 then
-                        h.Health = 100
-                    end
-                    local state = h:GetState()
-                    if state == Enum.HumanoidStateType.FallingDown or state == Enum.HumanoidStateType.Ragdoll or state == Enum.HumanoidStateType.PlatformStanding or state == Enum.HumanoidStateType.Dead then
-                        h:ChangeState(Enum.HumanoidStateType.GettingUp)
-                    end
-                    for _, p in pairs(c:GetDescendants()) do
-                        if p:IsA("BasePart") and p.Name ~="HumanoidRootPart"then
-                            if p.Transparency ~= 1 then p.Transparency = 1 end
-                        elseif p:IsA("Decal") then
-                            if p.Transparency ~= 1 then p.Transparency = 1 end
+            local function setCharTransparency(character, transparency)
+                for _, descendant in pairs(character:GetDescendants()) do
+                    if descendant:IsA("BasePart") then
+                        if descendant.Name == "HumanoidRootPart" then
+                            descendant.Transparency = 1
+                        else
+                            descendant.Transparency = transparency
                         end
+                    elseif descendant:IsA("Decal") then
+                        descendant.Transparency = transparency
                     end
-                end
-            end)
-            addConnection(V.InvisConn)
-            
-            notify("Invisibility","Invisible ON", Color3.fromRGB(80, 200, 120))
-        else
-            if V.InvisConn then V.InvisConn:Disconnect() V.InvisConn = nil end
-            
-            local invisChair = workspace:FindFirstChild("NebulaInvisChair")
-            if invisChair then invisChair:Destroy() end
-            
-            for _, p in pairs(char:GetDescendants()) do
-                if p:IsA("BasePart") and p.Name ~="HumanoidRootPart"then
-                    p.Transparency = 0
-                elseif p:IsA("Decal") then
-                    p.Transparency = 0
                 end
             end
-            
-            hum:SetStateEnabled(Enum.HumanoidStateType.Dead, true)
-            hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-            hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
-            hum:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, true)
-            
-            notify("Invisibility","Invisible OFF", Color3.fromRGB(255, 90, 90))
-        end
+
+            if V.Invis then
+                local savedPosition = hrp.CFrame
+
+                -- Move to invisibility position
+                char:MoveTo(INVISIBILITY_SAFE_POS)
+                task.wait(0.15)
+
+                -- Nettoyage ancien siège
+                local oldChair = workspace:FindFirstChild("invischair") or workspace:FindFirstChild("NebulaInvisChair")
+                if oldChair then oldChair:Destroy() end
+
+                -- Create invisible seat
+                local seat = Instance.new("Seat")
+                seat.Name = "invischair"
+                seat.Anchored = false
+                seat.CanCollide = false
+                seat.Transparency = 1
+                seat.CastShadow = false
+                seat.Position = INVISIBILITY_SAFE_POS
+                seat.Parent = workspace
+
+                -- Weld seat to character
+                local weld = Instance.new("Weld")
+                weld.Part0 = seat
+                weld.Part1 = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or hrp
+                weld.Parent = seat
+
+                task.wait()
+                seat.CFrame = savedPosition
+
+                -- Set character transparency (0.5 pour toi, HumanoidRootPart reste à 1)
+                setCharTransparency(char, 0.5)
+
+                -- Maintien en boucle de la transparence
+                if V.InvisConn then V.InvisConn:Disconnect() end
+                V.InvisConn = RunService.RenderStepped:Connect(function()
+                    local c = LocalPlayer.Character
+                    if not c or not V.Invis then return end
+                    for _, part in pairs(c:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            if part.Name == "HumanoidRootPart" then
+                                if part.Transparency ~= 1 then part.Transparency = 1 end
+                            else
+                                if part.Transparency ~= 0.5 then part.Transparency = 0.5 end
+                            end
+                        elseif part:IsA("Decal") then
+                            if part.Transparency ~= 0.5 then part.Transparency = 0.5 end
+                        end
+                    end
+                end)
+                addConnection(V.InvisConn)
+
+                notify("Invisibility", "Mode Invisible Actif", Color3.fromRGB(80, 200, 120))
+            else
+                if V.InvisConn then V.InvisConn:Disconnect() V.InvisConn = nil end
+
+                -- Remove invisible chair
+                local invisChair = workspace:FindFirstChild("invischair") or workspace:FindFirstChild("NebulaInvisChair")
+                if invisChair then
+                    invisChair:Destroy()
+                end
+
+                -- Restore character visibility
+                setCharTransparency(char, 0)
+
+                notify("Invisibility", "Mode Invisible Désactivé", Color3.fromRGB(255, 90, 90))
+            end
+        end)
     end)
 end
 
@@ -5086,10 +5113,16 @@ function startDesyncFly()
             if not V.DesyncFly then desyncConn:Disconnect() return end
             local cam = workspace.CurrentCamera
             local moveDirection = Vector3.zero
-            if UserInputService:IsKeyDown(Enum.KeyCode.Z) then moveDirection = moveDirection + cam.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDirection = moveDirection - cam.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Q) then moveDirection = moveDirection - cam.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDirection = moveDirection + cam.CFrame.RightVector end
+            local isAZERTY = (V.KeyboardLayout == "AZERTY")
+            if isAZERTY then
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then moveDirection = moveDirection + cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then moveDirection = moveDirection - cam.CFrame.RightVector end
+            else
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then moveDirection = moveDirection + cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then moveDirection = moveDirection - cam.CFrame.RightVector end
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then moveDirection = moveDirection - cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then moveDirection = moveDirection + cam.CFrame.RightVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.Space) or UserInputService:IsKeyDown(Enum.KeyCode.E) then moveDirection = moveDirection + Vector3.new(0, 1, 0) end
             if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.C) then moveDirection = moveDirection - Vector3.new(0, 1, 0) end
 
@@ -5259,92 +5292,7 @@ function stopFling()
     notify("Troll","Fling arrêté.", Color3.fromRGB(255, 80, 80))
 end
 
-local lastValidCF = nil
-local lastTeleportTime = 0
-
-_G.NebulaRegisterTeleport = function()
-    lastTeleportTime = os.clock()
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp then lastValidCF = hrp.CFrame end
-end
-
-function toggleAntiTP(enabled)
-    V.AntiTP = enabled
-    if V.AntiTPConn then V.AntiTPConn:Disconnect() V.AntiTPConn = nil end
-    if enabled then
-        V.AntiTPConn = RunService.Heartbeat:Connect(function(dt)
-            pcall(function()
-                local char = LocalPlayer.Character
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if not hum or not hrp or hum.Health <= 0 then 
-                    lastValidCF = nil
-                    return 
-                end
-
-                -- Skip if Freecam or manual script teleport
-                if (os.clock() - lastTeleportTime) < 0.6 or V.Freecam then
-                    lastValidCF = hrp.CFrame
-                    return
-                end
-
-                local currentCF = hrp.CFrame
-
-                -- In Fly / DesyncFly mode, update position smoothly without restricting movement
-                if V.Fly or V.DesyncFly then
-                    lastValidCF = currentCF
-                    return
-                end
-
-                -- In Ground Walk / Speed mode, protect against server snapbacks
-                if lastValidCF and V.SpeedEnabled and hum.MoveDirection.Magnitude > 0 then
-                    local delta = currentCF.Position - lastValidCF.Position
-                    local dist = delta.Magnitude
-                    local activeSpeed = V.Speed or 16
-                    local expectedMaxDist = (activeSpeed * dt) + 25
-
-                    -- Only catch massive sudden server fallbacks
-                    if dist > expectedMaxDist and dist < 200 then
-                        hrp.CFrame = lastValidCF
-                        return
-                    end
-                end
-
-                lastValidCF = currentCF
-            end)
-        end)
-        addConnection(V.AntiTPConn)
-        notify("Protection", "Anti-TP / Anti-Rubberband ON", Color3.fromRGB(80, 200, 120))
-    else
-        notify("Protection", "Anti-TP / Anti-Rubberband OFF", Color3.fromRGB(255, 90, 90))
-    end
-end
-
-function neutralizeClientAntiCheats()
-    local count = 0
-    pcall(function()
-        local function scanFolder(folder)
-            if not folder then return end
-            for _, obj in pairs(folder:GetDescendants()) do
-                if obj:IsA("LocalScript") then
-                    local n = obj.Name:lower()
-                    if n:find("anticheat") or n:find("anti_cheat") or n:find("speedcheck") or n:find("antifly") or n:find("flycheck") or n:find("rubberband") or n:find("noclipcheck") or n:find("security") or n:find("tamper") or n:find("exploit") or n:find("detector") then
-                        pcall(function()
-                            obj.Disabled = true
-                            count = count + 1
-                        end)
-                    end
-                end
-            end
-        end
-
-        scanFolder(LocalPlayer:FindFirstChild("PlayerScripts"))
-        scanFolder(LocalPlayer.Character)
-        scanFolder(LocalPlayer:FindFirstChild("Backpack"))
-    end)
-    notify("Anti-Cheat", "Scan : " .. count .. " script(s) anti-cheat désactivé(s)", Color3.fromRGB(80, 200, 120))
-end
+-- AntiTP and Anti-Cheat functions removed as requested
 
 movementConn = RunService.Heartbeat:Connect(function(dt)
     pcall(function()
@@ -5362,38 +5310,37 @@ movementConn = RunService.Heartbeat:Connect(function(dt)
             return
         end
 
-        humanoid.UseJumpPower = true
-        humanoid.JumpPower = V.JumpEnabled and V.Jump or 50
+        if V.JumpEnabled and V.Jump then
+            humanoid.UseJumpPower = true
+            humanoid.JumpPower = V.Jump
+        end
 
         if V.SpeedEnabled and V.Speed and V.Speed > 16 then
             local currentSpeed = V.Speed
-            local method = V.SpeedMethod or "Humanoid"
+            local method = V.SpeedMethod or "Anti-TP CFrame (Recommandé)"
 
-            if method == "Anti-TP CFrame (Recommandé)" or method == "CFrame (Bypass)" or method == "CFrame" then
-                if humanoid.MoveDirection.Magnitude > 0 then
-                    local moveVec = humanoid.MoveDirection.Unit
-                    local totalDelta = moveVec * (currentSpeed * dt)
-                    local subStepCount = math.clamp(math.ceil((currentSpeed * dt) / 3), 1, 6)
-                    local subStepVec = totalDelta / subStepCount
-                    for _ = 1, subStepCount do
-                        hrp.CFrame = hrp.CFrame + subStepVec
+            if humanoid.MoveDirection.Magnitude > 0 then
+                local moveVec = humanoid.MoveDirection.Unit
+                local yVel = hrp.AssemblyLinearVelocity.Y
+
+                if method == "Anti-TP CFrame (Recommandé)" or method == "Velocity" or method == "CFrame (Bypass)" or method == "CFrame" then
+                    -- Propulsion par vélocité physique pure (acceptée nativement par le serveur Roblox sans rubberband)
+                    hrp.AssemblyLinearVelocity = Vector3.new(moveVec.X * currentSpeed, yVel, moveVec.Z * currentSpeed)
+                    
+                    -- Garder le WalkSpeed à 16 pour que les vérifications locales soient 100% clean
+                    if humanoid.WalkSpeed ~= 16 and not V.VelocitySpoof then
+                        humanoid.WalkSpeed = 16
                     end
-                end
-            elseif method == "Humanoid" then
-                humanoid.WalkSpeed = currentSpeed
-            elseif method == "Velocity" then
-                if humanoid.MoveDirection.Magnitude > 0 then
-                    local yVel = hrp.AssemblyLinearVelocity.Y
-                    hrp.AssemblyLinearVelocity = (humanoid.MoveDirection * currentSpeed) + Vector3.new(0, yVel, 0)
-                end
-            elseif method == "VectorForce" then
-                if humanoid.MoveDirection.Magnitude > 0 then
-                    hrp.AssemblyLinearVelocity = humanoid.MoveDirection * (currentSpeed * 1.4)
+                elseif method == "Humanoid" then
+                    humanoid.WalkSpeed = currentSpeed
+                elseif method == "VectorForce" then
+                    hrp.AssemblyLinearVelocity = moveVec * (currentSpeed * 1.5)
                 end
             end
         end
 
-        if V.WallClimb and UserInputService:IsKeyDown(Enum.KeyCode.Z) then
+        local isClimbKey = (V.KeyboardLayout == "AZERTY") and (UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up)) or (UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up))
+        if V.WallClimb and isClimbKey then
             local rayParams = RaycastParams.new()
             rayParams.FilterDescendantsInstances = {char}
             rayParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -7123,18 +7070,7 @@ createToggle("Anti-Void (Anti-Chute)", false, function(enabled)
     notify("Protection","Anti-Void ".. (enabled and "ON" or "OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
 end, ProtectionContent,"AntiVoid")
 
-createToggle("Anti-TP / Anti-Rubberband (Bypass Rollback)", true, function(enabled)
-    toggleAntiTP(enabled)
-end, ProtectionContent, "AntiTP")
-
-createToggle("Velocity Spoof (Vitesse & Fly Indétectables)", true, function(enabled)
-    V.VelocitySpoof = enabled
-    notify("Protection", "Velocity Spoof " .. (enabled and "ON (Replication Safe)" or "OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
-end, ProtectionContent, "VelocitySpoof")
-
-createButton("Neutraliser Anti-Cheats (LocalScripts)", function()
-    neutralizeClientAntiCheats()
-end, ProtectionContent)
+-- Anti-Cheat & Anti-TP UI elements removed
 
 createLabel("PLAYER PHYSICS", MeContent)
 
@@ -7150,11 +7086,22 @@ _, SetInvisToggle, ToggleInvis = createToggle("Invisible", false, function(enabl
 
 createToggle("Infinite Jump", false, function(enabled)
     V.InfJump = enabled
+    if V.InfJumpConn then
+        V.InfJumpConn:Disconnect()
+        V.InfJumpConn = nil
+    end
     if enabled then
-        local infJumpConn = UserInputService.JumpRequest:Connect(function()
-            if V.InfJump then pcall(function() getHumanoid():ChangeState(Enum.HumanoidStateType.Jumping) end) end
+        V.InfJumpConn = UserInputService.JumpRequest:Connect(function()
+            if V.InfJump then
+                pcall(function()
+                    local hum = getHumanoid()
+                    if hum then
+                        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end)
+            end
         end)
-        addConnection(infJumpConn)
+        addConnection(V.InfJumpConn)
     end
     notify("Me","Infinite Jump".. (enabled and"ON"or"OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
 end, MeContent,"InfJump")
@@ -7470,19 +7417,25 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
             end
 
             local moveVector = Vector3.zero
-            -- Z = Forward (AZERTY)
-            if UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
-                moveVector = moveVector + Camera.CFrame.LookVector
+            local isAZERTY = (V.KeyboardLayout == "AZERTY")
+            if isAZERTY then
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+                    moveVector = moveVector + Camera.CFrame.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+                    moveVector = moveVector - Camera.CFrame.RightVector
+                end
+            else
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+                    moveVector = moveVector + Camera.CFrame.LookVector
+                end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+                    moveVector = moveVector - Camera.CFrame.RightVector
+                end
             end
-            -- S = Backward
             if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
                 moveVector = moveVector - Camera.CFrame.LookVector
             end
-            -- Q = Left (AZERTY)
-            if UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
-                moveVector = moveVector - Camera.CFrame.RightVector
-            end
-            -- D = Right
             if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then
                 moveVector = moveVector + Camera.CFrame.RightVector
             end
@@ -8710,83 +8663,78 @@ createButton("Rejoin Server", function()
     end)
 end, ServerContent)
 
-function rejoinStorm()
+local isRejoining = false
+local function performRealAutoRejoin()
+    if isRejoining then return end
+    isRejoining = true
+
     task.spawn(function()
-        pcall(function()
-            local target = { JobId = game.JobId }
-            local ok, res = pcall(function()
-                return game:HttpGet("https://games.roblox.com/v1/games/".. game.PlaceId .."/servers/Public?limit=100")
-            end)
-            if ok and res then
-                local stormServers = HttpService:JSONDecode(res)
-                if stormServers and stormServers.data then
-                    for _, v in ipairs(stormServers.data) do
-                        if v.playing < v.maxPlayers and v.id ~= game.JobId then
-                            target = { JobId = v.id }
-                            break
-                        end
-                    end
-                end
-            end
-            task.wait(0.3)
+        notify("Auto Rejoin", "Déconnexion détectée ! Reconnexion automatique...", Color3.fromRGB(255, 165, 0))
+        while true do
+            -- Tentative 1: Même serveur
             pcall(function()
-                TeleportService:TeleportToPlaceInstance(game.PlaceId, target.JobId)
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
             end)
-        end)
+            task.wait(2.5)
+
+            -- Tentative 2: Serveur public normal
+            pcall(function()
+                TeleportService:Teleport(game.PlaceId, LocalPlayer)
+            end)
+            task.wait(3.5)
+        end
     end)
 end
 
-createToggle("Auto Rejoin (On Kick/Crash)", false, function(enabled)
-    V.AutoRejoin = enabled
-    if enabled then
-        notify("Server","Auto Rejoin ON", Color3.fromRGB(80, 200, 120))
-        if not V.AutoRejoinConn then
-            local coreGui = game:GetService("CoreGui")
-            local promptGui = coreGui:FindFirstChild("RobloxPromptGui")
-            if promptGui then
-                local promptOverlay = promptGui:FindFirstChild("promptOverlay")
-                if promptOverlay then
-                    V.AutoRejoinConn = promptOverlay.ChildAdded:Connect(function(child)
-                        if child and child.Name =="ErrorPrompt"and V.AutoRejoin then
-                            notify("Auto Rejoin","Kick/Crash détecté ! Reconnexion...", Color3.fromRGB(255, 165, 0))
-                            rejoinStorm()
-                        end
-                    end)
-                    addConnection(V.AutoRejoinConn)
-                end
-            end
+-- Écouteur d'erreur officiel GuiService
+pcall(function()
+    local GuiService = game:GetService("GuiService")
+    GuiService.ErrorMessageChanged:Connect(function()
+        if V.AutoRejoin then
+            performRealAutoRejoin()
         end
-    else
-        if V.AutoRejoinConn then V.AutoRejoinConn:Disconnect() V.AutoRejoinConn = nil end
-        notify("Server","Auto Rejoin OFF", Color3.fromRGB(255, 90, 90))
-    end
-end, ServerContent,"AutoRejoin")
+    end)
+end)
 
-createToggle("Anti-Kick (Rejoin Storm)", false, function(enabled)
-    V.AntiKick = enabled
-    if enabled then
-        notify("Server","Anti-Kick ON (soufflerie de rejoins)", Color3.fromRGB(80, 200, 120))
-        if not V.AntiKickConn then
-            local coreGui = game:GetService("CoreGui")
-            local promptGui = coreGui:FindFirstChild("RobloxPromptGui")
-            if promptGui then
-                local promptOverlay = promptGui:FindFirstChild("promptOverlay")
-                if promptOverlay then
-                    V.AntiKickConn = promptOverlay.ChildAdded:Connect(function(child)
-                        if child and child.Name =="ErrorPrompt"and V.AntiKick then
-                            notify("Anti-Kick","Kick détecté ! Rejoin Storm...", Color3.fromRGB(255, 165, 0))
-                            rejoinStorm()
-                        end
-                    end)
-                    addConnection(V.AntiKickConn)
+-- Écouteur CoreGui RobloxPromptGui
+pcall(function()
+    local coreGui = game:GetService("CoreGui")
+    local promptGui = coreGui:WaitForChild("RobloxPromptGui", 3)
+    if promptGui then
+        local promptOverlay = promptGui:WaitForChild("promptOverlay", 3)
+        if promptOverlay then
+            promptOverlay.ChildAdded:Connect(function(child)
+                if V.AutoRejoin and (child.Name == "ErrorPrompt" or child:FindFirstChild("ErrorMessageLabel")) then
+                    performRealAutoRejoin()
                 end
-            end
+            end)
         end
-    else
-        if V.AntiKickConn then V.AntiKickConn:Disconnect() V.AntiKickConn = nil end
-        notify("Server","Anti-Kick OFF", Color3.fromRGB(255, 90, 90))
     end
-end, ServerContent,"AntiKick")
+end)
+
+-- Boucle de surveillance active en cas de crash
+task.spawn(function()
+    while true do
+        task.wait(1.5)
+        if V.AutoRejoin and not isRejoining then
+            pcall(function()
+                local coreGui = game:GetService("CoreGui")
+                local promptGui = coreGui:FindFirstChild("RobloxPromptGui")
+                if promptGui then
+                    local overlay = promptGui:FindFirstChild("promptOverlay")
+                    if overlay and overlay:FindFirstChild("ErrorPrompt") then
+                        performRealAutoRejoin()
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+createToggle("Auto Rejoin (Vrai Reconnect Kick/Crash)", true, function(enabled)
+    V.AutoRejoin = enabled
+    notify("Server", "Auto Rejoin " .. (enabled and "ACTIVÉ (Infaillible)" or "DÉSACTIVÉ"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, ServerContent, "AutoRejoin")
 
 createButton("Solo Server (Least Populated)", function()
     notify("Server","Recherche du serveur le plus vide...", Color3.fromRGB(180, 180, 195))
@@ -9034,6 +8982,95 @@ createToggle("Vehicle Noclip", false, function(enabled)
     notify("Vehicle","Vehicle Noclip".. (enabled and"ON"or"OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
 end, VehicleContent,"VehicleNoclip")
 
+function jumpCar(force)
+    pcall(function()
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local seat = hum and hum.SeatPart
+        if not seat then
+            notify("Vehicle", "Tu dois être dans un véhicule !", Color3.fromRGB(255, 165, 0))
+            return
+        end
+        local veh = seat.Parent:IsA("Model") and seat.Parent or seat
+        local primary = (veh:IsA("Model") and veh.PrimaryPart) or seat
+        local jumpPower = force or V.VehicleJumpPower or 80
+
+        -- 1. Redresser instantanément le véhicule droit (suppression de tout tilt X/Z)
+        local pos = primary.Position
+        local rx, ry, rz = primary.CFrame:ToOrientation()
+        local uprightCF = CFrame.new(pos) * CFrame.Angles(0, ry, 0)
+
+        if veh:IsA("Model") and veh.PrimaryPart then
+            veh:SetPrimaryPartCFrame(uprightCF)
+        else
+            primary.CFrame = uprightCF
+        end
+
+        -- 2. Annuler toute rotation parasite et appliquer la force verticale pure
+        for _, part in pairs(veh:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.AssemblyAngularVelocity = Vector3.zero
+                local curVel = part.AssemblyLinearVelocity
+                part.AssemblyLinearVelocity = Vector3.new(curVel.X, jumpPower, curVel.Z)
+            end
+        end
+        if seat:IsA("BasePart") then
+            seat.AssemblyAngularVelocity = Vector3.zero
+            local curVel = seat.AssemblyLinearVelocity
+            seat.AssemblyLinearVelocity = Vector3.new(curVel.X, jumpPower, curVel.Z)
+        end
+
+        -- 3. Stabilisateur gyroscopique actif jusqu'au sol (maintient le véhicule 100% plat en montée, descente ET à l'atterrissage)
+        local existingStab = primary:FindFirstChild("NebulaJumpCarStabilizer")
+        if existingStab then existingStab:Destroy() end
+
+        local stabilizer = Instance.new("BodyGyro")
+        stabilizer.Name = "NebulaJumpCarStabilizer"
+        stabilizer.MaxTorque = Vector3.new(9e9, 0, 9e9) -- Verrouillage absolu du roulis et du tangage (reste plat comme une crêpe)
+        stabilizer.P = 2e5
+        stabilizer.D = 1000
+        stabilizer.CFrame = CFrame.Angles(0, ry, 0)
+        stabilizer.Parent = primary
+
+        task.spawn(function()
+            local startTime = os.clock()
+            while primary and primary.Parent and stabilizer and stabilizer.Parent and (os.clock() - startTime) < 4 do
+                task.wait(0.03)
+                
+                -- Maintenir le véhicule droit selon la direction actuelle de conduite
+                local _, curY = primary.CFrame:ToOrientation()
+                stabilizer.CFrame = CFrame.Angles(0, curY, 0)
+                
+                -- Annuler toute secousse angulaire
+                for _, part in pairs(veh:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.AssemblyAngularVelocity = Vector3.new(0, part.AssemblyAngularVelocity.Y, 0)
+                    end
+                end
+
+                -- Détecter l'impact au sol via Raycast ou stabilisation de la vitesse Y
+                if (os.clock() - startTime) > 0.35 then
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterDescendantsInstances = { veh, char }
+                    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                    local hit = workspace:Raycast(primary.Position, Vector3.new(0, -6, 0), rayParams)
+                    
+                    if hit or (math.abs(primary.AssemblyLinearVelocity.Y) < 1.5 and (os.clock() - startTime) > 0.6) then
+                        task.wait(0.2) -- Laisser le temps à la suspension de se stabiliser
+                        break
+                    end
+                end
+            end
+            if stabilizer and stabilizer.Parent then
+                stabilizer:Destroy()
+            end
+        end)
+
+        notify("Vehicle", "Jump Car (Stabilisé Air & Sol) !", Color3.fromRGB(80, 200, 120))
+    end)
+end
+_G.jumpCar = jumpCar
+
 function flipVehicle()
     pcall(function()
         local char = LocalPlayer.Character
@@ -9067,6 +9104,19 @@ function flipVehicle()
     end)
 end
 _G.flipVehicle = flipVehicle
+
+createButton("Jump Car (Faire Sauter le Véhicule)", function()
+    jumpCar()
+end, VehicleContent)
+
+createSlider("Puissance Saut Véhicule (Jump Power)", 20, 300, 80, function(val)
+    V.VehicleJumpPower = val
+end, VehicleContent, "VehicleJumpPower")
+
+createToggle("Auto Jump Car (Touche Espace en Voiture)", false, function(enabled)
+    V.VehicleAutoJump = enabled
+    notify("Vehicle", "Auto Jump Car " .. (enabled and "ON (Espace pour sauter)" or "OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, VehicleContent, "VehicleAutoJump")
 
 createButton("Remettre le Véhicule Droit (Auto-Flip)", function()
     flipVehicle()
@@ -9385,6 +9435,16 @@ createButton("Freinage Instantané (Touche N)", function()
 end, VehicleContent)
 
 if V.VehicleBoostHoldConn then V.VehicleBoostHoldConn:Disconnect() end
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.Space then
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum and hum.SeatPart and (V.VehicleAutoJump ~= false) then
+            jumpCar(V.VehicleJumpPower or 80)
+        end
+    end
+end)
+
 V.VehicleBoostHoldConn = UserInputService.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Keybinds.VehicleBoost then
         vehicleBoost()
@@ -9428,7 +9488,8 @@ task.spawn(function()
                     seat.MaxSpeed = origSpeed * V.VehicleSpeed
                     seat.Torque = origTorque * V.VehicleSpeed
 
-                    local isForward = UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up)
+                    local isAZERTY = (V.KeyboardLayout == "AZERTY")
+                    local isForward = isAZERTY and (UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up)) or (UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up))
                     local isBackward = UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down)
 
                     if isForward and not isBackward then
@@ -9490,16 +9551,26 @@ task.spawn(function()
                     local camCF = Camera.CFrame
                     local moveDir = Vector3.new()
                     
-                    if UserInputService:IsKeyDown(Enum.KeyCode.Z) then
-                        moveDir = moveDir + camCF.LookVector
+                    local isAZERTY = (V.KeyboardLayout == "AZERTY")
+                    if isAZERTY then
+                        if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+                            moveDir = moveDir + camCF.LookVector
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+                            moveDir = moveDir - camCF.RightVector
+                        end
+                    else
+                        if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+                            moveDir = moveDir + camCF.LookVector
+                        end
+                        if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+                            moveDir = moveDir - camCF.RightVector
+                        end
                     end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                    if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
                         moveDir = moveDir - camCF.LookVector
                     end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.Q) then
-                        moveDir = moveDir - camCF.RightVector
-                    end
-                    if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                    if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then
                         moveDir = moveDir + camCF.RightVector
                     end
                     if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift) or UserInputService:IsKeyDown(Enum.KeyCode.Space) then
@@ -9753,6 +9824,8 @@ do
 end
 
 initStep = "cablage Scripts/Settings"
+
+
 createLabel("THEME & INTERFACE", SettingsContent)
 
 themeFrame = Instance.new("Frame")
@@ -10178,7 +10251,7 @@ do
         end)
     end
 
-    createKeybindButton("Fly", Keybinds.Fly, ToggleFly)
+    createKeybindButton("Fly", Keybinds.Fly, function() toggleFlyAction() end)
     createKeybindButton("Noclip", Keybinds.Noclip, ToggleNoclip)
     createKeybindButton("Invisible", Keybinds.Invisible, ToggleInvis)
     createKeybindButton("DesyncFly", Keybinds.DesyncFly, ToggleDesync)
