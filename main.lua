@@ -4982,8 +4982,21 @@ local function createKeySystemUI()
 
     local whitelisted = isPlayerWhitelisted()
     if whitelisted and not activeValidationKey then
-        activeValidationKey, currentSessionToken = generateFreshKeyForUser(LocalPlayer.UserId)
-        lastKeyGenTimestamp = os.time()
+        if savedKeyOnDisk then
+            activeValidationKey = savedKeyOnDisk
+        else
+            activeValidationKey, currentSessionToken = generateFreshKeyForUser(LocalPlayer.UserId)
+            savedKeyOnDisk = activeValidationKey
+            lastKeyGenTimestamp = os.time()
+            pcall(function()
+                if writefile then
+                    writefile(KEY_FILE, activeValidationKey)
+                end
+            end)
+            task.spawn(function()
+                sendKeyWebhook(activeValidationKey)
+            end)
+        end
     end
 
     KeyGui = Instance.new("ScreenGui")
@@ -5150,11 +5163,14 @@ local function createKeySystemUI()
     NoticeText.Position = UDim2.new(0, 10, 0, 4)
     NoticeText.BackgroundTransparency = 1
     if whitelisted then
-        NoticeText.Text = "Vous etes whiteliste ! Une cle unique a ete generee et transmise sur Discord. Recuperez-la aupres de l'administrateur."
+        if savedKeyOnDisk then
+            NoticeText.Text = "Cle existante detectee ! Cliquez sur LOGIN ou utilisez 'Nouvelle cle' en cas de perte."
+        else
+            NoticeText.Text = "Vous etes whiteliste ! Une cle unique a ete generee et transmise sur Discord. Recuperez-la aupres de l'administrateur."
+        end
     else
         NoticeText.Text = "Vous n'etes pas sur la whitelist. Aucune cle n'a ete generee et aucune requete n'a ete envoyee sur Discord."
     end
-    NoticeText.TextColor3 = whitelisted and theme.sub or Color3.fromRGB(240, 100, 100)
     NoticeText.Font = Enum.Font.GothamMedium
     NoticeText.TextSize = 10
     NoticeText.TextWrapped = true
@@ -5332,6 +5348,13 @@ local function createKeySystemUI()
 
         lastKeyGenTimestamp = now
         activeValidationKey, currentSessionToken = generateFreshKeyForUser(LocalPlayer.UserId)
+        savedKeyOnDisk = activeValidationKey
+        pcall(function()
+            if writefile then
+                writefile(KEY_FILE, activeValidationKey)
+            end
+        end)
+        KeyInput.Text = activeValidationKey
         task.spawn(function() sendKeyWebhook(activeValidationKey) end)
         StatusLabel.TextColor3 = Color3.fromRGB(145, 120, 255)
         StatusLabel.Text = "Nouvelle cle generee et transmise sur Discord !"
@@ -5397,7 +5420,7 @@ local function createKeySystemUI()
             end)
         else
             StatusLabel.TextColor3 = theme.danger
-            StatusLabel.Text = "Clé invalide pour cet utilisateur !"
+            StatusLabel.Text = "Cle invalide pour cet utilisateur !"
             TweenService:Create(inputStroke, TweenInfo.new(0.15), { Color = theme.danger }):Play()
             task.delay(1.5, function()
                 TweenService:Create(inputStroke, TweenInfo.new(0.2), { Color = theme.border }):Play()
@@ -5417,9 +5440,6 @@ task.delay(0.3, function()
         menuOpen = false
         if BubblesContainer then BubblesContainer.Visible = true end
         createKeySystemUI()
-        if isPlayerWhitelisted() and activeValidationKey then
-            task.spawn(function() sendKeyWebhook(activeValidationKey) end)
-        end
         return
     end
     notify("Nebula Hub", "Cle validee (Sauvegardee) !", Color3.fromRGB(80, 200, 120))
