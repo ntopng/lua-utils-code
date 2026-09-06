@@ -53,6 +53,7 @@ _G.Aimlock_Prediction = true
 _G.Aimlock_PredictionBoost = 1.0
 _G.Aimlock_PingCompensation = true
 _G.Aimlock_StickyTarget = nil
+_G.Aimlock_TargetNPCs = false
 
 Aimlock_Enabled = false
 Aimlock_Key = Enum.KeyCode.E
@@ -67,7 +68,9 @@ Aimlock_Smoothness = 1
 Aimlock_Prediction = true
 Aimlock_PredictionBoost = 1.0
 Aimlock_PingCompensation = true
+Aimlock_TargetNPCs = false
 currentLockedTarget = nil
+currentLockedChar = nil
 currentLockedPart = nil
 
 SilentAimCircle = nil
@@ -84,6 +87,36 @@ if Drawing and Drawing.new then
     end)
 end
 
+local cachedAimNPCs = {}
+local lastAimNPCScan = 0
+local function getAimNPCList()
+    local now = tick()
+    if now - lastAimNPCScan < 0.4 then
+        return cachedAimNPCs
+    end
+    lastAimNPCScan = now
+    local list = {}
+    local function scan(inst, depth)
+        if not inst or depth > 3 then return end
+        for _, obj in ipairs(inst:GetChildren()) do
+            if obj:IsA("Model") and obj ~= LocalPlayer.Character and not Players:GetPlayerFromCharacter(obj) then
+                local hum = obj:FindFirstChildOfClass("Humanoid")
+                local root = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso") or obj:FindFirstChild("Head")
+                if hum and hum.Health > 0 and root then
+                    table.insert(list, obj)
+                else
+                    scan(obj, depth + 1)
+                end
+            elseif obj:IsA("Folder") then
+                scan(obj, depth + 1)
+            end
+        end
+    end
+    scan(workspace, 1)
+    cachedAimNPCs = list
+    return list
+end
+
 function isPlayerVisibleAim(targetChar, tPart)
     if not LocalPlayer.Character or not targetChar or not tPart then return true end
     local cam = workspace.CurrentCamera
@@ -97,14 +130,18 @@ function isPlayerVisibleAim(targetChar, tPart)
     return res == nil
 end
 
-function isTargetStillValid(target)
+function isTargetStillValid(target, expectedChar)
     if not target or not target.Parent or target == LocalPlayer then return false end
-    if not target.Character or not target.Character.Parent then return false end
-    local hum = target.Character:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.Health <= 0 then return false end
+    local char = (typeof(target) == "Instance" and target:IsA("Model") and target) or (target.Character)
+    if not char or not char.Parent or not char:IsDescendantOf(workspace) then return false end
+    if expectedChar and char ~= expectedChar then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or not hum.Parent or hum.Health <= 0 then return false end
+    local state = hum:GetState()
+    if state == Enum.HumanoidStateType.Dead or state == Enum.HumanoidStateType.Physics then return false end
     local targetPartName = _G.Aimlock_TargetPart or Aimlock_TargetPart or "Head"
-    local part = target.Character:FindFirstChild(targetPartName) or target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("Torso") or target.Character:FindFirstChild("UpperTorso")
-    if not part then return false end
+    local part = char:FindFirstChild(targetPartName) or char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+    if not part or not part.Parent or not part:IsDescendantOf(workspace) then return false end
     return true, part
 end
 
@@ -119,20 +156,22 @@ function getAimlockTarget()
     if not cam then return nil, nil end
 
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
+        if p ~= LocalPlayer and p.Character and p.Character:IsDescendantOf(workspace) then
             local sameTeam = (LocalPlayer.Team and p.Team and LocalPlayer.Team == p.Team)
             if not sameTeam then
-                local part = p.Character:FindFirstChild(targetPartName) or p.Character:FindFirstChild("Head") or p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso") or p.Character:FindFirstChild("UpperTorso")
                 local hum = p.Character:FindFirstChildOfClass("Humanoid")
-                if part and hum and hum.Health > 0 then
-                    local screenPos, onScreen = cam:WorldToViewportPoint(part.Position)
-                    if onScreen and screenPos.Z > 0 then
-                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mouseLoc).Magnitude
-                        if dist < shortestDist then
-                            if not wallcheck or isPlayerVisibleAim(p.Character, part) then
-                                shortestDist = dist
-                                bestTarget = p
-                                bestPart = part
+                if hum and hum.Parent and hum.Health > 0 and hum:GetState() ~= Enum.HumanoidStateType.Dead then
+                    local part = p.Character:FindFirstChild(targetPartName) or p.Character:FindFirstChild("Head") or p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso") or p.Character:FindFirstChild("UpperTorso")
+                    if part and part:IsDescendantOf(workspace) then
+                        local screenPos, onScreen = cam:WorldToViewportPoint(part.Position)
+                        if onScreen and screenPos.Z > 0 then
+                            local dist = (Vector2.new(screenPos.X, screenPos.Y) - mouseLoc).Magnitude
+                            if dist < shortestDist then
+                                if not wallcheck or isPlayerVisibleAim(p.Character, part) then
+                                    shortestDist = dist
+                                    bestTarget = p
+                                    bestPart = part
+                                end
                             end
                         end
                     end
@@ -140,6 +179,32 @@ function getAimlockTarget()
             end
         end
     end
+
+    if _G.Aimlock_TargetNPCs or Aimlock_TargetNPCs then
+        local npcs = getAimNPCList()
+        for _, npc in ipairs(npcs) do
+            if npc and npc.Parent and npc:IsDescendantOf(workspace) and npc ~= LocalPlayer.Character then
+                local hum = npc:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Parent and hum.Health > 0 and hum:GetState() ~= Enum.HumanoidStateType.Dead then
+                    local part = npc:FindFirstChild(targetPartName) or npc:FindFirstChild("Head") or npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Torso") or npc:FindFirstChild("UpperTorso")
+                    if part and part:IsDescendantOf(workspace) then
+                        local screenPos, onScreen = cam:WorldToViewportPoint(part.Position)
+                        if onScreen and screenPos.Z > 0 then
+                            local dist = (Vector2.new(screenPos.X, screenPos.Y) - mouseLoc).Magnitude
+                            if dist < shortestDist then
+                                if not wallcheck or isPlayerVisibleAim(npc, part) then
+                                    shortestDist = dist
+                                    bestTarget = npc
+                                    bestPart = part
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     return bestTarget, bestPart
 end
 
@@ -166,9 +231,17 @@ _G.NebulaAimlockConn = RunService.RenderStepped:Connect(function()
     end
 
     if activeLock then
-        local valid, validPart = isTargetStillValid(currentLockedTarget)
+        local valid, validPart = isTargetStillValid(currentLockedTarget, currentLockedChar)
         if not valid then
-            currentLockedTarget, currentLockedPart = getAimlockTarget()
+            currentLockedTarget = nil
+            currentLockedChar = nil
+            currentLockedPart = nil
+            local newTarget, newPart = getAimlockTarget()
+            if newTarget and newPart then
+                currentLockedTarget = newTarget
+                currentLockedChar = (typeof(newTarget) == "Instance" and newTarget:IsA("Model") and newTarget) or newTarget.Character
+                currentLockedPart = newPart
+            end
         else
             currentLockedPart = validPart
         end
@@ -178,30 +251,42 @@ _G.NebulaAimlockConn = RunService.RenderStepped:Connect(function()
             local targetPos = currentLockedPart.Position
             
             if _G.Aimlock_Prediction or Aimlock_Prediction then
-                local rootPart = currentLockedTarget.Character and (currentLockedTarget.Character:FindFirstChild("HumanoidRootPart") or currentLockedTarget.Character:FindFirstChild("Torso"))
+                local targetChar = (typeof(currentLockedTarget) == "Instance" and currentLockedTarget:IsA("Model") and currentLockedTarget) or (currentLockedTarget and currentLockedTarget.Character)
+                local rootPart = targetChar and (targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("Head"))
                 if rootPart then
                     local rawVel = rootPart.AssemblyLinearVelocity or rootPart.Velocity or Vector3.zero
-                    if rawVel.Magnitude < 300 then
+                    if rawVel.Magnitude < 250 then
                         local shotDist = (cam.CFrame.Position - targetPos).Magnitude
                         local bulletSpeed = 1000
                         local travelTime = math.min((shotDist / bulletSpeed), 0.18)
                         local boost = (_G.Aimlock_PredictionBoost or Aimlock_PredictionBoost or 1.0)
-                        local lead = Vector3.new(rawVel.X, rawVel.Y * 0.2, rawVel.Z) * travelTime * boost
+                        local velY = math.clamp(rawVel.Y, -30, 30)
+                        local velX = math.clamp(rawVel.X, -100, 100)
+                        local velZ = math.clamp(rawVel.Z, -100, 100)
+                        local lead = Vector3.new(velX, velY * 0.1, velZ) * travelTime * boost
                         targetPos = targetPos + lead
                     end
                 end
             end
 
             local smooth = _G.Aimlock_Smoothness or Aimlock_Smoothness or 1
-            local targetCF = CFrame.lookAt(cam.CFrame.Position, targetPos)
-            if smooth <= 1 then
-                cam.CFrame = targetCF
-            else
-                cam.CFrame = cam.CFrame:Lerp(targetCF, math.clamp(1 / smooth, 0.08, 1))
+            local camPos = cam.CFrame.Position
+            local diff = targetPos - camPos
+            if diff.Magnitude > 0.5 then
+                local targetCF = CFrame.lookAt(camPos, targetPos)
+                local rx, ry, rz = targetCF:ToOrientation()
+                if math.abs(rx) < math.rad(82) then
+                    if smooth <= 1 then
+                        cam.CFrame = targetCF
+                    else
+                        cam.CFrame = cam.CFrame:Lerp(targetCF, math.clamp(1 / smooth, 0.08, 1))
+                    end
+                end
             end
         end
     else
         currentLockedTarget = nil
+        currentLockedChar = nil
         currentLockedPart = nil
     end
 end)
@@ -226,6 +311,7 @@ _G.NebulaAimlockInputBeganConn = UserInputService.InputBegan:Connect(function(in
             Aimlock_Enabled = _G.Aimlock_Enabled
             if not Aimlock_Enabled then
                 currentLockedTarget = nil
+                currentLockedChar = nil
                 currentLockedPart = nil
             end
             notify("Aimlock", "Aimlock " .. (Aimlock_Enabled and "ACTIVÉ" or "DÉSACTIVÉ"), Aimlock_Enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
@@ -245,6 +331,7 @@ _G.NebulaAimlockInputEndedConn = UserInputService.InputEnded:Connect(function(in
         _G.Aimlock_IsHeld = false
         Aimlock_IsHeld = false
         currentLockedTarget = nil
+        currentLockedChar = nil
         currentLockedPart = nil
     end
 end)
@@ -6303,7 +6390,7 @@ movementConn = RunService.RenderStepped:Connect(function(dt)
             local currentSpeed = V.Speed
             local method = V.SpeedMethod or "Anti-TP CFrame (Recommandé)"
 
-            if humanoid.MoveDirection.Magnitude > 0 then
+            if humanoid.MoveDirection.Magnitude > 0.05 then
                 local moveVec = humanoid.MoveDirection.Unit
                 local yVel = hrp.AssemblyLinearVelocity.Y
 
@@ -6317,6 +6404,12 @@ movementConn = RunService.RenderStepped:Connect(function(dt)
                     humanoid.WalkSpeed = currentSpeed
                 elseif method == "VectorForce" then
                     hrp.AssemblyLinearVelocity = moveVec * (currentSpeed * 1.5)
+                end
+            else
+                local yVel = hrp.AssemblyLinearVelocity.Y
+                hrp.AssemblyLinearVelocity = Vector3.new(0, yVel, 0)
+                if method == "Humanoid" and not V.VelocitySpoof and humanoid.WalkSpeed ~= 16 then
+                    humanoid.WalkSpeed = 16
                 end
             end
         end
@@ -7492,7 +7585,19 @@ end, MovementContent, "AZERTYLayout")
 createLabel("SPEED & JUMP", MovementContent)
 _, _, ToggleSpeed = createToggle("Enable Walk Speed", false, function(enabled)
     V.SpeedEnabled = enabled
-    notify("Movement","Walk Speed".. (enabled and"ON"or"OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+    if not enabled then
+        pcall(function()
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hum and not V.VelocitySpoof then hum.WalkSpeed = 16 end
+            if hrp then
+                local yVel = hrp.AssemblyLinearVelocity.Y
+                hrp.AssemblyLinearVelocity = Vector3.new(0, yVel, 0)
+            end
+        end)
+    end
+    notify("Movement","Walk Speed ".. (enabled and "ON" or "OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
 end, MovementContent,"SpeedEnabled")
 createSlider("Walk Speed", 16, 300, 16, function(val) V.Speed = val end, MovementContent,"Speed")
 
@@ -9351,13 +9456,18 @@ createSlider("Prediction Strength (Force 0.5x - 2.5x)", 5, 25, 10, function(val)
     _G.Aimlock_PredictionBoost = factor
 end, AimContent, "AimPredStrength")
 
+createToggle("Target NPCs (Cibler les PNJ)", false, function(enabled)
+    Aimlock_TargetNPCs = enabled
+    _G.Aimlock_TargetNPCs = enabled
+end, AimContent, "AimTargetNPCs")
+
 tracerColors = { Color3.fromRGB(180, 70, 255), Color3.fromRGB(0, 240, 255) }
 tracerColorIdx = 1
 
 function spawnNeonTracer(startPos, endPos)
     pcall(function()
         local dist = (endPos - startPos).Magnitude
-        if dist < 1 then return end
+        if dist < 0.5 then return end
         
         local part = Instance.new("Part")
         part.Name = "NebulaNeonBulletTracer"
@@ -9383,34 +9493,108 @@ function spawnNeonTracer(startPos, endPos)
 end
 _G.spawnNeonTracer = spawnNeonTracer
 
-function hookBulletTracers()
+local lastTracerTick = 0
+local function fireBulletTracer()
+    if not V.BulletTracers then return end
+    local now = tick()
+    if now - lastTracerTick < 0.04 then return end
+    lastTracerTick = now
+
+    local char = LocalPlayer.Character
+    if not char then return end
+    local cam = workspace.CurrentCamera
+
+    local startPos = nil
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        local muzzle = tool:FindFirstChild("Muzzle", true)
+            or tool:FindFirstChild("Barrel", true)
+            or tool:FindFirstChild("MuzzlePoint", true)
+            or tool:FindFirstChild("FirePoint", true)
+            or tool:FindFirstChild("Tip", true)
+            or tool:FindFirstChild("Handle", true)
+            or tool:FindFirstChildWhichIsA("BasePart", true)
+        if muzzle then startPos = muzzle.Position end
+    end
+    if not startPos then
+        local hand = char:FindFirstChild("RightHand")
+            or char:FindFirstChild("Right Arm")
+            or char:FindFirstChild("Head")
+            or char:FindFirstChild("HumanoidRootPart")
+        if hand then startPos = hand.Position end
+    end
+    if not startPos and cam then
+        startPos = cam.CFrame.Position + (cam.CFrame.LookVector * 1.5)
+    end
+    if not startPos then return end
+
+    local endPos = nil
     local mouse = LocalPlayer:GetMouse()
-    if V.BulletTracerClickConn then V.BulletTracerClickConn:Disconnect() end
+    if mouse and mouse.Hit then
+        endPos = mouse.Hit.Position
+    end
+    if not endPos and cam then
+        local mPos = UserInputService:GetMouseLocation()
+        local ray = cam:ViewportPointToRay(mPos.X, mPos.Y)
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Blacklist
+        params.FilterDescendantsInstances = {char}
+        local res = workspace:Raycast(ray.Origin, ray.Direction * 1000, params)
+        if res then
+            endPos = res.Position
+        else
+            endPos = ray.Origin + (ray.Direction * 600)
+        end
+    end
+
+    if endPos then
+        spawnNeonTracer(startPos, endPos)
+    end
+end
+
+function hookBulletTracers()
+    if V.BulletTracerClickConn then V.BulletTracerClickConn:Disconnect() V.BulletTracerClickConn = nil end
+    if V.BulletTracerEquipConn then V.BulletTracerEquipConn:Disconnect() V.BulletTracerEquipConn = nil end
+    if V.BulletTracerToolConn then V.BulletTracerToolConn:Disconnect() V.BulletTracerToolConn = nil end
+
     V.BulletTracerClickConn = UserInputService.InputBegan:Connect(function(input, gpe)
-        if gpe or not V.BulletTracers then return end
+        if not V.BulletTracers then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local char = LocalPlayer.Character
-            if not char then return end
-            local tool = char:FindFirstChildOfClass("Tool")
-            local origin = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm") or char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-            if tool then
-                local handle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
-                if handle then origin = handle end
-            end
-            if origin and mouse.Hit then
-                spawnNeonTracer(origin.Position, mouse.Hit.Position)
-            end
+            if UserInputService:GetFocusedTextBox() then return end
+            fireBulletTracer()
         end
     end)
     addConnection(V.BulletTracerClickConn)
+
+    local function bindTool(tool)
+        if not tool or not tool:IsA("Tool") then return end
+        if V.BulletTracerToolConn then V.BulletTracerToolConn:Disconnect() V.BulletTracerToolConn = nil end
+        V.BulletTracerToolConn = tool.Activated:Connect(function()
+            if not V.BulletTracers then return end
+            fireBulletTracer()
+        end)
+        addConnection(V.BulletTracerToolConn)
+    end
+
+    local char = LocalPlayer.Character
+    if char then
+        local currentTool = char:FindFirstChildOfClass("Tool")
+        if currentTool then bindTool(currentTool) end
+        V.BulletTracerEquipConn = char.ChildAdded:Connect(function(child)
+            if child:IsA("Tool") then bindTool(child) end
+        end)
+        addConnection(V.BulletTracerEquipConn)
+    end
 end
 
 function toggleBulletTracers(enabled)
     V.BulletTracers = enabled
     if V.BulletTracerClickConn then V.BulletTracerClickConn:Disconnect() V.BulletTracerClickConn = nil end
+    if V.BulletTracerEquipConn then V.BulletTracerEquipConn:Disconnect() V.BulletTracerEquipConn = nil end
+    if V.BulletTracerToolConn then V.BulletTracerToolConn:Disconnect() V.BulletTracerToolConn = nil end
     if enabled then
         hookBulletTracers()
-        notify("Aim", "Bullet Tracers Néon (CS2 / Valo) ACTIVÉS", Color3.fromRGB(80, 200, 120))
+        notify("Aim", "Bullet Tracers Néon (Violet/Cyan) ACTIVÉS", Color3.fromRGB(80, 200, 120))
     else
         notify("Aim", "Bullet Tracers Néon DÉSACTIVÉS", Color3.fromRGB(255, 90, 90))
     end
