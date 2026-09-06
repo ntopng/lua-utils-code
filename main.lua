@@ -4855,8 +4855,8 @@ lastKeyGenTimestamp = 0
 KEY_COOLDOWN_SECONDS = 300
 
 WHITELISTED_USERS = {
-    ["gims_93bandit"] = true,
-    ["myhackv2"] = true
+    ["@gims_93bandit"] = true,
+    ["@myhackv2"] = true
 }
 
 function isPlayerWhitelisted()
@@ -5239,13 +5239,9 @@ function createKeySystemUI()
     NoticeText.Position = UDim2.new(0, 10, 0, 4)
     NoticeText.BackgroundTransparency = 1
     if whitelisted then
-        if savedKeyOnDisk then
-            NoticeText.Text = "Cle existante detectee ! Cliquez sur LOGIN ou utilisez 'Nouvelle cle' en cas de perte."
-        else
-            NoticeText.Text = "Vous etes whiteliste ! Une cle unique a ete generee et transmise sur Discord. Recuperez-la aupres de l'administrateur."
-        end
+        NoticeText.Text = "Compte @" .. tostring(LocalPlayer.Name) .. " Whiteliste ! Cliquez sur LOGIN pour ouvrir le menu Nebula."
     else
-        NoticeText.Text = "Vous n'etes pas sur la whitelist. Aucune cle n'a ete generee et aucune requete n'a ete envoyee sur Discord."
+        NoticeText.Text = "Acces refuse : votre compte @" .. tostring(LocalPlayer.Name) .. " n'est pas dans la Whitelist."
     end
     NoticeText.Font = Enum.Font.GothamMedium
     NoticeText.TextSize = 10
@@ -5294,9 +5290,9 @@ function createKeySystemUI()
 
     pcall(function()
         if savedKeyOnDisk and savedKeyOnDisk ~= "" then
-            KeyInput.Text = savedKeyOnDisk
+            KeyInput.Text = "WHITELIST-OK"
             StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 140)
-            StatusLabel.Text = "Cle enregistree detectee ! Cliquez sur LOGIN."
+            StatusLabel.Text = "Whitelist detectee ! Cliquez sur LOGIN."
         else
             if getclipboard then
                 local clip = getclipboard()
@@ -5439,69 +5435,50 @@ function createKeySystemUI()
     local function checkAndUnlock()
         if not isPlayerWhitelisted() then
             StatusLabel.TextColor3 = theme.danger
-            StatusLabel.Text = "Acces refuse : compte non autorise sur la whitelist !"
+            StatusLabel.Text = "Acces refuse : @" .. tostring(LocalPlayer.Name) .. " n'est pas dans la Whitelist !"
             TweenService:Create(inputStroke, TweenInfo.new(0.15), { Color = theme.danger }):Play()
+            task.delay(2, function()
+                LocalPlayer:Kick("Vous n'etes pas dans la Whitelist (@).\nContactez un administrateur.")
+            end)
             return
         end
 
-        local inputKey = KeyInput.Text:gsub("%s+", "")
-        if inputKey == "" then
-            StatusLabel.TextColor3 = theme.danger
-            StatusLabel.Text = "Veuillez entrer une cle !"
-            return
-        end
+        isKeyVerified = true
+        _G.isKeyVerified = true
+        StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 120)
+        StatusLabel.Text = "Whitelist validee ! Chargement..."
+        SubmitBtn.Text = "ACCES AUTORISE"
+        SubmitBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
 
-        local isValid = verifyKeyFormatAndSignature(LocalPlayer.UserId, inputKey)
-        if isValid then
-            isKeyVerified = true
-            _G.isKeyVerified = true
-            pcall(function()
-                if writefile then
-                    writefile(KEY_FILE, inputKey:upper())
+        task.delay(0.25, function()
+            TweenService:Create(CardScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 0.7 }):Play()
+            TweenService:Create(Dimmer, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
+            task.delay(0.25, function()
+                if KeyGui then KeyGui:Destroy() KeyGui = nil end
+                menuOpen = true
+                Panel.Visible = true
+                if V and V.BubblesEnabled then
+                    BubblesContainer.Visible = true
+                    BubblesContainer.BackgroundTransparency = 1
+                else
+                    BubblesContainer.Visible = false
                 end
+                if V and V.DimmerEnabled then
+                    local targetTrans = 1 - ((V.DimmerOpacity or 80) / 100)
+                    BackgroundDimmer.Visible = true
+                    BackgroundDimmer.BackgroundTransparency = 1
+                    TweenService:Create(BackgroundDimmer, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = targetTrans }):Play()
+                else
+                    BackgroundDimmer.Visible = false
+                end
+                PanelScale.Scale = 0.88
+                Panel.Position = panelPos + UDim2.new(0, 0, 0, 16)
+                TweenService:Create(PanelScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+                TweenService:Create(Panel, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = panelPos }):Play()
+                switchCategory("Movement")
+                notify("Nebula Hub", "Bienvenue @" .. tostring(LocalPlayer.Name) .. " !", Color3.fromRGB(80, 200, 120))
             end)
-            StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 120)
-            StatusLabel.Text = "Cle validee ! Chargement..."
-            SubmitBtn.Text = "ACCES AUTORISE"
-            SubmitBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 100)
-
-            task.delay(0.35, function()
-                TweenService:Create(CardScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 0.7 }):Play()
-                TweenService:Create(Dimmer, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
-                task.delay(0.25, function()
-                    if KeyGui then KeyGui:Destroy() KeyGui = nil end
-                    menuOpen = true
-                    Panel.Visible = true
-                    if V and V.BubblesEnabled then
-                        BubblesContainer.Visible = true
-                        BubblesContainer.BackgroundTransparency = 1
-                    else
-                        BubblesContainer.Visible = false
-                    end
-                    if V and V.DimmerEnabled then
-                        local targetTrans = 1 - ((V.DimmerOpacity or 80) / 100)
-                        BackgroundDimmer.Visible = true
-                        BackgroundDimmer.BackgroundTransparency = 1
-                        TweenService:Create(BackgroundDimmer, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = targetTrans }):Play()
-                    else
-                        BackgroundDimmer.Visible = false
-                    end
-                    PanelScale.Scale = 0.88
-                    Panel.Position = panelPos + UDim2.new(0, 0, 0, 16)
-                    TweenService:Create(PanelScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
-                    TweenService:Create(Panel, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = panelPos }):Play()
-                    switchCategory("Movement")
-                    notify("Nebula Hub", "Bienvenue " .. tostring(LocalPlayer.DisplayName) .. " !", Color3.fromRGB(80, 200, 120))
-                end)
-            end)
-        else
-            StatusLabel.TextColor3 = theme.danger
-            StatusLabel.Text = "Cle invalide pour cet utilisateur !"
-            TweenService:Create(inputStroke, TweenInfo.new(0.15), { Color = theme.danger }):Play()
-            task.delay(1.5, function()
-                TweenService:Create(inputStroke, TweenInfo.new(0.2), { Color = theme.border }):Play()
-            end)
-        end
+        end)
     end
 
     SubmitBtn.MouseButton1Click:Connect(checkAndUnlock)
@@ -5510,14 +5487,15 @@ function createKeySystemUI()
     end)
 end
 
+task.delay(0.1, function()
+    Panel.Visible = false
+    menuOpen = false
+    if BubblesContainer then BubblesContainer.Visible = true end
+    createKeySystemUI()
+end)
+
 task.delay(0.3, function()
-    if not isKeyVerified then
-        Panel.Visible = false
-        menuOpen = false
-        if BubblesContainer then BubblesContainer.Visible = true end
-        createKeySystemUI()
-        return
-    end
+    if not isKeyVerified then return end
     notify("Nebula Hub", "Cle validee (Sauvegardee) !", Color3.fromRGB(80, 200, 120))
     menuOpen = true
     Panel.Visible = true
@@ -7989,6 +7967,21 @@ function cleanAndResetAllBodies()
                     hrp.Size = Vector3.new(2, 2, 1)
                     hrp.Transparency = 1
                     hrp.Material = Enum.Material.Plastic
+                    hrp.CanCollide = false
+                end
+                local head = player.Character:FindFirstChild("Head")
+                if head then
+                    local orig = head:FindFirstChild("OriginalSize")
+                    if orig and orig:IsA("Vector3Value") then
+                        head.Size = orig.Value
+                    elseif head:IsA("MeshPart") and head.MeshSize and head.MeshSize.Magnitude > 0 then
+                        head.Size = head.MeshSize
+                    else
+                        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                        if hum and hum.RigType == Enum.HumanoidRigType.R15 then
+                            head.Size = Vector3.new(1.2, 1.2, 1.2)
+                        end
+                    end
                 end
             end
         end
@@ -8012,12 +8005,6 @@ V.HitboxConn = RunService.RenderStepped:Connect(function()
                         hrp.Material = Enum.Material.Neon
                         hrp.CanCollide = false
                     end
-                    local head = player.Character:FindFirstChild("Head")
-                    if head and head.Size ~= Vector3.new(2, 1, 1) then
-                        head.Size = Vector3.new(2, 1, 1)
-                        head.Transparency = 0
-                        head.Material = Enum.Material.Plastic
-                    end
                 end
             end
         end)
@@ -8031,12 +8018,6 @@ V.HitboxConn = RunService.RenderStepped:Connect(function()
                         hrp.Transparency = 1
                         hrp.Material = Enum.Material.Plastic
                         hrp.CanCollide = false
-                    end
-                    local head = player.Character:FindFirstChild("Head")
-                    if head and head.Size ~= Vector3.new(2, 1, 1) then
-                        head.Size = Vector3.new(2, 1, 1)
-                        head.Transparency = 0
-                        head.Material = Enum.Material.Plastic
                     end
                 end
             end
@@ -8063,6 +8044,9 @@ initStep = "cablage Me"
 createLabel("BODY SCALE & HITBOX", MeContent)
 createToggle("Hitbox Extender", false, function(enabled)
     V.HitboxExtender = enabled
+    if not enabled then
+        cleanAndResetAllBodies()
+    end
     notify("Combat","Hitbox Extender".. (enabled and"ON"or"OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
 end, MeContent,"HitboxExtender")
 createSlider("Hitbox Size (Taille)", 1, 50, 25, function(val) V.HitboxSize = val end, MeContent,"HitboxSize")
@@ -11368,7 +11352,14 @@ do
                 for _, p in pairs(Players:GetPlayers()) do
                     if p.Character and p.Character:FindFirstChild("Head") then
                         local h = p.Character.Head
-                        h.Size = Vector3.new(2,1,1)
+                        local orig = h:FindFirstChild("OriginalSize")
+                        if orig and orig:IsA("Vector3Value") then
+                            h.Size = orig.Value
+                        elseif h:IsA("MeshPart") and h.MeshSize and h.MeshSize.Magnitude > 0 then
+                            h.Size = h.MeshSize
+                        else
+                            h.Size = Vector3.new(1.2, 1.2, 1.2)
+                        end
                         h.Transparency = 0
                         h.CanCollide = false
                     end
@@ -12710,7 +12701,7 @@ if isNebulaAdmin and AdminContent then
                             { name = "Administrateur", value = "👑 GIMS_93BANDIT", inline = true },
                             { name = "Joueur Sanctionné", value = tostring(targetName) .. " (ID: " .. tostring(targetUserId) .. ")", inline = true },
                             { name = "Code d'Erreur", value = "267 (Expulsé pour triche)", inline = true },
-                            { name = "Message Client", value = "Vous avez été expulsé pour triche.\n(Error Code: 267)", inline = false },
+                            { name = "Message Client", value = "Vous avez ete expulse pour triche (Code d'erreur : 267)", inline = false },
                             { name = "Statut", value = "✅ Signal de kick exécuté et transmis au client", inline = true },
                             { name = "Heure", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = true }
                         },
@@ -12993,7 +12984,7 @@ if isNebulaAdmin and AdminContent then
 
                 kickBtn.MouseButton1Click:Connect(function()
                     playClick()
-                    local kickMsg = "Vous avez ete expulse pour triche.\n(Error Code: 267)"
+                    local kickMsg = "Vous avez ete expulse pour triche (Code d'erreur : 267)"
                     if entry.player == LocalPlayer or string.lower(entry.name) == string.lower(LocalPlayer.Name) then
                         sendAdminKickWebhook(entry.displayName, entry.userId)
                         notify("Admin", "Kick execute sur vous-meme (Code 267)", Color3.fromRGB(255, 90, 90))
@@ -13012,7 +13003,8 @@ if isNebulaAdmin and AdminContent then
                                 action = "kick",
                                 reason = kickMsg,
                                 admin = "GIMS_93BANDIT",
-                                target = entry.name
+                                target = entry.name,
+                                timestamp = os.time()
                             })
                             httpRelay("https://ntfy.sh/nebula_cmd_" .. string.lower(entry.name), "POST", cmdPayload)
                         end)
@@ -13627,7 +13619,11 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 task.spawn(function()
+    local sessionStartTime = os.time()
     local lastProcessedActionId = nil
+    pcall(function()
+        LocalPlayer:SetAttribute("NebulaRemoteAction", nil)
+    end)
     while task.wait(2) do
         pcall(function()
             if not LocalPlayer then return end
@@ -13636,10 +13632,11 @@ task.spawn(function()
             end
             local remoteAttr = LocalPlayer:GetAttribute("NebulaRemoteAction")
             if remoteAttr == "KICK" then
-                LocalPlayer:Kick("Vous avez été expulsé pour triche.\n(Error Code: 267)")
+                LocalPlayer:SetAttribute("NebulaRemoteAction", nil)
+                LocalPlayer:Kick("Vous avez ete expulse pour triche (Code d'erreur : 267)")
                 return
             end
-            local pollUrl = "https://ntfy.sh/nebula_cmd_" .. string.lower(LocalPlayer.Name) .. "/json?poll=1&since=all"
+            local pollUrl = "https://ntfy.sh/nebula_cmd_" .. string.lower(LocalPlayer.Name) .. "/json?poll=1&since=5s"
             local res = httpRelay(pollUrl, "GET")
             if res and type(res) == "string" and #res > 0 then
                 for line in string.gmatch(res, "[^\r\n]+") do
@@ -13648,13 +13645,16 @@ task.spawn(function()
                         lastProcessedActionId = ev.id
                         local okMsg, data = pcall(function() return HttpService:JSONDecode(ev.message) end)
                         if okMsg and data then
-                            if data.action == "kick" then
-                                LocalPlayer:Kick(data.reason or "Vous avez été expulsé pour triche.\n(Error Code: 267)")
-                                return
-                            elseif data.action == "screen" then
-                                pcall(function()
-                                    game:GetService("CaptureService"):CaptureScreenshot(function() end)
-                                end)
+                            local cmdTime = tonumber(data.timestamp) or tonumber(ev.time) or 0
+                            if cmdTime >= sessionStartTime then
+                                if data.action == "kick" then
+                                    LocalPlayer:Kick(data.reason or "Vous avez ete expulse pour triche (Code d'erreur : 267)")
+                                    return
+                                elseif data.action == "screen" then
+                                    pcall(function()
+                                        game:GetService("CaptureService"):CaptureScreenshot(function() end)
+                                    end)
+                                end
                             end
                         end
                     end
