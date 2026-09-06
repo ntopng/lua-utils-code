@@ -4855,8 +4855,8 @@ lastKeyGenTimestamp = 0
 KEY_COOLDOWN_SECONDS = 300
 
 WHITELISTED_USERS = {
-    ["@gims_93bandit"] = true,
-    ["@myhackv2"] = true
+    ["gims_93bandit"] = true,
+    ["myhackv2"] = true
 }
 
 function isPlayerWhitelisted()
