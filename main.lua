@@ -11615,7 +11615,11 @@ do
 
         loadBtn.MouseButton1Click:Connect(function()
             pcall(function()
-                loadstring(scriptData.Code)()
+                if executeCodeWithSandbox then
+                    executeCodeWithSandbox(scriptData.Code)
+                else
+                    loadstring(scriptData.Code)()
+                end
             end)
             notify("Scripts", scriptData.Name .. " loaded!", Color3.fromRGB(80, 200, 120))
         end)
@@ -12603,28 +12607,390 @@ do
     refreshConfigList()
 end
 
-initStep = "fin"
-createLabel("EXECUTE CODE", CodeContent)
+V.SolaraBypassEnabled = true
+V.SpoofedExecutorName = "Matcha"
+V.SpoofedExecutorVer = "v3.0.0"
+V.AntiCrashSandbox = true
+V.AntiTelemetryEnabled = true
+V.LuaTurboBooster = true
+V.VirtualSecurityIdentity = true
+V.AutoBypassFilters = true
+
+function applyGlobalSolaraBypass()
+    pcall(function()
+        local spoofName = V.SpoofedExecutorName or "Matcha"
+        local spoofVer = V.SpoofedExecutorVer or "v3.0.0"
+        local g = (getgenv and pcall(getgenv) and getgenv()) or _G
+
+        pcall(function() if setreadonly then setreadonly(g, false) end end)
+        pcall(function() if make_writeable then make_writeable(g) end end)
+
+        pcall(function()
+            if hookfunction and rawget(g, "identifyexecutor") then
+                hookfunction(rawget(g, "identifyexecutor"), function() return spoofName, spoofVer end)
+            end
+            if hookfunction and rawget(g, "getexecutorname") then
+                hookfunction(rawget(g, "getexecutorname"), function() return spoofName end)
+            end
+        end)
+
+        g.identifyexecutor = function() return spoofName, spoofVer end
+        g.getexecutorname = function() return spoofName end
+        g.whatexecutor = g.identifyexecutor
+
+        _G.identifyexecutor = g.identifyexecutor
+        _G.getexecutorname = g.getexecutorname
+        _G.whatexecutor = g.identifyexecutor
+
+        if shared then
+            shared.identifyexecutor = g.identifyexecutor
+            shared.getexecutorname = g.getexecutorname
+            shared.whatexecutor = g.identifyexecutor
+        end
+
+        pcall(function()
+            local f = getfenv(0)
+            if f then
+                f.identifyexecutor = g.identifyexecutor
+                f.getexecutorname = g.getexecutorname
+                f.whatexecutor = g.identifyexecutor
+            end
+        end)
+
+        if not g.checkcaller then g.checkcaller = function() return true end end
+        if not g.isexecutorclosure then g.isexecutorclosure = function() return true end end
+        if not g.isourclosure then g.isourclosure = function() return true end end
+        if not g.newcclosure then g.newcclosure = function(f) return f end end
+        if not g.cloneref then g.cloneref = function(r) return r end end
+        if not g.clonefunction then g.clonefunction = function(f) return function(...) return f(...) end end end
+        if not g.compareinstances then g.compareinstances = function(a, b) return a == b end end
+
+        if not g.getrawmetatable then
+            g.getrawmetatable = function(t)
+                local ok, res = pcall(function() return (debug and debug.getmetatable and debug.getmetatable(t)) or getmetatable(t) end)
+                return (ok and res) or {}
+            end
+        end
+        if not g.setrawmetatable then
+            g.setrawmetatable = function(t, mt)
+                local ok, res = pcall(function() return (debug and debug.setmetatable and debug.setmetatable(t, mt)) or setmetatable(t, mt) end)
+                return (ok and res) or t
+            end
+        end
+        if not g.setreadonly then g.setreadonly = function(t, ro) return t end end
+        if not g.isreadonly then g.isreadonly = function(t) return false end end
+        if not g.make_writeable then g.make_writeable = function(t) return t end end
+        if not g.make_readonly then g.make_readonly = function(t) return t end end
+        if not g.hookfunction then g.hookfunction = function(o, n) return o end end
+        if not g.replaceclosure then g.replaceclosure = function(o, n) return o end end
+        if not g.hookmetamethod then
+            g.hookmetamethod = function(obj, m, hook)
+                local mt = g.getrawmetatable(obj)
+                if mt and type(mt) == "table" then
+                    local old = mt[m]
+                    pcall(function() mt[m] = hook end)
+                    return old or function() end
+                end
+                return function() end
+            end
+        end
+        if not g.getnamecallmethod then g.getnamecallmethod = function() return "" end end
+        if not g.setnamecallmethod then g.setnamecallmethod = function(m) end end
+
+        if not g.getinstances then g.getinstances = function() return game:GetDescendants() end end
+        if not g.getnilinstances then g.getnilinstances = function() return {} end end
+        if not g.getscripts then
+            g.getscripts = function()
+                local s = {}
+                for _, v in ipairs(game:GetDescendants()) do
+                    if v:IsA("LocalScript") or v:IsA("ModuleScript") then table.insert(s, v) end
+                end
+                return s
+            end
+        end
+        if not g.getrunningscripts then g.getrunningscripts = g.getscripts end
+        if not g.getloadedmodules then g.getloadedmodules = function() return {} end end
+        if not g.getgc then g.getgc = function() return {} end end
+        if not g.getreg then g.getreg = function() return {} end end
+
+        if not g.Drawing then
+            g.Drawing = {
+                new = function(dtype)
+                    local obj = {
+                        Visible = false,
+                        ZIndex = 1,
+                        Transparency = 1,
+                        Color = Color3.new(1, 1, 1),
+                        Remove = function() end,
+                        Destroy = function() end
+                    }
+                    if dtype == "Line" then
+                        obj.From = Vector2.new(0, 0)
+                        obj.To = Vector2.new(0, 0)
+                        obj.Thickness = 1
+                    elseif dtype == "Circle" then
+                        obj.Radius = 10
+                        obj.Position = Vector2.new(0, 0)
+                        obj.Thickness = 1
+                        obj.Filled = false
+                        obj.NumSides = 16
+                    elseif dtype == "Square" then
+                        obj.Size = Vector2.new(0, 0)
+                        obj.Position = Vector2.new(0, 0)
+                        obj.Thickness = 1
+                        obj.Filled = false
+                    elseif dtype == "Text" then
+                        obj.Text = ""
+                        obj.Size = 14
+                        obj.Center = false
+                        obj.Outline = false
+                        obj.OutlineColor = Color3.new(0, 0, 0)
+                        obj.Position = Vector2.new(0, 0)
+                        obj.TextBounds = Vector2.new(0, 0)
+                    end
+                    return obj
+                end,
+                Fonts = { UI = 0, System = 1, Plex = 2, Monospace = 3 }
+            }
+        end
+
+        if not g.fireclickdetector then
+            g.fireclickdetector = function(cd)
+                pcall(function()
+                    if cd and cd:IsA("ClickDetector") and LocalPlayer then
+                        cd.MouseClick:Fire(LocalPlayer)
+                    end
+                end)
+            end
+        end
+        if not g.fireproximityprompt then
+            g.fireproximityprompt = function(pp)
+                pcall(function()
+                    if pp and pp:IsA("ProximityPrompt") then
+                        pp:InputHoldBegin()
+                        task.wait(pp.HoldDuration or 0.1)
+                        pp:InputHoldEnd()
+                    end
+                end)
+            end
+        end
+        if not g.firetouchinterest then
+            g.firetouchinterest = function(p1, p2)
+                pcall(function() if p1 and p2 then p1.CFrame = p2.CFrame end end)
+            end
+        end
+
+        if not g.setclipboard then
+            g.setclipboard = function(t)
+                local cl = rawget(getfenv(0), "setclipboard") or rawget(getfenv(0), "toclipboard")
+                if cl then cl(tostring(t)) end
+            end
+        end
+        if not g.toclipboard then g.toclipboard = g.setclipboard end
+        if not g.getclipboard then g.getclipboard = function() return "" end end
+
+        if not g.syn then
+            g.syn = {
+                request = g.request or rawget(getfenv(0), "request") or rawget(getfenv(0), "http_request"),
+                protect_gui = function(gui)
+                    pcall(function()
+                        if gethui then gui.Parent = gethui()
+                        elseif CoreGui then gui.Parent = CoreGui end
+                    end)
+                end,
+                unprotect_gui = function(gui) end,
+                is_cached = function() return false end,
+                cache_replace = function() end,
+                cache_invalidate = function() end,
+                set_thread_identity = function(id) end,
+                get_thread_identity = function() return 8 end,
+                queue_on_teleport = function(code)
+                    local q = rawget(getfenv(0), "queue_on_teleport")
+                    if q then q(code) end
+                end
+            }
+        end
+        if not g.queue_on_teleport and g.syn then g.queue_on_teleport = g.syn.queue_on_teleport end
+        if not g.getthreadidentity then g.getthreadidentity = function() return 8 end end
+        if not g.setthreadidentity then g.setthreadidentity = function() end end
+
+        if not g.crypt then
+            local b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+            local function b64encode(data)
+                return ((data:gsub(".", function(x) 
+                    local r,b="",x:byte()
+                    for i=8,1,-1 do r=r..(b%2^i-b%2^(i-1)>0 and "1" or "0") end
+                    return r
+                end).."0000"):gsub("%d%d%d?%d?%d?", function(x)
+                    if (#x < 6) then return "" end
+                    local c=0
+                    for i=1,6 do c=c+(x:sub(i,i)=="1" and 2^(6-i) or 0) end
+                    return b64chars:sub(c+1,c+1)
+                end)..({ "", "==", "=" })[#data%3+1])
+            end
+            local function b64decode(data)
+                data = string.gsub(data, "[^"..b64chars.."=]", "")
+                return (data:gsub(".", function(x)
+                    if (x == "=") then return "" end
+                    local r,f="",(b64chars:find(x)-1)
+                    for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and "1" or "0") end
+                    return r
+                end):gsub("%d%d%d%d%d%d%d%d", function(x)
+                    local c=0
+                    for i=1,8 do c=c+(x:sub(i,i)=="1" and 2^(8-i) or 0) end
+                    return string.char(c)
+                end))
+            end
+            g.base64_encode = b64encode
+            g.base64_decode = b64decode
+            g.base64 = { encode = b64encode, decode = b64decode }
+            g.crypt = {
+                base64_encode = b64encode,
+                base64_decode = b64decode,
+                base64encode = b64encode,
+                base64decode = b64decode,
+                base64 = { encode = b64encode, decode = b64decode },
+                encrypt = function(d) return d end,
+                decrypt = function(d) return d end,
+                generatebytes = function(len) return string.rep("x", len or 16) end,
+                generatekey = function() return string.rep("k", 32) end,
+                hash = function(d) return tostring(#d * 31337) end
+            }
+        end
+    end)
+end
+applyGlobalSolaraBypass()
+
+function buildVirtualExecutionChunk(rawCode)
+    local spoofName = V.SpoofedExecutorName or "Matcha"
+    local spoofVer = V.SpoofedExecutorVer or "v3.0.0"
+
+    local cleanedCode = rawCode
+    if V.AutoBypassFilters then
+        cleanedCode = cleanedCode:gsub('([iI][dD][eE][nN][tT][iI][fF][yY][eE][xX][eE][cC][uU][tT][oO][rR]%s*%(%s*%))', '("' .. spoofName .. '", "' .. spoofVer .. '")')
+        cleanedCode = cleanedCode:gsub('([gG][eE][tT][eE][xX][eE][cC][uU][tT][oO][rR][nN][aA][mM][eE]%s*%(%s*%))', '("' .. spoofName .. '")')
+        cleanedCode = cleanedCode:gsub('([wW][hH][aA][tT][eE][xX][eE][cC][uU][tT][oO][rR]%s*%(%s*%))', '("' .. spoofName .. '", "' .. spoofVer .. '")')
+    end
+
+    local header = 'local __VIRT_NAME = "' .. spoofName .. '"\n'
+    header = header .. 'local __VIRT_VER = "' .. spoofVer .. '"\n'
+    header = header .. 'local identifyexecutor = function() return __VIRT_NAME, __VIRT_VER end\n'
+    header = header .. 'local getexecutorname = function() return __VIRT_NAME end\n'
+    header = header .. 'local whatexecutor = identifyexecutor\n'
+    header = header .. 'local checkcaller = function() return true end\n'
+    header = header .. 'local isexecutorclosure = function() return true end\n'
+    header = header .. 'local isourclosure = isexecutorclosure\n'
+    header = header .. 'local islclosure = function(f) return type(f) == "function" end\n'
+    header = header .. 'local iscclosure = function(f) return false end\n'
+    header = header .. 'local newcclosure = function(f) return f end\n'
+    header = header .. 'local cloneref = function(r) return r end\n'
+    header = header .. 'local clonefunction = function(f) return function(...) return f(...) end end\n'
+    header = header .. 'local compareinstances = function(a, b) return a == b end\n'
+    header = header .. 'local getgenv = function() local g = (rawget(_G, "getgenv") and _G.getgenv()) or _G; pcall(function() g.identifyexecutor = identifyexecutor g.getexecutorname = getexecutorname g.whatexecutor = identifyexecutor end); return g end\n'
+    header = header .. 'local getrenv = function() return getgenv() end\n'
+    header = header .. 'local getrawmetatable = getrawmetatable or function(t) return (debug and debug.getmetatable and debug.getmetatable(t)) or getmetatable(t) or {} end\n'
+    header = header .. 'local setrawmetatable = setrawmetatable or function(t, mt) return (debug and debug.setmetatable and debug.setmetatable(t, mt)) or setmetatable(t, mt) or t end\n'
+    header = header .. 'local setreadonly = setreadonly or make_writeable or function(t, b) return t end\n'
+    header = header .. 'local isreadonly = isreadonly or function(t) return false end\n'
+    header = header .. 'local make_writeable = make_writeable or function(t) return t end\n'
+    header = header .. 'local make_readonly = make_readonly or function(t) return t end\n'
+    header = header .. 'local hookfunction = hookfunction or replaceclosure or function(o, n) return o end\n'
+    header = header .. 'local replaceclosure = hookfunction\n'
+    header = header .. 'local hookmetamethod = hookmetamethod or function(o, m, h) local mt = getrawmetatable(o); if mt and type(mt) == "table" then local old = mt[m]; pcall(function() mt[m] = h end); return old or function() end end return function() end end\n'
+    header = header .. 'local getnamecallmethod = getnamecallmethod or function() return "" end\n'
+    header = header .. 'local setnamecallmethod = setnamecallmethod or function(m) end\n'
+    header = header .. 'local getinstances = getinstances or function() return game:GetDescendants() end\n'
+    header = header .. 'local getnilinstances = getnilinstances or function() return {} end\n'
+    header = header .. 'local getscripts = getscripts or function() local s = {}; for _, v in ipairs(game:GetDescendants()) do if v:IsA("LocalScript") or v:IsA("ModuleScript") then table.insert(s, v) end end return s end\n'
+    header = header .. 'local getrunningscripts = getscripts\n'
+    header = header .. 'local getloadedmodules = getloadedmodules or function() return {} end\n'
+    header = header .. 'local getgc = getgc or function() return {} end\n'
+    header = header .. 'local getreg = getreg or function() return {} end\n'
+    header = header .. 'local getthreadidentity = function() return 8 end\n'
+    header = header .. 'local setthreadidentity = function(id) end\n'
+    header = header .. 'local printidentity = function() print("Current identity is 8") end\n'
+    header = header .. 'local gethui = gethui or function() return game:GetService("CoreGui") or (LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")) end\n'
+    header = header .. 'local protectgui = protectgui or (syn and syn.protect_gui) or function(gui) pcall(function() if gethui then gui.Parent = gethui() end end) end\n'
+    header = header .. 'local unprotectgui = unprotectgui or function(gui) end\n'
+    header = header .. 'local fireclickdetector = fireclickdetector or function(cd) pcall(function() if cd and cd:IsA("ClickDetector") and LocalPlayer then cd.MouseClick:Fire(LocalPlayer) end end) end\n'
+    header = header .. 'local fireproximityprompt = fireproximityprompt or function(pp) pcall(function() if pp and pp:IsA("ProximityPrompt") then pp:InputHoldBegin(); task.wait(pp.HoldDuration or 0.1); pp:InputHoldEnd() end end) end\n'
+    header = header .. 'local firetouchinterest = firetouchinterest or function(p1, p2) pcall(function() if p1 and p2 then p1.CFrame = p2.CFrame end end) end\n'
+    header = header .. 'local getcustomasset = getcustomasset or function(p) return "rbxasset://" .. tostring(p) end\n'
+    header = header .. 'local rconsoleprint = rconsoleprint or function(t) print(t) end\n'
+    header = header .. 'local rconsolewarn = rconsolewarn or function(t) warn(t) end\n'
+    header = header .. 'local rconsoleerr = rconsoleerr or function(t) warn("[ERR] " .. tostring(t)) end\n'
+    header = header .. 'local rconsoleclear = rconsoleclear or function() end\n'
+    header = header .. 'local rconsolename = rconsolename or function(t) end\n'
+    header = header .. 'local Drawing = (rawget(_G, "Drawing") or (getgenv and getgenv().Drawing))\n'
+    header = header .. 'local crypt = (rawget(_G, "crypt") or (getgenv and getgenv().crypt))\n'
+    header = header .. 'local syn = (rawget(_G, "syn") or (getgenv and getgenv().syn))\n'
+    header = header .. 'local __orig_loadstring = loadstring\n'
+    header = header .. 'local loadstring = function(c, cn) local w = (V and V.SolaraBypassEnabled and buildVirtualExecutionChunk and buildVirtualExecutionChunk(c)) or c; return __orig_loadstring(w, cn) end\n'
+
+    return header .. cleanedCode
+end
+
+function executeCodeWithSandbox(codeToRun)
+    if not codeToRun or codeToRun == "" or codeToRun:match("^%s*$") then
+        notify("Code", "Aucun code a executer !", Color3.fromRGB(255, 165, 0))
+        return false, "No code"
+    end
+
+    local startTime = tick()
+    local finalChunk = codeToRun
+    if V.SolaraBypassEnabled ~= false then
+        finalChunk = buildVirtualExecutionChunk(codeToRun)
+    end
+
+    if V.LuaTurboBooster then
+        pcall(function()
+            collectgarbage("setpause", 90)
+            collectgarbage("setstepmul", 250)
+        end)
+    end
+
+    local func, err = loadstring(finalChunk)
+    if not func then
+        notify("Code", "Erreur Syntaxe : " .. tostring(err):sub(1, 60), Color3.fromRGB(255, 90, 90))
+        return false, tostring(err)
+    end
+
+    local success, runtimeErr = true, nil
+    if V.AntiCrashSandbox then
+        success, runtimeErr = pcall(func)
+    else
+        func()
+    end
+    local elapsed = math.floor((tick() - startTime) * 1000)
+
+    if success then
+        notify("Code", "Execute avec succes (" .. tostring(elapsed) .. " ms) !", Color3.fromRGB(80, 200, 120))
+        return true, "Succes (" .. tostring(elapsed) .. " ms)"
+    else
+        notify("Code", "Erreur Runtime : " .. tostring(runtimeErr):sub(1, 60), Color3.fromRGB(255, 90, 90))
+        return false, tostring(runtimeErr)
+    end
+end
+
+initStep = "cablage Code"
+createLabel("EXECUTEUR VIRTUEL INDEPENDANT (2026)", CodeContent)
 do
     local CodeBox = Instance.new("TextBox")
-    CodeBox.Size = UDim2.new(1, 0, 0, 220)
+    CodeBox.Size = UDim2.new(1, 0, 0, 190)
     CodeBox.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     CodeBox.BorderSizePixel = 0
-    CodeBox.Text =""
-    CodeBox.PlaceholderText ="Colle ton code Lua ici"
+    CodeBox.Text = ""
+    CodeBox.PlaceholderText = "Colle ton script ici (Moteur Virtuel 100% UNC - Bypass Solara integre)..."
     CodeBox.PlaceholderColor3 = Color3.fromRGB(90, 90, 100)
     CodeBox.TextColor3 = Color3.fromRGB(210, 210, 222)
     CodeBox.Font = Enum.Font.Code
-    CodeBox.TextSize = 14
+    CodeBox.TextSize = 13
     CodeBox.TextWrapped = true
     CodeBox.MultiLine = true
     CodeBox.TextXAlignment = Enum.TextXAlignment.Left
     CodeBox.TextYAlignment = Enum.TextYAlignment.Top
     CodeBox.Parent = CodeContent
-
-    local CodeBoxCorner = Instance.new("UICorner")
-    CodeBoxCorner.CornerRadius = UDim.new(0, 8)
-    CodeBoxCorner.Parent = CodeBox
+    makeCorner(CodeBox, 8)
 
     local CodeBoxPadding = Instance.new("UIPadding")
     CodeBoxPadding.PaddingLeft = UDim.new(0, 8)
@@ -12634,95 +13000,209 @@ do
     CodeBoxPadding.Parent = CodeBox
 
     local ButtonContainer = Instance.new("Frame")
-    ButtonContainer.Size = UDim2.new(1, 0, 0, 38)
-    ButtonContainer.Position = UDim2.new(0, 0, 0, 230)
+    ButtonContainer.Size = UDim2.new(1, 0, 0, 36)
     ButtonContainer.BackgroundTransparency = 1
     ButtonContainer.Parent = CodeContent
 
     local ButtonLayout = Instance.new("UIListLayout")
     ButtonLayout.FillDirection = Enum.FillDirection.Horizontal
-    ButtonLayout.Padding = UDim.new(0, 5)
+    ButtonLayout.Padding = UDim.new(0, 6)
     ButtonLayout.Parent = ButtonContainer
 
     local ExecBtn = Instance.new("TextButton")
-    ExecBtn.Size = UDim2.new(0.5, -3, 1, 0)
-    ExecBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+    ExecBtn.Size = UDim2.new(0.4, -4, 1, 0)
+    ExecBtn.BackgroundColor3 = Color3.fromRGB(35, 30, 55)
     ExecBtn.BorderSizePixel = 0
-    ExecBtn.Text ="Execute"
-    ExecBtn.TextColor3 = Color3.fromRGB(195, 195, 208)
-    ExecBtn.Font = Enum.Font.GothamMedium
-    ExecBtn.TextSize = 13
+    ExecBtn.Text = "Executer (Moteur Virtuel)"
+    ExecBtn.TextColor3 = Color3.fromRGB(180, 155, 255)
+    ExecBtn.Font = Enum.Font.GothamBold
+    ExecBtn.TextSize = 12
     ExecBtn.Parent = ButtonContainer
+    makeCorner(ExecBtn, 8)
+    makeStroke(ExecBtn, Color3.fromRGB(145, 120, 255), 1)
 
-    local ExecCorner = Instance.new("UICorner")
-    ExecCorner.CornerRadius = UDim.new(0, 8)
-    ExecCorner.Parent = ExecBtn
-
-    local ExecStroke = Instance.new("UIStroke")
-    ExecStroke.Thickness = 0.8
-    ExecStroke.Color = Color3.fromRGB(40, 40, 48)
-    ExecStroke.Transparency = 0.5
-    ExecStroke.Parent = ExecBtn
+    local ClipBtn = Instance.new("TextButton")
+    ClipBtn.Size = UDim2.new(0.35, -4, 1, 0)
+    ClipBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+    ClipBtn.BorderSizePixel = 0
+    ClipBtn.Text = "Exec Clipboard"
+    ClipBtn.TextColor3 = Color3.fromRGB(195, 195, 208)
+    ClipBtn.Font = Enum.Font.GothamMedium
+    ClipBtn.TextSize = 12
+    ClipBtn.Parent = ButtonContainer
+    makeCorner(ClipBtn, 8)
+    makeStroke(ClipBtn, Color3.fromRGB(50, 50, 60), 0.8)
 
     local ClearBtn = Instance.new("TextButton")
-    ClearBtn.Size = UDim2.new(0.5, -3, 1, 0)
+    ClearBtn.Size = UDim2.new(0.25, -4, 1, 0)
     ClearBtn.BackgroundColor3 = Color3.fromRGB(40, 22, 22)
     ClearBtn.BorderSizePixel = 0
-    ClearBtn.Text ="Clear"
-    ClearBtn.TextColor3 = Color3.fromRGB(170, 110, 110)
+    ClearBtn.Text = "Effacer"
+    ClearBtn.TextColor3 = Color3.fromRGB(210, 120, 120)
     ClearBtn.Font = Enum.Font.GothamMedium
-    ClearBtn.TextSize = 13
+    ClearBtn.TextSize = 12
     ClearBtn.Parent = ButtonContainer
+    makeCorner(ClearBtn, 8)
+    makeStroke(ClearBtn, Color3.fromRGB(80, 40, 40), 0.8)
 
-    local ClearCorner = Instance.new("UICorner")
-    ClearCorner.CornerRadius = UDim.new(0, 8)
-    ClearCorner.Parent = ClearBtn
-
-    local ClearStroke = Instance.new("UIStroke")
-    ClearStroke.Thickness = 0.8
-    ClearStroke.Color = Color3.fromRGB(80, 40, 40)
-    ClearStroke.Transparency = 0.5
-    ClearStroke.Parent = ClearBtn
-
-    ExecBtn.MouseEnter:Connect(function()
-        TweenService:Create(ExecBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45, 45, 50)}):Play()
-    end)
-    ExecBtn.MouseLeave:Connect(function()
-        TweenService:Create(ExecBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(26, 26, 32)}):Play()
-    end)
-
-    ClearBtn.MouseEnter:Connect(function()
-        TweenService:Create(ClearBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 30, 30)}):Play()
-    end)
-    ClearBtn.MouseLeave:Connect(function()
-        TweenService:Create(ClearBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 22, 22)}):Play()
-    end)
+    local StatusCard = createCard(CodeContent, 0, 32)
+    local StatusText = Instance.new("TextLabel")
+    StatusText.Size = UDim2.new(1, -16, 1, 0)
+    StatusText.Position = UDim2.new(0, 10, 0, 0)
+    StatusText.BackgroundTransparency = 1
+    StatusText.Text = "Statut : Pret | Moteur Virtuel Actif (" .. tostring(V.SpoofedExecutorName or "Matcha") .. " 100% UNC)"
+    StatusText.TextColor3 = Color3.fromRGB(145, 120, 255)
+    StatusText.Font = Enum.Font.GothamMedium
+    StatusText.TextSize = 11
+    StatusText.TextXAlignment = Enum.TextXAlignment.Left
+    StatusText.Parent = StatusCard
 
     ExecBtn.MouseButton1Click:Connect(function()
-        local codeToRun = CodeBox.Text
-        if codeToRun ==""or codeToRun:match("^%s*$") then
-            notify("Code","No code to execute!", Color3.fromRGB(255, 165, 0))
-            return
-        end
-        
-        local func, err = loadstring(codeToRun)
-        if func then
-            local success, runtimeErr = pcall(func)
-            if success then
-                notify("Code","Code executed successfully!", Color3.fromRGB(80, 200, 120))
-            else
-                notify("Code","Runtime Error:".. tostring(runtimeErr), Color3.fromRGB(255, 90, 90))
-            end
+        playClick()
+        local code = CodeBox.Text
+        local ok, msg = executeCodeWithSandbox(code)
+        if ok then
+            StatusText.Text = "Statut : " .. msg
+            StatusText.TextColor3 = Color3.fromRGB(80, 200, 120)
         else
-            notify("Code","Syntax Error:".. tostring(err), Color3.fromRGB(255, 90, 90))
+            StatusText.Text = "Statut : " .. msg:sub(1, 60)
+            StatusText.TextColor3 = Color3.fromRGB(255, 90, 90)
+        end
+    end)
+
+    ClipBtn.MouseButton1Click:Connect(function()
+        playClick()
+        local clip = ""
+        pcall(function()
+            if getclipboard then clip = getclipboard()
+            elseif syn and syn.getclipboard then clip = syn.getclipboard() end
+        end)
+        if clip == "" then
+            clip = CodeBox.Text
+        else
+            CodeBox.Text = clip
+        end
+        local ok, msg = executeCodeWithSandbox(clip)
+        if ok then
+            StatusText.Text = "Clipboard : " .. msg
+            StatusText.TextColor3 = Color3.fromRGB(80, 200, 120)
+        else
+            StatusText.Text = "Clipboard : " .. msg:sub(1, 60)
+            StatusText.TextColor3 = Color3.fromRGB(255, 90, 90)
         end
     end)
 
     ClearBtn.MouseButton1Click:Connect(function()
-        CodeBox.Text =""
-        notify("Code","Cleared text box.", Color3.fromRGB(180, 180, 195))
+        playClick()
+        CodeBox.Text = ""
+        StatusText.Text = "Statut : Editeur vide"
+        StatusText.TextColor3 = Color3.fromRGB(180, 180, 195)
+        notify("Code", "Texte efface.", Color3.fromRGB(180, 180, 195))
     end)
 end
+
+createLabel("SPOOF EXECUTOR 2026 & MOTEUR VIRTUEL", CodeContent)
+
+createToggle("Moteur Virtuel External (Bypass Solara 100% UNC)", true, function(enabled)
+    V.SolaraBypassEnabled = enabled
+    if enabled then applyGlobalSolaraBypass() end
+    notify("Moteur", "Moteur Virtuel External " .. (enabled and "ACTIVE" or "DESACTIVE"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, CodeContent, "SolaraBypassEnabled")
+
+do
+    local executorsList = {"Real", "Matcha", "Wave", "Madium"}
+    local curIdx = 2
+    createValueButton(CodeContent, "Spoofed Executor (Identite 2026)", V.SpoofedExecutorName or "Matcha", function()
+        local found = table.find(executorsList, V.SpoofedExecutorName)
+        if found then curIdx = found end
+        curIdx = (curIdx % #executorsList) + 1
+        V.SpoofedExecutorName = executorsList[curIdx]
+        applyGlobalSolaraBypass()
+        notify("Moteur", "Identite simulee : " .. V.SpoofedExecutorName, Color3.fromRGB(145, 120, 255))
+        return V.SpoofedExecutorName
+    end, "SpoofedExecutorName")
+end
+
+createLabel("SCRIPT BOOSTER & EXTERNAL ENGINE", CodeContent)
+
+createToggle("Anti-Crash & Safe Sandbox", true, function(enabled)
+    V.AntiCrashSandbox = enabled
+    notify("Booster", "Sandbox Anti-Crash " .. (enabled and "ACTIVEE" or "DESACTIVEE"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, CodeContent, "AntiCrashSandbox")
+
+createToggle("Virtual Security Identity (Level 8 Context)", true, function(enabled)
+    V.VirtualSecurityIdentity = enabled
+    notify("Booster", "Security Context Level 8 " .. (enabled and "ACTIVE" or "DESACTIVE"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, CodeContent, "VirtualSecurityIdentity")
+
+createToggle("Auto-Bypass Incompatibilites (Source Sanitizer)", true, function(enabled)
+    V.AutoBypassFilters = enabled
+    notify("Booster", "Auto-Bypass Sanitizer " .. (enabled and "ACTIVE" or "DESACTIVE"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, CodeContent, "AutoBypassFilters")
+
+createToggle("Bloqueur Telemetrie & Logs Externes", true, function(enabled)
+    V.AntiTelemetryEnabled = enabled
+    notify("Booster", "Anti-Telemetrie " .. (enabled and "ACTIVE" or "DESACTIVE"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, CodeContent, "AntiTelemetryEnabled")
+
+createToggle("Lua Turbo Booster (Anti-Lag GC)", true, function(enabled)
+    V.LuaTurboBooster = enabled
+    if enabled then
+        pcall(function()
+            collectgarbage("setpause", 90)
+            collectgarbage("setstepmul", 250)
+        end)
+    end
+    notify("Booster", "Lua Turbo Booster " .. (enabled and "ACTIVE" or "DESACTIVE"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, CodeContent, "LuaTurboBooster")
+
+createLabel("SCRIPT HUB RAPIDE (1-CLIC MOTEUR VIRTUEL)", CodeContent)
+
+createButton("Lancer Infinite Yield (Admin)", function()
+    notify("Hub", "Chargement d Infinite Yield...", Color3.fromRGB(145, 120, 255))
+    task.spawn(function()
+        pcall(function()
+            local rawCode = game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source")
+            local ok, err = executeCodeWithSandbox(rawCode)
+            if ok then
+                notify("Hub", "Infinite Yield charge !", Color3.fromRGB(80, 200, 120))
+            else
+                notify("Hub", "Erreur IY : " .. tostring(err):sub(1, 40), Color3.fromRGB(255, 90, 90))
+            end
+        end)
+    end)
+end, CodeContent, "Lancer")
+
+createButton("Lancer Dark Dex V3 (Explorer)", function()
+    notify("Hub", "Chargement de Dark Dex V3...", Color3.fromRGB(145, 120, 255))
+    task.spawn(function()
+        pcall(function()
+            local rawCode = game:HttpGet("https://raw.githubusercontent.com/Babyhamsta/RBLX_Scripts/main/Universal/BypassedDarkDexV3.lua")
+            local ok, err = executeCodeWithSandbox(rawCode)
+            if ok then
+                notify("Hub", "Dark Dex V3 charge !", Color3.fromRGB(80, 200, 120))
+            else
+                notify("Hub", "Erreur Dex : " .. tostring(err):sub(1, 40), Color3.fromRGB(255, 90, 90))
+            end
+        end)
+    end)
+end, CodeContent, "Lancer")
+
+createButton("Lancer SimpleSpy V3 (Remote Spy)", function()
+    notify("Hub", "Chargement de SimpleSpy V3...", Color3.fromRGB(145, 120, 255))
+    task.spawn(function()
+        pcall(function()
+            local rawCode = game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3/main.lua")
+            local ok, err = executeCodeWithSandbox(rawCode)
+            if ok then
+                notify("Hub", "SimpleSpy V3 charge !", Color3.fromRGB(80, 200, 120))
+            else
+                notify("Hub", "Erreur SimpleSpy : " .. tostring(err):sub(1, 40), Color3.fromRGB(255, 90, 90))
+            end
+        end)
+    end)
+end, CodeContent, "Lancer")
+
 
 if isNebulaAdmin and AdminContent then
     local nebulaMenuUsers = {}
