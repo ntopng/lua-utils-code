@@ -5262,16 +5262,28 @@ function createKeySystemUI()
     KeyInput.Size = UDim2.new(1, -20, 1, 0)
     KeyInput.Position = UDim2.new(0, 10, 0, 0)
     KeyInput.BackgroundTransparency = 1
-    KeyInput.Text = ""
-    KeyInput.PlaceholderText = whitelisted and "Entrez votre cle..." or "Acces refuse - Non whiteliste"
+    KeyInput.Text = whitelisted and "WHITELIST-OK" or ""
+    KeyInput.PlaceholderText = whitelisted and "WHITELIST-OK" or "Acces refuse - Non whiteliste"
     KeyInput.PlaceholderColor3 = Color3.fromRGB(90, 95, 115)
-    KeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+    KeyInput.TextColor3 = whitelisted and Color3.fromRGB(80, 220, 140) or Color3.fromRGB(255, 255, 255)
     KeyInput.Font = Enum.Font.Code
     KeyInput.TextSize = 12
     KeyInput.ClearTextOnFocus = false
+    KeyInput.TextEditable = not whitelisted
+    KeyInput.Active = not whitelisted
     KeyInput.Parent = InputContainer
 
+    KeyInput:GetPropertyChangedSignal("Text"):Connect(function()
+        if whitelisted and KeyInput.Text ~= "WHITELIST-OK" then
+            KeyInput.Text = "WHITELIST-OK"
+        end
+    end)
+
     KeyInput.Focused:Connect(function()
+        if whitelisted then
+            KeyInput:ReleaseFocus()
+            return
+        end
         TweenService:Create(inputStroke, TweenInfo.new(0.2), { Color = theme.accent }):Play()
     end)
     KeyInput.FocusLost:Connect(function()
@@ -5289,10 +5301,16 @@ function createKeySystemUI()
     StatusLabel.Parent = Card
 
     pcall(function()
-        if savedKeyOnDisk and savedKeyOnDisk ~= "" then
+        if whitelisted then
             KeyInput.Text = "WHITELIST-OK"
+            KeyInput.TextEditable = false
+            KeyInput.Active = false
             StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 140)
             StatusLabel.Text = "Whitelist detectee ! Cliquez sur LOGIN."
+        elseif savedKeyOnDisk and savedKeyOnDisk ~= "" then
+            KeyInput.Text = savedKeyOnDisk
+            StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 140)
+            StatusLabel.Text = "Cle sauvegardee detectee ! Cliquez sur LOGIN."
         else
             if getclipboard then
                 local clip = getclipboard()
@@ -5352,18 +5370,18 @@ function createKeySystemUI()
     makeCorner(CopyIdBtn, 7)
     makeStroke(CopyIdBtn, theme.border, 1)
 
-    local NewKeyBtn = Instance.new("TextButton")
-    NewKeyBtn.Size = UDim2.new(0.31, 0, 1, 0)
-    NewKeyBtn.Position = UDim2.new(0.69, 0, 0, 0)
-    NewKeyBtn.BackgroundColor3 = Color3.fromRGB(20, 21, 30)
-    NewKeyBtn.BorderSizePixel = 0
-    NewKeyBtn.Text = "Nouvelle clee"
-    NewKeyBtn.TextColor3 = theme.text
-    NewKeyBtn.Font = Enum.Font.GothamBold
-    NewKeyBtn.TextSize = 10
-    NewKeyBtn.Parent = ActionRow
-    makeCorner(NewKeyBtn, 7)
-    makeStroke(NewKeyBtn, theme.border, 1)
+    local CopyUsernameBtn = Instance.new("TextButton")
+    CopyUsernameBtn.Size = UDim2.new(0.31, 0, 1, 0)
+    CopyUsernameBtn.Position = UDim2.new(0.69, 0, 0, 0)
+    CopyUsernameBtn.BackgroundColor3 = Color3.fromRGB(20, 21, 30)
+    CopyUsernameBtn.BorderSizePixel = 0
+    CopyUsernameBtn.Text = "Copier mon @"
+    CopyUsernameBtn.TextColor3 = theme.text
+    CopyUsernameBtn.Font = Enum.Font.GothamBold
+    CopyUsernameBtn.TextSize = 10
+    CopyUsernameBtn.Parent = ActionRow
+    makeCorner(CopyUsernameBtn, 7)
+    makeStroke(CopyUsernameBtn, theme.border, 1)
 
     local function setupHover(btn)
         btn.MouseEnter:Connect(function()
@@ -5375,9 +5393,10 @@ function createKeySystemUI()
     end
     setupHover(AutoDropBtn)
     setupHover(CopyIdBtn)
-    setupHover(NewKeyBtn)
+    setupHover(CopyUsernameBtn)
 
     AutoDropBtn.MouseButton1Click:Connect(function()
+        if whitelisted then return end
         pcall(function()
             if getclipboard then
                 local clip = getclipboard()
@@ -5400,36 +5419,14 @@ function createKeySystemUI()
         end)
     end)
 
-    NewKeyBtn.MouseButton1Click:Connect(function()
-        if not isPlayerWhitelisted() then
-            StatusLabel.TextColor3 = theme.danger
-            StatusLabel.Text = "Refuse : Vous n'etes pas sur la whitelist !"
-            return
-        end
-
-        local now = os.time()
-        local elapsed = now - lastKeyGenTimestamp
-        if elapsed < KEY_COOLDOWN_SECONDS then
-            local remaining = KEY_COOLDOWN_SECONDS - elapsed
-            local mins = math.floor(remaining / 60)
-            local secs = remaining % 60
-            StatusLabel.TextColor3 = Color3.fromRGB(255, 170, 0)
-            StatusLabel.Text = string.format("Patientez %02d:%02d avant de regenerer.", mins, secs)
-            return
-        end
-
-        lastKeyGenTimestamp = now
-        activeValidationKey, currentSessionToken = generateFreshKeyForUser(LocalPlayer.UserId)
-        savedKeyOnDisk = activeValidationKey
+    CopyUsernameBtn.MouseButton1Click:Connect(function()
         pcall(function()
-            if writefile then
-                writefile(KEY_FILE, activeValidationKey)
+            if setclipboard then
+                setclipboard("@" .. tostring(LocalPlayer.Name))
+                StatusLabel.TextColor3 = Color3.fromRGB(80, 200, 255)
+                StatusLabel.Text = "@" .. tostring(LocalPlayer.Name) .. " copie dans le presse-papier !"
             end
         end)
-        KeyInput.Text = activeValidationKey
-        task.spawn(function() sendKeyWebhook(activeValidationKey) end)
-        StatusLabel.TextColor3 = Color3.fromRGB(145, 120, 255)
-        StatusLabel.Text = "Nouvelle cle generee et transmise sur Discord !"
     end)
 
     local function checkAndUnlock()
@@ -5862,21 +5859,11 @@ function startFly()
             local moveVector = Vector3.new(0, 0, 0)
             local speed = V.FlySpeed or 150
 
-            local isAZERTY = (V.KeyboardLayout == "AZERTY")
-            if isAZERTY then
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
-                    moveVector = moveVector + camCF.LookVector
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
-                    moveVector = moveVector - camCF.RightVector
-                end
-            else
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
-                    moveVector = moveVector + camCF.LookVector
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
-                    moveVector = moveVector - camCF.RightVector
-                end
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+                moveVector = moveVector + camCF.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+                moveVector = moveVector - camCF.RightVector
             end
             if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
                 moveVector = moveVector - camCF.LookVector
@@ -6094,14 +6081,8 @@ function startDesyncFly()
             if not V.DesyncFly then desyncConn:Disconnect() return end
             local cam = workspace.CurrentCamera
             local moveDirection = Vector3.zero
-            local isAZERTY = (V.KeyboardLayout == "AZERTY")
-            if isAZERTY then
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then moveDirection = moveDirection + cam.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then moveDirection = moveDirection - cam.CFrame.RightVector end
-            else
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then moveDirection = moveDirection + cam.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then moveDirection = moveDirection - cam.CFrame.RightVector end
-            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then moveDirection = moveDirection + cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then moveDirection = moveDirection - cam.CFrame.RightVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then moveDirection = moveDirection - cam.CFrame.LookVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then moveDirection = moveDirection + cam.CFrame.RightVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.Space) or UserInputService:IsKeyDown(Enum.KeyCode.E) then moveDirection = moveDirection + Vector3.new(0, 1, 0) end
@@ -6277,7 +6258,7 @@ function stopFling()
 end
 
 
-movementConn = RunService.Heartbeat:Connect(function(dt)
+movementConn = RunService.RenderStepped:Connect(function(dt)
     pcall(function()
         local char = LocalPlayer.Character
         if not char then return end
@@ -6297,29 +6278,19 @@ movementConn = RunService.Heartbeat:Connect(function(dt)
             return
         end
 
-        if V.KeyboardLayout == "AZERTY" and not UserInputService:GetFocusedTextBox() and not V.Fly and not V.DesyncFly then
-            local camCF = Camera and Camera.CFrame or workspace.CurrentCamera.CFrame
-            local forward = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z)
-            if forward.Magnitude > 0.001 then forward = forward.Unit end
-            local right = Vector3.new(camCF.RightVector.X, 0, camCF.RightVector.Z)
-            if right.Magnitude > 0.001 then right = right.Unit end
+        if not UserInputService:GetFocusedTextBox() and not V.Fly and not V.DesyncFly then
+            local isZ = UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up)
+            local isS = UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down)
+            local isQ = UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left)
+            local isD = UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right)
 
-            local moveDir = Vector3.zero
-            if UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
-                moveDir = moveDir + forward
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
-                moveDir = moveDir - forward
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
-                moveDir = moveDir - right
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then
-                moveDir = moveDir + right
-            end
-
-            if moveDir.Magnitude > 0 then
-                humanoid:Move(moveDir.Unit, false)
+            if isZ or isS or isQ or isD then
+                local fwd = (isZ and -1 or 0) + (isS and 1 or 0)
+                local side = (isD and 1 or 0) + (isQ and -1 or 0)
+                local moveVec = Vector3.new(side, 0, fwd)
+                if moveVec.Magnitude > 0 then
+                    humanoid:Move(moveVec.Unit, true)
+                end
             end
         end
 
@@ -6350,9 +6321,9 @@ movementConn = RunService.Heartbeat:Connect(function(dt)
             end
         end
 
-        local isClimbForward = (V.KeyboardLayout == "AZERTY") and (UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up)) or (UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up))
+        local isClimbForward = UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up)
         local isClimbBackward = UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down)
-        local isClimbLeft = (V.KeyboardLayout == "AZERTY") and (UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.Left)) or (UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left))
+        local isClimbLeft = UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left)
         local isClimbRight = UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right)
 
         if V.WallClimb then
@@ -7300,6 +7271,19 @@ function createESPForPlayer(player)
             healthBg.Visible = false
         end
 
+        if (V.ESPPV or HealthPV_Enabled) and hum then
+            healthPvText.Visible = true
+            local curHp = math.floor(hum.Health + 0.5)
+            local maxHp = math.max(hum.MaxHealth, 1)
+            local hpRatio = math.clamp(curHp / maxHp, 0, 1)
+            healthPvText.Text = tostring(curHp) .. " PV"
+            healthPvText.Size = UDim2.new(0, 48, 0, 14)
+            healthPvText.Position = UDim2.new(0, screenPos.X - width/2 - 28, 0, screenPos.Y + height/2 + 2)
+            healthPvText.TextColor3 = Color3.fromRGB(math.floor(255 * (1 - hpRatio)), math.floor(255 * hpRatio), 60)
+        else
+            healthPvText.Visible = false
+        end
+
         if V.ESPWeapon then
             local tool = char:FindFirstChildOfClass("Tool")
             if tool then
@@ -7500,6 +7484,11 @@ function toggleClickTP(enabled)
     end
 end
 initStep = "cablage Movement"
+createLabel("CLAVIER AZERTY (ZQSD)", MovementContent)
+createToggle("Deplacement Clavier AZERTY (ZQSD)", true, function(enabled)
+    V.KeyboardLayout = enabled and "AZERTY" or "QWERTY"
+    notify("Movement", enabled and "Touches AZERTY (Z:Avancer Q:Gauche S:Reculer D:Droite) ACTIVES" or "Mode QWERTY Actif", Color3.fromRGB(80, 200, 120))
+end, MovementContent, "AZERTYLayout")
 createLabel("SPEED & JUMP", MovementContent)
 _, _, ToggleSpeed = createToggle("Enable Walk Speed", false, function(enabled)
     V.SpeedEnabled = enabled
@@ -7749,14 +7738,33 @@ function setupInfiniteStamina(enabled)
                                 c:SetAttribute(attr, 100)
                             end
                         end
+                        for _, desc in ipairs(c:GetDescendants()) do
+                            if (desc:IsA("NumberValue") or desc:IsA("IntValue")) and isStaminaName(desc.Name) then
+                                local maxVal = desc:FindFirstChild("MaxValue") or desc:FindFirstChild("Max")
+                                local target = (maxVal and maxVal.Value) or 100
+                                if desc.Value < target then desc.Value = target end
+                            elseif desc:IsA("BoolValue") and (desc.Name == "Exhausted" or desc.Name == "Tired") then
+                                desc.Value = false
+                            end
+                        end
                     end
                     for attr, val in pairs(LocalPlayer:GetAttributes()) do
                         if isStaminaName(attr) and type(val) == "number" and val < 100 then
                             LocalPlayer:SetAttribute(attr, 100)
                         end
                     end
+                    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+                    if pg then
+                        for _, desc in ipairs(pg:GetDescendants()) do
+                            if (desc:IsA("NumberValue") or desc:IsA("IntValue")) and isStaminaName(desc.Name) then
+                                local maxVal = desc:FindFirstChild("MaxValue") or desc:FindFirstChild("Max")
+                                local target = (maxVal and maxVal.Value) or 100
+                                if desc.Value < target then desc.Value = target end
+                            end
+                        end
+                    end
                 end)
-                task.wait(0.35)
+                task.wait(0.15)
             end
         end)
 
@@ -7958,6 +7966,8 @@ createToggle("Auto-Bhop (Bunny Hop)", false, function(enabled)
     notify("Movement","Auto-Bhop".. (enabled and"ON"or"OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
 end, MovementContent,"AutoBhop")
 
+
+
 function cleanAndResetAllBodies()
     pcall(function()
         for _, player in pairs(Players:GetPlayers()) do
@@ -8110,24 +8120,10 @@ function toggleAntiFling(enabled)
         V.AntiFlingConn = RunService.Stepped:Connect(function()
             if not V.AntiFling then return end
             pcall(function()
-                local myChar = LocalPlayer.Character
-                if not myChar then return end
-                local myHrp = myChar:FindFirstChild("HumanoidRootPart")
-                local hum = myChar:FindFirstChildOfClass("Humanoid")
-
-                if myHrp then
-                    if myHrp.AssemblyAngularVelocity.Magnitude > 20 then
-                        myHrp.AssemblyAngularVelocity = Vector3.zero
-                    end
-                    if myHrp.AssemblyLinearVelocity.Magnitude > 300 then
-                        myHrp.AssemblyLinearVelocity = Vector3.new(0, myHrp.AssemblyLinearVelocity.Y, 0)
-                    end
-                end
-
                 for _, player in pairs(Players:GetPlayers()) do
                     if player ~= LocalPlayer and player.Character then
                         for _, part in pairs(player.Character:GetChildren()) do
-                            if part:IsA("BasePart") then
+                            if part:IsA("BasePart") and part.CanCollide then
                                 part.CanCollide = false
                             end
                         end
@@ -8136,7 +8132,7 @@ function toggleAntiFling(enabled)
             end)
         end)
         addConnection(V.AntiFlingConn)
-        notify("Protection","Anti-Fling ON (Immunisé contre les Flings)", Color3.fromRGB(80, 200, 120))
+        notify("Protection","Anti-Fling ON (Sans collision)", Color3.fromRGB(80, 200, 120))
     else
         if V.AntiFlingConn then V.AntiFlingConn:Disconnect() V.AntiFlingConn = nil end
         notify("Protection","Anti-Fling OFF", Color3.fromRGB(255, 90, 90))
@@ -8647,16 +8643,16 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
             end
 
             local moveVector = Vector3.zero
-            if UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
                 moveVector = moveVector + Camera.CFrame.LookVector
             end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
                 moveVector = moveVector - Camera.CFrame.LookVector
             end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
                 moveVector = moveVector - Camera.CFrame.RightVector
             end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then
                 moveVector = moveVector + Camera.CFrame.RightVector
             end
             if UserInputService:IsKeyDown(Enum.KeyCode.Space) or UserInputService:IsKeyDown(Enum.KeyCode.E) then
@@ -10936,8 +10932,7 @@ task.spawn(function()
                     seat.MaxSpeed = origSpeed * V.VehicleSpeed
                     seat.Torque = origTorque * V.VehicleSpeed
 
-                    local isAZERTY = (V.KeyboardLayout == "AZERTY")
-                    local isForward = isAZERTY and (UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up)) or (UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up))
+                    local isForward = UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up)
                     local isBackward = UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down)
 
                     if isForward and not isBackward then
@@ -10999,21 +10994,11 @@ task.spawn(function()
                     local camCF = Camera.CFrame
                     local moveDir = Vector3.new()
                     
-                    local isAZERTY = (V.KeyboardLayout == "AZERTY")
-                    if isAZERTY then
-                        if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
-                            moveDir = moveDir + camCF.LookVector
-                        end
-                        if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
-                            moveDir = moveDir - camCF.RightVector
-                        end
-                    else
-                        if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
-                            moveDir = moveDir + camCF.LookVector
-                        end
-                        if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
-                            moveDir = moveDir - camCF.RightVector
-                        end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+                        moveDir = moveDir + camCF.LookVector
+                    end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then
+                        moveDir = moveDir - camCF.RightVector
                     end
                     if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
                         moveDir = moveDir - camCF.LookVector
@@ -11802,7 +11787,12 @@ do
         menuBtnStroke.Color = theme.accent
     end)
 
-    createLabel("KEYBINDS", SettingsContent)
+    createLabel("CLAVIER & DISPOSITION", SettingsContent)
+createToggle("Mode Clavier AZERTY (Touches ZQSD)", true, function(enabled)
+    V.KeyboardLayout = enabled and "AZERTY" or "QWERTY"
+    notify("Settings", enabled and "Clavier AZERTY (ZQSD) Verrouille" or "Clavier QWERTY Actif", Color3.fromRGB(80, 200, 120))
+end, SettingsContent, "KeyboardLayoutSetting")
+createLabel("KEYBINDS", SettingsContent)
     local function createKeybindButton(name, defaultKey, callback)
         local KeybindFrame = createCard(SettingsContent, 0, 44)
 
