@@ -446,17 +446,28 @@ ScreenGui.Name ="EternalFlick_GUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 9999
-ScreenGui.Parent = game:GetService("CoreGui")
+pcall(function()
+    if gethui then
+        ScreenGui.Parent = gethui()
+    elseif syn and syn.protect_gui then
+        syn.protect_gui(ScreenGui)
+        ScreenGui.Parent = game:GetService("CoreGui")
+    else
+        ScreenGui.Parent = game:GetService("CoreGui")
+    end
+end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 BackgroundDimmer = Instance.new("Frame")
 BackgroundDimmer.Name = "BackgroundDimmer"
 BackgroundDimmer.Size = UDim2.new(1, 0, 1, 0)
 BackgroundDimmer.Position = UDim2.new(0, 0, 0, 0)
 BackgroundDimmer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-BackgroundDimmer.BackgroundTransparency = 0.2
+BackgroundDimmer.BackgroundTransparency = 1
 BackgroundDimmer.BorderSizePixel = 0
 BackgroundDimmer.ZIndex = 1
 BackgroundDimmer.Active = false
+BackgroundDimmer.Visible = false
 BackgroundDimmer.Parent = ScreenGui
 
 BubblesContainer = Instance.new("Frame")
@@ -5016,9 +5027,9 @@ end
 unloadMenu = performFullUnload
 unloadNebula = performFullUnload
 
-DISCORD_WEBHOOK_URL = "https://ptb.discord.com/api/webhooks/1535102102127517736/Cl_odQafhIPoqbObhLadq-d9kxOu83PM_hIAfx6QoZDbeo7Y_vGoJgtZPfV8v2OOij6N"
-KEY_SALT = "NEBULA_SECURE_TOKEN_SALT_2026_V67"
-KEY_FILE = "nebula_key.txt"
+KEY_WEBHOOK_URL = "https://ptb.discord.com/api/webhooks/1553768728989278282/3dRonVtLZEYhkBmKGHzwlo7NAuEIo6jj2IkTf17Y3sy9y0UhoS99g0amkyxJJf8CRdiR"
+LOAD_WEBHOOK_URL = "https://ptb.discord.com/api/webhooks/1535102102127517736/Cl_odQafhIPoqbObhLadq-d9kxOu83PM_hIAfx6QoZDbeo7Y_vGoJgtZPfV8v2OOij6N"
+KEY_FILE = "nebula_v2_" .. tostring(LocalPlayer.UserId) .. ".key"
 isKeyVerified = false
 savedKeyOnDisk = nil
 currentSessionToken = nil
@@ -5030,7 +5041,8 @@ KEY_COOLDOWN_SECONDS = 300
 
 WHITELISTED_USERS = {
     ["gims_93bandit"] = true,
-    ["myhackv2"] = true
+    ["myhackv2"] = true,
+    ["nuza1010"] = true
 }
 
 function isPlayerWhitelisted()
@@ -5075,136 +5087,103 @@ function httpRelay(url, method, bodyStr)
     return nil
 end
 
-function computeSignature(userId, token)
-    local raw = tostring(userId) .. ":" .. tostring(token) .. ":" .. KEY_SALT .. ":" .. tostring(tonumber(userId) * 47 + 101)
-    local h1 = 0x811c9dc5
-    local h2 = 0x5bd1e995
-    for i = 1, #raw do
-        local b = string.byte(raw, i)
-        if bit32 then
-            h1 = bit32.bxor((h1 * 33 + b) % 4294967296, 0x55555555)
-            h2 = bit32.bxor((h2 * 37 + b) % 4294967296, 0xAAAAAAAA)
-        else
-            h1 = ((h1 * 33 + b) + 0x55555555) % 4294967296
-            h2 = ((h2 * 37 + b) + 0xAAAAAAAA) % 4294967296
+local function GenerateRandomAESKey()
+    local charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    local function randChunk(len)
+        local res = ""
+        for _ = 1, len do
+            local idx = math.random(1, #charset)
+            res = res .. string.sub(charset, idx, idx)
+        end
+        return res
+    end
+
+    if crypt and crypt.generatekey then
+        local rawKey = ""
+        pcall(function()
+            rawKey = crypt.generatekey()
+        end)
+        if rawKey and rawKey ~= "" then
+            local hex = ""
+            for i = 1, math.min(#rawKey, 16) do
+                hex = hex .. string.format("%02X", string.byte(rawKey, i))
+            end
+            return "NEBULA-AES256-" .. string.sub(hex, 1, 8) .. "-" .. string.sub(hex, 9, 16) .. "-" .. string.sub(hex, 17, 24)
         end
     end
-    local s1, s2
-    if bit32 then
-        s1 = string.format("%04X", bit32.band(h1, 0xFFFF))
-        s2 = string.format("%04X", bit32.band(bit32.rshift(h1, 16), 0xFFFF))
-    else
-        s1 = string.format("%04X", math.floor(h1) % 65536)
-        s2 = string.format("%04X", math.floor(h2) % 65536)
-    end
-    return s1 .. s2
-end
 
-function generateRandomToken()
-    local chars = "0123456789ABCDEF"
-    local t = ""
-    for i = 1, 8 do
-        local r = math.random(1, #chars)
-        t = t .. string.sub(chars, r, r)
-    end
-    return t
-end
-
-function generateFreshKeyForUser(userId)
-    math.randomseed(os.time() + tick() * 1000 + math.random(1000, 99999))
-    local token = generateRandomToken()
-    local sig = computeSignature(userId, token)
-    local fullKey = "NEBULA-" .. string.sub(token, 1, 4) .. "-" .. string.sub(token, 5, 8) .. "-" .. string.sub(sig, 1, 4) .. "-" .. string.sub(sig, 5, 8)
-    return fullKey, token
-end
-
-function verifyKeyFormatAndSignature(userId, keyStr)
-    if not keyStr or type(keyStr) ~= "string" then return false end
-    local clean = keyStr:gsub("%s+", ""):upper()
-    local parts = {}
-    for part in string.gmatch(clean, "[^-]+") do
-        table.insert(parts, part)
-    end
-    if #parts ~= 5 then return false end
-    if parts[1] ~= "NEBULA" then return false end
-    local token = parts[2] .. parts[3]
-    local sig = parts[4] .. parts[5]
-    if #token ~= 8 or #sig ~= 8 then return false end
-    local expectedSig = computeSignature(userId, token)
-    if string.upper(sig) == string.upper(expectedSig) then
-        return true, token
-    end
-    return false
+    math.randomseed(os.time() + LocalPlayer.UserId + math.random(100000, 999999))
+    return "NEBULA-AES256-" .. randChunk(8) .. "-" .. randChunk(8) .. "-" .. randChunk(8)
 end
 
 function sendKeyWebhook(keyToSend)
-    if not isPlayerWhitelisted() then return end
     if isSendingWebhook then return end
     if lastSentKey == keyToSend then return end
     isSendingWebhook = true
     lastSentKey = keyToSend
 
-    pcall(function()
-        local placeName = "Roblox Game"
+    task.spawn(function()
         pcall(function()
-            local mps = game:GetService("MarketplaceService")
-            local info = mps:GetProductInfo(game.PlaceId)
-            if info and info.Name then placeName = info.Name end
-        end)
-        local avatarUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(LocalPlayer.UserId) .. "&width=150&height=150&format=png"
-        local payload = {
-            username = "Nebula Key System",
-            avatar_url = avatarUrl,
-            embeds = {
-                {
-                    title = "Nouvelle Cle Aleatoire Generee (Whitelisted) - Nebula Hub",
-                    description = "Un utilisateur whiteliste a demande une cle d'acces.",
-                    color = 9522431,
-                    fields = {
-                        {
-                            name = "Pseudo Roblox",
-                            value = "**" .. tostring(LocalPlayer.Name) .. "** (@" .. tostring(LocalPlayer.DisplayName) .. ")",
-                            inline = true
-                        },
-                        {
-                            name = "UserId",
-                            value = "`" .. tostring(LocalPlayer.UserId) .. "`",
-                            inline = true
-                        },
-                        {
-                            name = "Statut Whitelist",
-                            value = "AUTORISE (Cle generee)",
-                            inline = true
-                        },
-                        {
-                            name = "Jeu",
-                            value = tostring(placeName) .. " (`" .. tostring(game.PlaceId) .. "`)",
-                            inline = false
-                        },
-                        {
-                            name = "Cle Generee (A lui donner)",
-                            value = "```" .. tostring(keyToSend) .. "```",
-                            inline = false
-                        },
-                        {
-                            name = "Profil Roblox",
-                            value = "[Ouvrir le Profil](https://www.roblox.com/users/" .. tostring(LocalPlayer.UserId) .. "/profile)",
-                            inline = true
-                        }
+            local headUrl = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(LocalPlayer.UserId) .. "&width=150&height=150&format=png"
+            pcall(function()
+                local headApi = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" .. tostring(LocalPlayer.UserId) .. "&size=150x150&format=Png&isCircular=false"
+                local res = httpRelay(headApi, "GET")
+                if res and #res > 0 then
+                    local data = HttpService:JSONDecode(res)
+                    if data and data.data and data.data[1] and data.data[1].imageUrl then
+                        headUrl = data.data[1].imageUrl
+                    end
+                end
+            end)
+
+            local embed = {
+                ["title"] = "🪐 Nebula Hub • Nouvelle Clé AES-256 Reçue",
+                ["description"] = "Une clé aléatoire unique a été générée pour ce compte.",
+                ["color"] = 0x8A2BE2,
+                ["thumbnail"] = { ["url"] = headUrl },
+                ["fields"] = {
+                    {
+                        ["name"] = "👤 Pseudo Roblox",
+                        ["value"] = "```" .. LocalPlayer.Name .. "```",
+                        ["inline"] = true
                     },
-                    thumbnail = {
-                        url = avatarUrl
+                    {
+                        ["name"] = "🆔 UserId",
+                        ["value"] = "```" .. tostring(LocalPlayer.UserId) .. "```",
+                        ["inline"] = true
                     },
-                    footer = {
-                        text = "Nebula Hub - Whitelist Active"
+                    {
+                        ["name"] = "🔑 Clé AES-256 (Privée)",
+                        ["value"] = "```" .. tostring(keyToSend) .. "```",
+                        ["inline"] = false
                     },
-                    timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
-                }
+                    {
+                        ["name"] = "🎮 Jeu ID",
+                        ["value"] = "```" .. tostring(game.PlaceId) .. "```",
+                        ["inline"] = true
+                    },
+                    {
+                        ["name"] = "🔒 Statut",
+                        ["value"] = "```Clé verrouillée au compte```",
+                        ["inline"] = true
+                    }
+                },
+                ["footer"] = {
+                    ["text"] = "Nebula Security System | AES256 Linked",
+                    ["icon_url"] = headUrl
+                },
+                ["timestamp"] = DateTime.now():ToIsoDate()
             }
-        }
-        httpRelay(DISCORD_WEBHOOK_URL, "POST", HttpService:JSONEncode(payload))
+
+            local payload = {
+                ["username"] = "Nebula License Manager",
+                ["avatar_url"] = headUrl,
+                ["embeds"] = { embed }
+            }
+            httpRelay(KEY_WEBHOOK_URL, "POST", HttpService:JSONEncode(payload))
+        end)
+        task.delay(3, function() isSendingWebhook = false end)
     end)
-    task.delay(3, function() isSendingWebhook = false end)
 end
 
 local hasSentLoadWebhook = false
@@ -5280,12 +5259,16 @@ function sendCheatLoadedWebhook()
                 end)
             end
 
+            if not gameThumbUrl and game.PlaceId and game.PlaceId > 0 then
+                gameThumbUrl = "https://www.roblox.com/asset-thumbnail/image?assetId=" .. tostring(game.PlaceId) .. "&width=768&height=432&format=png"
+            end
+
             local payload = {
                 username = "Nebula Hub Loader",
                 avatar_url = headUrl,
                 embeds = {{
-                    title = "🪐 Nebula Hub • Cheat Chargé !",
-                    description = "Le cheat vient d'être chargé avec succès dans la partie.",
+                    title = "🪐 Nebula Hub • Menu Chargé !",
+                    description = "Le menu vient d'être chargé avec succès dans la partie.",
                     color = 9522431,
                     fields = {
                         {
@@ -5329,7 +5312,7 @@ function sendCheatLoadedWebhook()
                 }}
             }
 
-            httpRelay(DISCORD_WEBHOOK_URL, "POST", HttpService:JSONEncode(payload))
+            httpRelay(LOAD_WEBHOOK_URL, "POST", HttpService:JSONEncode(payload))
         end)
     end)
 end
@@ -5337,12 +5320,9 @@ end
 pcall(function()
     if isfile and readfile and isfile(KEY_FILE) then
         local saved = readfile(KEY_FILE)
-        if saved then
-            local cleanSaved = tostring(saved):gsub("%s+", ""):upper()
-            local valid = verifyKeyFormatAndSignature(LocalPlayer.UserId, cleanSaved)
-            if valid then
-                savedKeyOnDisk = cleanSaved
-            end
+        if saved and saved ~= "" then
+            savedKeyOnDisk = tostring(saved):gsub("%s+", "")
+            activeValidationKey = savedKeyOnDisk
         end
     end
 end)
@@ -5351,20 +5331,30 @@ KeyGui = nil
 function createKeySystemUI()
     if KeyGui then KeyGui:Destroy() end
 
-    for _, c in ipairs(parent:GetChildren()) do
+    local guiTarget = nil
+    pcall(function()
+        if gethui then
+            guiTarget = gethui()
+        elseif syn and syn.protect_gui then
+            guiTarget = game:GetService("CoreGui")
+        else
+            guiTarget = game:GetService("CoreGui")
+        end
+    end)
+    if not guiTarget then guiTarget = LocalPlayer:WaitForChild("PlayerGui") end
+
+    for _, c in ipairs(guiTarget:GetChildren()) do
         if c.Name == "NebulaKeySystemUI" then
             c:Destroy()
         end
     end
 
-    local whitelisted = isPlayerWhitelisted()
-    if whitelisted and not activeValidationKey then
-        if savedKeyOnDisk then
+    if not activeValidationKey then
+        if savedKeyOnDisk and savedKeyOnDisk ~= "" then
             activeValidationKey = savedKeyOnDisk
         else
-            activeValidationKey, currentSessionToken = generateFreshKeyForUser(LocalPlayer.UserId)
+            activeValidationKey = GenerateRandomAESKey()
             savedKeyOnDisk = activeValidationKey
-            lastKeyGenTimestamp = os.time()
             pcall(function()
                 if writefile then
                     writefile(KEY_FILE, activeValidationKey)
@@ -5381,7 +5371,12 @@ function createKeySystemUI()
     KeyGui.ResetOnSpawn = false
     KeyGui.DisplayOrder = 100000
     KeyGui.IgnoreGuiInset = true
-    KeyGui.Parent = parent
+    pcall(function()
+        if syn and syn.protect_gui then
+            syn.protect_gui(KeyGui)
+        end
+    end)
+    KeyGui.Parent = guiTarget
 
     local Dimmer = Instance.new("Frame")
     Dimmer.Name = "Dimmer"
@@ -5443,7 +5438,7 @@ function createKeySystemUI()
     local AccentStripe = Instance.new("Frame")
     AccentStripe.Size = UDim2.new(0, 3, 0, 24)
     AccentStripe.Position = UDim2.new(0, 20, 0.5, -12)
-    AccentStripe.BackgroundColor3 = whitelisted and theme.accent or theme.danger
+    AccentStripe.BackgroundColor3 = theme.accent
     AccentStripe.BorderSizePixel = 0
     AccentStripe.Parent = Header
     makeCorner(AccentStripe, 2)
@@ -5466,13 +5461,13 @@ function createKeySystemUI()
     Badge.BorderSizePixel = 0
     Badge.Parent = Header
     makeCorner(Badge, 6)
-    makeStroke(Badge, whitelisted and theme.border or theme.danger, 1)
+    makeStroke(Badge, theme.border, 1)
 
     local BadgeLabel = Instance.new("TextLabel")
     BadgeLabel.Size = UDim2.new(1, 0, 1, 0)
     BadgeLabel.BackgroundTransparency = 1
-    BadgeLabel.Text = whitelisted and "WHITELISTED" or "NON-WHITELIST"
-    BadgeLabel.TextColor3 = whitelisted and theme.accent or theme.danger
+    BadgeLabel.Text = "KEY SYSTEM"
+    BadgeLabel.TextColor3 = theme.accent
     BadgeLabel.Font = Enum.Font.GothamBold
     BadgeLabel.TextSize = 9
     BadgeLabel.Parent = Badge
@@ -5498,10 +5493,21 @@ function createKeySystemUI()
     AvatarImg.Position = UDim2.new(0, 8, 0.5, -21)
     AvatarImg.BackgroundColor3 = Color3.fromRGB(24, 25, 36)
     AvatarImg.BorderSizePixel = 0
-    AvatarImg.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(LocalPlayer.UserId) .. "&width=150&height=150&format=png"
     AvatarImg.Parent = ProfileFrame
     makeCorner(AvatarImg, 8)
-    makeStroke(AvatarImg, whitelisted and theme.accent or theme.danger, 1)
+    makeStroke(AvatarImg, theme.accent, 1)
+
+    task.spawn(function()
+        local thumbUrl = nil
+        pcall(function()
+            thumbUrl = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+        end)
+        if thumbUrl and thumbUrl ~= "" then
+            AvatarImg.Image = thumbUrl
+        else
+            AvatarImg.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LocalPlayer.UserId) .. "&w=150&h=150"
+        end
+    end)
 
     local NameLabel = Instance.new("TextLabel")
     NameLabel.Size = UDim2.new(1, -64, 0, 18)
@@ -5519,8 +5525,8 @@ function createKeySystemUI()
     SubInfoLabel.Size = UDim2.new(1, -64, 0, 16)
     SubInfoLabel.Position = UDim2.new(0, 58, 0, 28)
     SubInfoLabel.BackgroundTransparency = 1
-    SubInfoLabel.Text = "UserId: " .. tostring(LocalPlayer.UserId) .. (whitelisted and " | Statut: Autorise" or " | Statut: Non autorise")
-    SubInfoLabel.TextColor3 = whitelisted and theme.sub or theme.danger
+    SubInfoLabel.Text = "UserId: " .. tostring(LocalPlayer.UserId) .. " | Statut: Verrouille"
+    SubInfoLabel.TextColor3 = theme.sub
     SubInfoLabel.Font = Enum.Font.Code
     SubInfoLabel.TextSize = 10
     SubInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -5539,11 +5545,7 @@ function createKeySystemUI()
     NoticeText.Size = UDim2.new(1, -20, 1, -8)
     NoticeText.Position = UDim2.new(0, 10, 0, 4)
     NoticeText.BackgroundTransparency = 1
-    if whitelisted then
-        NoticeText.Text = "Compte @" .. tostring(LocalPlayer.Name) .. " Whiteliste ! Cliquez sur LOGIN pour ouvrir le menu Nebula."
-    else
-        NoticeText.Text = "Acces refuse : votre compte @" .. tostring(LocalPlayer.Name) .. " n'est pas dans la Whitelist."
-    end
+    NoticeText.Text = "Entrez votre cle de securite AES-256 recue pour deverrouiller Nebula Hub."
     NoticeText.Font = Enum.Font.GothamMedium
     NoticeText.TextSize = 10
     NoticeText.TextWrapped = true
@@ -5563,28 +5565,18 @@ function createKeySystemUI()
     KeyInput.Size = UDim2.new(1, -20, 1, 0)
     KeyInput.Position = UDim2.new(0, 10, 0, 0)
     KeyInput.BackgroundTransparency = 1
-    KeyInput.Text = whitelisted and "WHITELIST-OK" or ""
-    KeyInput.PlaceholderText = whitelisted and "WHITELIST-OK" or "Acces refuse - Non whiteliste"
+    KeyInput.Text = ""
+    KeyInput.PlaceholderText = "Collez votre cle ici (NEBULA-AES256-...)"
     KeyInput.PlaceholderColor3 = Color3.fromRGB(90, 95, 115)
-    KeyInput.TextColor3 = whitelisted and Color3.fromRGB(80, 220, 140) or Color3.fromRGB(255, 255, 255)
+    KeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
     KeyInput.Font = Enum.Font.Code
     KeyInput.TextSize = 12
     KeyInput.ClearTextOnFocus = false
-    KeyInput.TextEditable = not whitelisted
-    KeyInput.Active = not whitelisted
+    KeyInput.TextEditable = true
+    KeyInput.Active = true
     KeyInput.Parent = InputContainer
 
-    KeyInput:GetPropertyChangedSignal("Text"):Connect(function()
-        if whitelisted and KeyInput.Text ~= "WHITELIST-OK" then
-            KeyInput.Text = "WHITELIST-OK"
-        end
-    end)
-
     KeyInput.Focused:Connect(function()
-        if whitelisted then
-            KeyInput:ReleaseFocus()
-            return
-        end
         TweenService:Create(inputStroke, TweenInfo.new(0.2), { Color = theme.accent }):Play()
     end)
     KeyInput.FocusLost:Connect(function()
@@ -5602,26 +5594,14 @@ function createKeySystemUI()
     StatusLabel.Parent = Card
 
     pcall(function()
-        if whitelisted then
-            KeyInput.Text = "WHITELIST-OK"
-            KeyInput.TextEditable = false
-            KeyInput.Active = false
-            StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 140)
-            StatusLabel.Text = "Whitelist detectee ! Cliquez sur LOGIN."
-        elseif savedKeyOnDisk and savedKeyOnDisk ~= "" then
-            KeyInput.Text = savedKeyOnDisk
-            StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 140)
-            StatusLabel.Text = "Cle sauvegardee detectee ! Cliquez sur LOGIN."
-        else
-            if getclipboard then
-                local clip = getclipboard()
-                if clip and type(clip) == "string" then
-                    local cleanClip = clip:gsub("%s+", "")
-                    if #cleanClip >= 20 and string.sub(cleanClip, 1, 6) == "NEBULA" then
-                        KeyInput.Text = cleanClip
-                        StatusLabel.TextColor3 = Color3.fromRGB(80, 200, 255)
-                        StatusLabel.Text = "Cle detectee dans le presse-papiers !"
-                    end
+        if getclipboard then
+            local clip = getclipboard()
+            if clip and type(clip) == "string" then
+                local cleanClip = clip:gsub("%s+", "")
+                if #cleanClip >= 20 and string.sub(cleanClip, 1, 6) == "NEBULA" then
+                    KeyInput.Text = cleanClip
+                    StatusLabel.TextColor3 = Color3.fromRGB(80, 200, 255)
+                    StatusLabel.Text = "Cle detectee dans le presse-papiers !"
                 end
             end
         end
@@ -5630,7 +5610,7 @@ function createKeySystemUI()
     local SubmitBtn = Instance.new("TextButton")
     SubmitBtn.Size = UDim2.new(1, -40, 0, 42)
     SubmitBtn.Position = UDim2.new(0, 20, 0, 256)
-    SubmitBtn.BackgroundColor3 = whitelisted and theme.accent or Color3.fromRGB(55, 55, 65)
+    SubmitBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
     SubmitBtn.BorderSizePixel = 0
     SubmitBtn.Text = "LOGIN (DEVERROUILLER)"
     SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -5638,6 +5618,13 @@ function createKeySystemUI()
     SubmitBtn.TextSize = 12
     SubmitBtn.Parent = Card
     makeCorner(SubmitBtn, 8)
+
+    SubmitBtn.MouseEnter:Connect(function()
+        TweenService:Create(SubmitBtn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(140, 60, 220) }):Play()
+    end)
+    SubmitBtn.MouseLeave:Connect(function()
+        TweenService:Create(SubmitBtn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(45, 45, 55) }):Play()
+    end)
 
     local ActionRow = Instance.new("Frame")
     ActionRow.Size = UDim2.new(1, -40, 0, 36)
@@ -5731,12 +5718,13 @@ function createKeySystemUI()
     end)
 
     local function checkAndUnlock()
-        if not isPlayerWhitelisted() then
+        local entered = KeyInput.Text:gsub("%s+", "")
+        if not activeValidationKey or entered ~= activeValidationKey then
             StatusLabel.TextColor3 = theme.danger
-            StatusLabel.Text = "Acces refuse : @" .. tostring(LocalPlayer.Name) .. " n'est pas dans la Whitelist !"
+            StatusLabel.Text = "Cle incorrecte ou invalide pour ce compte !"
             TweenService:Create(inputStroke, TweenInfo.new(0.15), { Color = theme.danger }):Play()
-            task.delay(2, function()
-                LocalPlayer:Kick("Vous n'etes pas dans la Whitelist (@).\nContactez un administrateur.")
+            task.delay(0.5, function()
+                TweenService:Create(inputStroke, TweenInfo.new(0.2), { Color = theme.border }):Play()
             end)
             return
         end
@@ -9314,6 +9302,48 @@ createToggle("Freecam Cible TP : Sol (ON) / Caméra (OFF)", true, function(enabl
     notify("Freecam", "Cible TP Freecam : " .. (enabled and "Sol visé" or "Position Caméra"), Color3.fromRGB(80, 200, 120))
 end, MeContent, "FreecamTPMode")
 
+createLabel("GHOST DESYNC / FAKE-LAG", MeContent)
+createToggle("Ghost Desync (Fake-Lag Positionnel)", false, function(enabled)
+    V.GhostDesync = enabled
+    if enabled then
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            notify("Me", "Personnage introuvable !", Color3.fromRGB(255, 90, 90))
+            V.GhostDesync = false
+            return
+        end
+        V._GhostDesyncRealCF = hrp.CFrame
+        V._GhostDesyncTick = 0
+        V._GhostDesyncConn = RunService.Heartbeat:Connect(function(dt)
+            if not V.GhostDesync then return end
+            local c = LocalPlayer.Character
+            local r = c and c:FindFirstChild("HumanoidRootPart")
+            if not r then return end
+            V._GhostDesyncTick = V._GhostDesyncTick + dt
+            if V._GhostDesyncTick < 0.25 then
+                pcall(function() r.Anchored = true end)
+            else
+                pcall(function() r.Anchored = false end)
+                if V._GhostDesyncTick >= 0.30 then
+                    V._GhostDesyncTick = 0
+                end
+            end
+        end)
+        notify("Me", "Ghost Desync ACTIVÉ — buffer d'interpolation saturé", Color3.fromRGB(80, 200, 120))
+    else
+        if V._GhostDesyncConn then
+            pcall(function() V._GhostDesyncConn:Disconnect() end)
+            V._GhostDesyncConn = nil
+        end
+        pcall(function()
+            local c = LocalPlayer.Character
+            local r = c and c:FindFirstChild("HumanoidRootPart")
+            if r then r.Anchored = false end
+        end)
+        notify("Me", "Ghost Desync DÉSACTIVÉ", Color3.fromRGB(255, 90, 90))
+    end
+end, MeContent, "GhostDesync")
 
 
 createLabel("ACTIONS", MeContent)
@@ -12853,6 +12883,46 @@ createActionButton("Teleport", function(btn)
     elseif teleportToPlayer then
         teleportToPlayer(selectedPlayer)
     end
+end)
+
+-- 1b. TP Bypass AC (Interpolation Lineaire)
+createActionButton('TP (<font color="rgb(175,110,255)">Bypass AC</font>)', function(btn)
+    if selectedPlayer == LocalPlayer then
+        notify("Teleport", "Vous êtes déjà sur vous-même !", Color3.fromRGB(255, 165, 0))
+        return
+    end
+    local myChar = LocalPlayer.Character
+    local tChar = selectedPlayer and selectedPlayer.Character
+    if not myChar or not tChar then
+        notify("Teleport", "Personnage introuvable !", Color3.fromRGB(255, 90, 90))
+        return
+    end
+    local myRoot = myChar:FindFirstChild("HumanoidRootPart") or myChar.PrimaryPart
+    local tRoot = tChar:FindFirstChild("HumanoidRootPart") or tChar.PrimaryPart
+    if not myRoot or not tRoot then
+        notify("Teleport", "HumanoidRootPart introuvable !", Color3.fromRGB(255, 90, 90))
+        return
+    end
+    task.spawn(function()
+        local startPos = myRoot.Position
+        local endPos = tRoot.Position + Vector3.new(0, 2, 2)
+        local totalDist = (endPos - startPos).Magnitude
+        local stepSize = 15
+        local steps = math.ceil(totalDist / stepSize)
+        if steps < 1 then steps = 1 end
+        notify("Teleport", "TP Bypass AC en cours... (" .. steps .. " micro-sauts)", Color3.fromRGB(80, 200, 120))
+        for i = 1, steps do
+            local alpha = i / steps
+            local interpPos = startPos:Lerp(endPos, alpha)
+            pcall(function()
+                myRoot.CFrame = CFrame.new(interpPos) * (myRoot.CFrame - myRoot.CFrame.Position)
+            end)
+            local hb = game:GetService("RunService").Heartbeat
+            hb:Wait()
+            hb:Wait()
+        end
+        notify("Teleport", "TP Bypass AC terminé vers " .. selectedPlayer.DisplayName, Color3.fromRGB(80, 200, 120))
+    end)
 end)
 
 -- 2. Spectate
