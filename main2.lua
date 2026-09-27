@@ -5041,8 +5041,7 @@ KEY_COOLDOWN_SECONDS = 300
 
 WHITELISTED_USERS = {
     ["gims_93bandit"] = true,
-    ["myhackv2"] = true,
-    ["nuza1010"] = true
+    ["myhackv2"] = true
 }
 
 function isPlayerWhitelisted()
@@ -9302,48 +9301,6 @@ createToggle("Freecam Cible TP : Sol (ON) / Caméra (OFF)", true, function(enabl
     notify("Freecam", "Cible TP Freecam : " .. (enabled and "Sol visé" or "Position Caméra"), Color3.fromRGB(80, 200, 120))
 end, MeContent, "FreecamTPMode")
 
-createLabel("GHOST DESYNC / FAKE-LAG", MeContent)
-createToggle("Ghost Desync (Fake-Lag Positionnel)", false, function(enabled)
-    V.GhostDesync = enabled
-    if enabled then
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then
-            notify("Me", "Personnage introuvable !", Color3.fromRGB(255, 90, 90))
-            V.GhostDesync = false
-            return
-        end
-        V._GhostDesyncRealCF = hrp.CFrame
-        V._GhostDesyncTick = 0
-        V._GhostDesyncConn = RunService.Heartbeat:Connect(function(dt)
-            if not V.GhostDesync then return end
-            local c = LocalPlayer.Character
-            local r = c and c:FindFirstChild("HumanoidRootPart")
-            if not r then return end
-            V._GhostDesyncTick = V._GhostDesyncTick + dt
-            if V._GhostDesyncTick < 0.25 then
-                pcall(function() r.Anchored = true end)
-            else
-                pcall(function() r.Anchored = false end)
-                if V._GhostDesyncTick >= 0.30 then
-                    V._GhostDesyncTick = 0
-                end
-            end
-        end)
-        notify("Me", "Ghost Desync ACTIVÉ — buffer d'interpolation saturé", Color3.fromRGB(80, 200, 120))
-    else
-        if V._GhostDesyncConn then
-            pcall(function() V._GhostDesyncConn:Disconnect() end)
-            V._GhostDesyncConn = nil
-        end
-        pcall(function()
-            local c = LocalPlayer.Character
-            local r = c and c:FindFirstChild("HumanoidRootPart")
-            if r then r.Anchored = false end
-        end)
-        notify("Me", "Ghost Desync DÉSACTIVÉ", Color3.fromRGB(255, 90, 90))
-    end
-end, MeContent, "GhostDesync")
 
 
 createLabel("ACTIONS", MeContent)
@@ -12883,46 +12840,6 @@ createActionButton("Teleport", function(btn)
     elseif teleportToPlayer then
         teleportToPlayer(selectedPlayer)
     end
-end)
-
--- 1b. TP Bypass AC (Interpolation Lineaire)
-createActionButton('TP (<font color="rgb(175,110,255)">Bypass AC</font>)', function(btn)
-    if selectedPlayer == LocalPlayer then
-        notify("Teleport", "Vous êtes déjà sur vous-même !", Color3.fromRGB(255, 165, 0))
-        return
-    end
-    local myChar = LocalPlayer.Character
-    local tChar = selectedPlayer and selectedPlayer.Character
-    if not myChar or not tChar then
-        notify("Teleport", "Personnage introuvable !", Color3.fromRGB(255, 90, 90))
-        return
-    end
-    local myRoot = myChar:FindFirstChild("HumanoidRootPart") or myChar.PrimaryPart
-    local tRoot = tChar:FindFirstChild("HumanoidRootPart") or tChar.PrimaryPart
-    if not myRoot or not tRoot then
-        notify("Teleport", "HumanoidRootPart introuvable !", Color3.fromRGB(255, 90, 90))
-        return
-    end
-    task.spawn(function()
-        local startPos = myRoot.Position
-        local endPos = tRoot.Position + Vector3.new(0, 2, 2)
-        local totalDist = (endPos - startPos).Magnitude
-        local stepSize = 15
-        local steps = math.ceil(totalDist / stepSize)
-        if steps < 1 then steps = 1 end
-        notify("Teleport", "TP Bypass AC en cours... (" .. steps .. " micro-sauts)", Color3.fromRGB(80, 200, 120))
-        for i = 1, steps do
-            local alpha = i / steps
-            local interpPos = startPos:Lerp(endPos, alpha)
-            pcall(function()
-                myRoot.CFrame = CFrame.new(interpPos) * (myRoot.CFrame - myRoot.CFrame.Position)
-            end)
-            local hb = game:GetService("RunService").Heartbeat
-            hb:Wait()
-            hb:Wait()
-        end
-        notify("Teleport", "TP Bypass AC terminé vers " .. selectedPlayer.DisplayName, Color3.fromRGB(80, 200, 120))
-    end)
 end)
 
 -- 2. Spectate
