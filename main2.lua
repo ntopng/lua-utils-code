@@ -25,6 +25,11 @@ local BlacklistedGames = {
 }
 _G.NebulaBlacklistedGames = BlacklistedGames
 
+local BlacklistedUsers = {
+    ["@wwwNuza"] = true,
+}
+_G.NebulaBlacklistedUsers = BlacklistedUsers
+
 local function isCurrentGameBlacklisted()
     local pId = game.PlaceId
     local gId = game.GameId
@@ -48,7 +53,56 @@ local function isCurrentGameBlacklisted()
     return false
 end
 
-local function showBlacklistMenu()
+local function isCurrentUserBlacklisted()
+    if not LocalPlayer then return false end
+    local rawName = tostring(LocalPlayer.Name):lower()
+    local atName = "@" .. rawName
+    local uId = LocalPlayer.UserId
+
+    if BlacklistedUsers[atName] or BlacklistedUsers[rawName] or BlacklistedUsers[tostring(rawName)] then
+        return true
+    end
+    if uId and (BlacklistedUsers[uId] or BlacklistedUsers[tostring(uId)]) then
+        return true
+    end
+
+    for k, v in pairs(BlacklistedUsers) do
+        local checkStr = function(val)
+            if type(val) == "string" then
+                local s = val:lower():gsub("%s+", "")
+                if s == rawName or s == atName or (uId and s == tostring(uId)) then
+                    return true
+                end
+            elseif type(val) == "number" and uId and val == uId then
+                return true
+            end
+            return false
+        end
+
+        if checkStr(k) and v == true then
+            return true
+        end
+        if checkStr(v) then
+            return true
+        end
+    end
+    return false
+end
+
+local function checkBlacklistStatus()
+    local isUserBl = isCurrentUserBlacklisted()
+    if isUserBl then
+        return true, "USER"
+    end
+    local isGameBl = isCurrentGameBlacklisted()
+    if isGameBl then
+        return true, "GAME"
+    end
+    return false, nil
+end
+
+local function showBlacklistMenu(reasonType)
+    local isUserReason = (reasonType == "USER")
     local guiTarget = nil
     pcall(function()
         if gethui then
@@ -278,7 +332,7 @@ local function showBlacklistMenu()
     IconLabel.Position = UDim2.new(0, 12, 0, 12)
     IconLabel.BackgroundColor3 = Color3.fromRGB(36, 20, 26)
     IconLabel.BorderSizePixel = 0
-    IconLabel.Text = "🚫"
+    IconLabel.Text = isUserReason and "👤" or "🚫"
     IconLabel.TextSize = 18
     IconLabel.Parent = InfoBox
     makeCorner(IconLabel, 8)
@@ -288,7 +342,7 @@ local function showBlacklistMenu()
     MsgTitle.Size = UDim2.new(1, -66, 0, 20)
     MsgTitle.Position = UDim2.new(0, 56, 0, 12)
     MsgTitle.BackgroundTransparency = 1
-    MsgTitle.Text = "Jeu non autorisé par Nebula"
+    MsgTitle.Text = isUserReason and "Utilisateur non autorisé" or "Jeu non autorisé par Nebula"
     MsgTitle.TextColor3 = Color3.fromRGB(235, 235, 242)
     MsgTitle.Font = Enum.Font.GothamBold
     MsgTitle.TextSize = 13
@@ -299,7 +353,11 @@ local function showBlacklistMenu()
     MsgDesc.Size = UDim2.new(1, -66, 0, 32)
     MsgDesc.Position = UDim2.new(0, 56, 0, 32)
     MsgDesc.BackgroundTransparency = 1
-    MsgDesc.Text = "Ce jeu est blacklisté. Le chargement de Nebula a été interrompu pour éviter tout risque."
+    if isUserReason then
+        MsgDesc.Text = "Votre compte (@" .. tostring(LocalPlayer.Name) .. ") est blacklisté de Nebula. Accès refusé."
+    else
+        MsgDesc.Text = "Ce jeu est blacklisté. Le chargement de Nebula a été interrompu pour éviter tout risque."
+    end
     MsgDesc.TextColor3 = Color3.fromRGB(130, 134, 152)
     MsgDesc.Font = Enum.Font.GothamMedium
     MsgDesc.TextSize = 10
@@ -320,8 +378,13 @@ local function showBlacklistMenu()
     GameTagPlace.Size = UDim2.new(1, -16, 0, 20)
     GameTagPlace.Position = UDim2.new(0, 8, 0, 6)
     GameTagPlace.BackgroundTransparency = 1
-    GameTagPlace.Text = "📍 PlaceId : " .. tostring(game.PlaceId)
-    GameTagPlace.TextColor3 = Color3.fromRGB(90, 160, 255)
+    if isUserReason then
+        GameTagPlace.Text = "👤 Compte : @" .. tostring(LocalPlayer.Name)
+        GameTagPlace.TextColor3 = Color3.fromRGB(240, 90, 90)
+    else
+        GameTagPlace.Text = "📍 PlaceId : " .. tostring(game.PlaceId)
+        GameTagPlace.TextColor3 = Color3.fromRGB(90, 160, 255)
+    end
     GameTagPlace.Font = Enum.Font.Code
     GameTagPlace.TextSize = 11
     GameTagPlace.TextXAlignment = Enum.TextXAlignment.Left
@@ -331,7 +394,11 @@ local function showBlacklistMenu()
     GameTagName.Size = UDim2.new(1, -16, 0, 18)
     GameTagName.Position = UDim2.new(0, 8, 0, 28)
     GameTagName.BackgroundTransparency = 1
-    GameTagName.Text = "🎮 Jeu : Chargement..."
+    if isUserReason then
+        GameTagName.Text = "🆔 UserId : " .. tostring(LocalPlayer.UserId)
+    else
+        GameTagName.Text = "🎮 Jeu : Chargement..."
+    end
     GameTagName.TextColor3 = Color3.fromRGB(150, 154, 172)
     GameTagName.Font = Enum.Font.Gotham
     GameTagName.TextSize = 10
@@ -339,16 +406,18 @@ local function showBlacklistMenu()
     GameTagName.TextTruncate = Enum.TextTruncate.AtEnd
     GameTagName.Parent = GameTag
 
-    task.spawn(function()
-        pcall(function()
-            local prodInfo = MarketplaceService:GetProductInfo(game.PlaceId)
-            if prodInfo and prodInfo.Name then
-                GameTagName.Text = "🎮 Jeu : " .. tostring(prodInfo.Name)
-            else
-                GameTagName.Text = "🎮 Jeu : Expérience Roblox"
-            end
+    if not isUserReason then
+        task.spawn(function()
+            pcall(function()
+                local prodInfo = MarketplaceService:GetProductInfo(game.PlaceId)
+                if prodInfo and prodInfo.Name then
+                    GameTagName.Text = "🎮 Jeu : " .. tostring(prodInfo.Name)
+                else
+                    GameTagName.Text = "🎮 Jeu : Expérience Roblox"
+                end
+            end)
         end)
-    end)
+    end
 
     local BtnRow = Instance.new("Frame")
     BtnRow.Size = UDim2.new(1, -36, 0, 42)
@@ -413,14 +482,15 @@ local function showBlacklistMenu()
         end)
         task.delay(0.1, function()
             pcall(function()
-                LocalPlayer:Kick("Ce jeu est blacklisté.")
+                LocalPlayer:Kick(isUserReason and "Votre compte est blacklisté de Nebula." or "Ce jeu est blacklisté.")
             end)
         end)
     end)
 end
 
-if isCurrentGameBlacklisted() then
-    showBlacklistMenu()
+local isBlacklisted, blacklistReason = checkBlacklistStatus()
+if isBlacklisted then
+    showBlacklistMenu(blacklistReason)
     return
 end
 
