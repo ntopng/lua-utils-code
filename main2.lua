@@ -354,7 +354,7 @@ local function showBlacklistMenu(reasonType)
     MsgDesc.Position = UDim2.new(0, 56, 0, 32)
     MsgDesc.BackgroundTransparency = 1
     if isUserReason then
-        MsgDesc.Text = "Votre compte (@" .. tostring(LocalPlayer.Name) .. ") est blacklisté de Nebula. Accès refusé."
+        MsgDesc.Text = "Votre compte (@" .. tostring(LocalPlayer.Name) .. ") est blacklisté de Nebula, Veuillez payer le script. Accès refusé."
     else
         MsgDesc.Text = "Ce jeu est blacklisté. Le chargement de Nebula a été interrompu pour éviter tout risque."
     end
