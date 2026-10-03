@@ -6,7 +6,425 @@ HttpService = game:GetService("HttpService")
 TeleportService = game:GetService("TeleportService")
 ProximityPromptService = game:GetService("ProximityPromptService")
 UserService = game:GetService("UserService")
+local MarketplaceService = game:GetService("MarketplaceService")
+
 LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then
+    pcall(function()
+        LocalPlayer = Players.LocalPlayer or Players:GetPropertyChangedSignal("LocalPlayer"):Wait() or Players.PlayerAdded:Wait()
+    end)
+    if not LocalPlayer then
+        repeat task.wait() until Players.LocalPlayer
+        LocalPlayer = Players.LocalPlayer
+    end
+end
+
+local BlacklistedGames = {
+    [107778070777162] = true,
+    [73934517857372] = true,
+    [100641654440407] = true,
+}
+_G.NebulaBlacklistedGames = BlacklistedGames
+
+local function isCurrentGameBlacklisted()
+    local pId = game.PlaceId
+    local gId = game.GameId
+    if BlacklistedGames[pId] or BlacklistedGames[tostring(pId)] then
+        return true
+    end
+    if gId and (BlacklistedGames[gId] or BlacklistedGames[tostring(gId)]) then
+        return true
+    end
+    for k, v in pairs(BlacklistedGames) do
+        if type(k) == "number" and (k == pId or k == gId) and v == true then
+            return true
+        end
+        if type(v) == "number" and (v == pId or v == gId) then
+            return true
+        end
+        if type(v) == "string" and (v == tostring(pId) or v == tostring(gId)) then
+            return true
+        end
+    end
+    return false
+end
+
+local function showBlacklistMenu()
+    local guiTarget = nil
+    pcall(function()
+        if gethui then
+            guiTarget = gethui()
+        elseif syn and syn.protect_gui then
+            guiTarget = game:GetService("CoreGui")
+        else
+            guiTarget = game:GetService("CoreGui")
+        end
+    end)
+    if not guiTarget then guiTarget = LocalPlayer:WaitForChild("PlayerGui") end
+
+    for _, c in ipairs(guiTarget:GetChildren()) do
+        if c.Name == "NebulaBlacklistUI" then
+            c:Destroy()
+        end
+    end
+
+    local BlacklistGui = Instance.new("ScreenGui")
+    BlacklistGui.Name = "NebulaBlacklistUI"
+    BlacklistGui.ResetOnSpawn = false
+    BlacklistGui.DisplayOrder = 100000
+    BlacklistGui.IgnoreGuiInset = true
+    pcall(function()
+        if syn and syn.protect_gui then
+            syn.protect_gui(BlacklistGui)
+        end
+    end)
+    BlacklistGui.Parent = guiTarget
+
+    local function makeCorner(gui, radius)
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, radius)
+        corner.Parent = gui
+        return corner
+    end
+
+    local function makeStroke(gui, color, thickness, transparency)
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = color or Color3.fromRGB(44, 46, 62)
+        stroke.Thickness = thickness or 1
+        stroke.Transparency = transparency or 0
+        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        stroke.Parent = gui
+        return stroke
+    end
+
+    local Dimmer = Instance.new("Frame")
+    Dimmer.Name = "Dimmer"
+    Dimmer.Size = UDim2.new(1, 0, 1, 0)
+    Dimmer.Position = UDim2.new(0, 0, 0, 0)
+    Dimmer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    Dimmer.BackgroundTransparency = 1
+    Dimmer.BorderSizePixel = 0
+    Dimmer.Active = true
+    Dimmer.Parent = BlacklistGui
+    TweenService:Create(Dimmer, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 0.4 }):Play()
+
+    local BubblesFolder = Instance.new("Frame")
+    BubblesFolder.Name = "BubblesFolder"
+    BubblesFolder.Size = UDim2.new(1, 0, 1, 0)
+    BubblesFolder.BackgroundTransparency = 1
+    BubblesFolder.ClipsDescendants = true
+    BubblesFolder.Active = false
+    BubblesFolder.Parent = BlacklistGui
+
+    local miniBubbles = {}
+    for i = 1, 18 do
+        local b = Instance.new("Frame")
+        local sz = math.random(8, 22)
+        b.Size = UDim2.new(0, sz, 0, sz)
+        b.BackgroundColor3 = (math.random() > 0.5) and Color3.fromRGB(145, 120, 255) or Color3.fromRGB(90, 160, 255)
+        b.BackgroundTransparency = math.random(60, 85) / 100
+        b.BorderSizePixel = 0
+        b.Parent = BubblesFolder
+        makeCorner(b, 50)
+        local bs = Instance.new("UIStroke")
+        bs.Color = Color3.fromRGB(255, 255, 255)
+        bs.Transparency = 0.8
+        bs.Thickness = 1
+        bs.Parent = b
+
+        local bData = {
+            frame = b,
+            x = math.random(),
+            y = math.random(),
+            speed = math.random(25, 60) / 1000,
+            swaySpeed = math.random(10, 25) / 10,
+            swayAmp = math.random(5, 15) / 1000,
+            offset = math.random() * math.pi * 2
+        }
+        b.Position = UDim2.new(bData.x, 0, bData.y, 0)
+        table.insert(miniBubbles, bData)
+    end
+
+    local bubbleConn
+    bubbleConn = RunService.RenderStepped:Connect(function(dt)
+        if not BlacklistGui or not BlacklistGui.Parent then
+            if bubbleConn then bubbleConn:Disconnect() end
+            return
+        end
+        local t = tick()
+        for _, b in ipairs(miniBubbles) do
+            b.y = b.y - b.speed * dt
+            if b.y < -0.05 then
+                b.y = 1.05
+                b.x = math.random()
+            end
+            local curX = b.x + math.sin(t * b.swaySpeed + b.offset) * b.swayAmp
+            b.frame.Position = UDim2.new(curX, 0, b.y, 0)
+        end
+    end)
+
+    local Card = Instance.new("Frame")
+    Card.Name = "Card"
+    Card.Size = UDim2.new(0, 440, 0, 280)
+    Card.Position = UDim2.new(0.5, -220, 0.5, -140)
+    Card.BackgroundColor3 = Color3.fromRGB(14, 15, 22)
+    Card.BorderSizePixel = 0
+    Card.Active = true
+    Card.ClipsDescendants = true
+    Card.Parent = BlacklistGui
+    makeCorner(Card, 14)
+    makeStroke(Card, Color3.fromRGB(44, 46, 62), 1.2, 0.2)
+
+    local CardScale = Instance.new("UIScale")
+    CardScale.Scale = 0.85
+    CardScale.Parent = Card
+    TweenService:Create(CardScale, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+
+    local cardDragging, cardDragStart, cardStartPos = false, nil, nil
+    Card.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            cardDragging = true
+            cardDragStart = input.Position
+            cardStartPos = Card.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    cardDragging = false
+                end
+            end)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if cardDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - cardDragStart
+            Card.Position = UDim2.new(
+                cardStartPos.X.Scale, cardStartPos.X.Offset + delta.X,
+                cardStartPos.Y.Scale, cardStartPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    local Header = Instance.new("Frame")
+    Header.Size = UDim2.new(1, 0, 0, 50)
+    Header.Position = UDim2.new(0, 0, 0, 0)
+    Header.BackgroundTransparency = 1
+    Header.BorderSizePixel = 0
+    Header.Parent = Card
+
+    local AccentStripe = Instance.new("Frame")
+    AccentStripe.Size = UDim2.new(0, 3, 0, 24)
+    AccentStripe.Position = UDim2.new(0, 18, 0.5, -12)
+    AccentStripe.BackgroundColor3 = Color3.fromRGB(145, 120, 255)
+    AccentStripe.BorderSizePixel = 0
+    AccentStripe.Parent = Header
+    makeCorner(AccentStripe, 2)
+
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Size = UDim2.new(0, 100, 0, 20)
+    TitleLabel.Position = UDim2.new(0, 28, 0, 10)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Text = "NEBULA"
+    TitleLabel.TextColor3 = Color3.fromRGB(145, 120, 255)
+    TitleLabel.Font = Enum.Font.GothamBlack
+    TitleLabel.TextSize = 16
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.Parent = Header
+
+    local SubTitleLabel = Instance.new("TextLabel")
+    SubTitleLabel.Size = UDim2.new(0, 150, 0, 12)
+    SubTitleLabel.Position = UDim2.new(0, 28, 0, 28)
+    SubTitleLabel.BackgroundTransparency = 1
+    SubTitleLabel.Text = "ROBLOX HUB • SÉCURITÉ"
+    SubTitleLabel.TextColor3 = Color3.fromRGB(130, 134, 152)
+    SubTitleLabel.Font = Enum.Font.Code
+    SubTitleLabel.TextSize = 9
+    SubTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    SubTitleLabel.Parent = Header
+
+    local Badge = Instance.new("Frame")
+    Badge.Size = UDim2.new(0, 105, 0, 24)
+    Badge.Position = UDim2.new(1, -123, 0.5, -12)
+    Badge.BackgroundColor3 = Color3.fromRGB(36, 18, 24)
+    Badge.BorderSizePixel = 0
+    Badge.Parent = Header
+    makeCorner(Badge, 6)
+    makeStroke(Badge, Color3.fromRGB(90, 30, 40), 1)
+
+    local BadgeLabel = Instance.new("TextLabel")
+    BadgeLabel.Size = UDim2.new(1, 0, 1, 0)
+    BadgeLabel.BackgroundTransparency = 1
+    BadgeLabel.Text = "⛔ BLACKLISTÉ"
+    BadgeLabel.TextColor3 = Color3.fromRGB(240, 70, 70)
+    BadgeLabel.Font = Enum.Font.GothamBold
+    BadgeLabel.TextSize = 9
+    BadgeLabel.Parent = Badge
+
+    local Divider = Instance.new("Frame")
+    Divider.Size = UDim2.new(1, -36, 0, 1)
+    Divider.Position = UDim2.new(0, 18, 0, 50)
+    Divider.BackgroundColor3 = Color3.fromRGB(28, 30, 42)
+    Divider.BorderSizePixel = 0
+    Divider.Parent = Card
+
+    local InfoBox = Instance.new("Frame")
+    InfoBox.Size = UDim2.new(1, -36, 0, 142)
+    InfoBox.Position = UDim2.new(0, 18, 0, 60)
+    InfoBox.BackgroundColor3 = Color3.fromRGB(18, 19, 28)
+    InfoBox.BorderSizePixel = 0
+    InfoBox.Parent = Card
+    makeCorner(InfoBox, 10)
+    makeStroke(InfoBox, Color3.fromRGB(44, 46, 62), 1)
+
+    local IconLabel = Instance.new("TextLabel")
+    IconLabel.Size = UDim2.new(0, 36, 0, 36)
+    IconLabel.Position = UDim2.new(0, 12, 0, 12)
+    IconLabel.BackgroundColor3 = Color3.fromRGB(36, 20, 26)
+    IconLabel.BorderSizePixel = 0
+    IconLabel.Text = "🚫"
+    IconLabel.TextSize = 18
+    IconLabel.Parent = InfoBox
+    makeCorner(IconLabel, 8)
+    makeStroke(IconLabel, Color3.fromRGB(70, 26, 34), 1)
+
+    local MsgTitle = Instance.new("TextLabel")
+    MsgTitle.Size = UDim2.new(1, -66, 0, 20)
+    MsgTitle.Position = UDim2.new(0, 56, 0, 12)
+    MsgTitle.BackgroundTransparency = 1
+    MsgTitle.Text = "Jeu non autorisé par Nebula"
+    MsgTitle.TextColor3 = Color3.fromRGB(235, 235, 242)
+    MsgTitle.Font = Enum.Font.GothamBold
+    MsgTitle.TextSize = 13
+    MsgTitle.TextXAlignment = Enum.TextXAlignment.Left
+    MsgTitle.Parent = InfoBox
+
+    local MsgDesc = Instance.new("TextLabel")
+    MsgDesc.Size = UDim2.new(1, -66, 0, 32)
+    MsgDesc.Position = UDim2.new(0, 56, 0, 32)
+    MsgDesc.BackgroundTransparency = 1
+    MsgDesc.Text = "Ce jeu est blacklisté. Le chargement de Nebula a été interrompu pour éviter tout risque."
+    MsgDesc.TextColor3 = Color3.fromRGB(130, 134, 152)
+    MsgDesc.Font = Enum.Font.GothamMedium
+    MsgDesc.TextSize = 10
+    MsgDesc.TextXAlignment = Enum.TextXAlignment.Left
+    MsgDesc.TextWrapped = true
+    MsgDesc.Parent = InfoBox
+
+    local GameTag = Instance.new("Frame")
+    GameTag.Size = UDim2.new(1, -24, 0, 54)
+    GameTag.Position = UDim2.new(0, 12, 0, 76)
+    GameTag.BackgroundColor3 = Color3.fromRGB(13, 14, 20)
+    GameTag.BorderSizePixel = 0
+    GameTag.Parent = InfoBox
+    makeCorner(GameTag, 8)
+    makeStroke(GameTag, Color3.fromRGB(32, 34, 46), 1)
+
+    local GameTagPlace = Instance.new("TextLabel")
+    GameTagPlace.Size = UDim2.new(1, -16, 0, 20)
+    GameTagPlace.Position = UDim2.new(0, 8, 0, 6)
+    GameTagPlace.BackgroundTransparency = 1
+    GameTagPlace.Text = "📍 PlaceId : " .. tostring(game.PlaceId)
+    GameTagPlace.TextColor3 = Color3.fromRGB(90, 160, 255)
+    GameTagPlace.Font = Enum.Font.Code
+    GameTagPlace.TextSize = 11
+    GameTagPlace.TextXAlignment = Enum.TextXAlignment.Left
+    GameTagPlace.Parent = GameTag
+
+    local GameTagName = Instance.new("TextLabel")
+    GameTagName.Size = UDim2.new(1, -16, 0, 18)
+    GameTagName.Position = UDim2.new(0, 8, 0, 28)
+    GameTagName.BackgroundTransparency = 1
+    GameTagName.Text = "🎮 Jeu : Chargement..."
+    GameTagName.TextColor3 = Color3.fromRGB(150, 154, 172)
+    GameTagName.Font = Enum.Font.Gotham
+    GameTagName.TextSize = 10
+    GameTagName.TextXAlignment = Enum.TextXAlignment.Left
+    GameTagName.TextTruncate = Enum.TextTruncate.AtEnd
+    GameTagName.Parent = GameTag
+
+    task.spawn(function()
+        pcall(function()
+            local prodInfo = MarketplaceService:GetProductInfo(game.PlaceId)
+            if prodInfo and prodInfo.Name then
+                GameTagName.Text = "🎮 Jeu : " .. tostring(prodInfo.Name)
+            else
+                GameTagName.Text = "🎮 Jeu : Expérience Roblox"
+            end
+        end)
+    end)
+
+    local BtnRow = Instance.new("Frame")
+    BtnRow.Size = UDim2.new(1, -36, 0, 42)
+    BtnRow.Position = UDim2.new(0, 18, 1, -56)
+    BtnRow.BackgroundTransparency = 1
+    BtnRow.BorderSizePixel = 0
+    BtnRow.Parent = Card
+
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.new(0.485, 0, 1, 0)
+    CloseBtn.Position = UDim2.new(0, 0, 0, 0)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(24, 25, 36)
+    CloseBtn.BorderSizePixel = 0
+    CloseBtn.Text = "✕  Fermer"
+    CloseBtn.TextColor3 = Color3.fromRGB(235, 235, 242)
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = 12
+    CloseBtn.Parent = BtnRow
+    makeCorner(CloseBtn, 8)
+    makeStroke(CloseBtn, Color3.fromRGB(44, 46, 62), 1)
+
+    CloseBtn.MouseEnter:Connect(function()
+        TweenService:Create(CloseBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(36, 38, 54) }):Play()
+    end)
+    CloseBtn.MouseLeave:Connect(function()
+        TweenService:Create(CloseBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(24, 25, 36) }):Play()
+    end)
+
+    CloseBtn.MouseButton1Click:Connect(function()
+        TweenService:Create(CardScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 0.7 }):Play()
+        TweenService:Create(Dimmer, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
+        task.delay(0.25, function()
+            if bubbleConn then bubbleConn:Disconnect() end
+            if BlacklistGui then BlacklistGui:Destroy() end
+        end)
+    end)
+
+    local QuitBtn = Instance.new("TextButton")
+    QuitBtn.Size = UDim2.new(0.485, 0, 1, 0)
+    QuitBtn.Position = UDim2.new(0.515, 0, 0, 0)
+    QuitBtn.BackgroundColor3 = Color3.fromRGB(180, 45, 45)
+    QuitBtn.BorderSizePixel = 0
+    QuitBtn.Text = "🚪  Quitter"
+    QuitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    QuitBtn.Font = Enum.Font.GothamBold
+    QuitBtn.TextSize = 12
+    QuitBtn.Parent = BtnRow
+    makeCorner(QuitBtn, 8)
+    makeStroke(QuitBtn, Color3.fromRGB(220, 60, 60), 1)
+
+    QuitBtn.MouseEnter:Connect(function()
+        TweenService:Create(QuitBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(215, 55, 55) }):Play()
+    end)
+    QuitBtn.MouseLeave:Connect(function()
+        TweenService:Create(QuitBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(180, 45, 45) }):Play()
+    end)
+
+    QuitBtn.MouseButton1Click:Connect(function()
+        QuitBtn.Text = "Fermeture..."
+        pcall(function()
+            game:Shutdown()
+        end)
+        task.delay(0.1, function()
+            pcall(function()
+                LocalPlayer:Kick("Ce jeu est blacklisté.")
+            end)
+        end)
+    end)
+end
+
+if isCurrentGameBlacklisted() then
+    showBlacklistMenu()
+    return
+end
+
 local Lighting = game:GetService("Lighting")
 local isKeyVerified = false
 
@@ -5041,6 +5459,8 @@ KEY_COOLDOWN_SECONDS = 300
 
 WHITELISTED_USERS = {
     ["gims_93bandit"] = true,
+    ["myhackv2"] = true,
+    ["nuza1010"] = true
 }
 
 function isPlayerWhitelisted()
