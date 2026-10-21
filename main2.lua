@@ -22,7 +22,8 @@ end
 local BlacklistedGames = {
     [107778070777162] = true,
     [73934517857372] = true,
-    [134208374070897] = true
+    [134208374070897] = true,
+    [122584270448462] = true
 }
 _G.NebulaBlacklistedGames = BlacklistedGames
 
