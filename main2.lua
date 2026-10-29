@@ -27,7 +27,7 @@ local BlacklistedGames = {
 _G.NebulaBlacklistedGames = BlacklistedGames
 
 local BlacklistedUsers = {
-    ["@usersh123"] = true,
+    ["@MYHACKV2"] = true,
 }
 _G.NebulaBlacklistedUsers = BlacklistedUsers
 
