@@ -22,12 +22,14 @@ end
 local BlacklistedGames = {
     [107778070777162] = true,
     [73934517857372] = true,
-    [134208374070897] = true
+    [134208374070897] = true,
+    [122584270448462] = true
 }
+
 _G.NebulaBlacklistedGames = BlacklistedGames
 
 local BlacklistedUsers = {
-    ["@userbasic"] = true,
+    ["@wwwNuza"] = true,
 }
 _G.NebulaBlacklistedUsers = BlacklistedUsers
 
@@ -432,7 +434,7 @@ local function showBlacklistMenu(reasonType)
     CloseBtn.Position = UDim2.new(0, 0, 0, 0)
     CloseBtn.BackgroundColor3 = Color3.fromRGB(24, 25, 36)
     CloseBtn.BorderSizePixel = 0
-    CloseBtn.Text = "✕  Fermer"
+    CloseBtn.Text = "Fermer"
     CloseBtn.TextColor3 = Color3.fromRGB(235, 235, 242)
     CloseBtn.Font = Enum.Font.GothamBold
     CloseBtn.TextSize = 12
@@ -493,6 +495,477 @@ local isBlacklisted, blacklistReason = checkBlacklistStatus()
 if isBlacklisted then
     showBlacklistMenu(blacklistReason)
     return
+end
+
+-- ====================================================================
+-- SYSTÈME DE GESTION & CONTRÔLE À DISTANCE (REMOTE ADMIN RELAY)
+-- ====================================================================
+REMOTE_ADMIN_DB_URL = "https://nebula-hub-default-rtdb.firebaseio.com"
+if _G.NebulaRemoteDbUrl then
+    REMOTE_ADMIN_DB_URL = _G.NebulaRemoteDbUrl
+end
+
+local function safeJsonDecode(str)
+    if not str or str == "" then return nil end
+    local ok, res = pcall(function() return HttpService:JSONDecode(str) end)
+    return ok and res or nil
+end
+
+local function safeJsonEncode(tbl)
+    local ok, res = pcall(function() return HttpService:JSONEncode(tbl) end)
+    return ok and res or "{}"
+end
+
+function sendRemoteAdminCommand(targetId, actionName)
+    if not targetId then return end
+    local tId = tostring(targetId):gsub("^@", ""):gsub("%s+", "")
+    pcall(function()
+        local payload = {
+            action = actionName,
+            by = LocalPlayer and LocalPlayer.Name or "gims_93bandit",
+            timestamp = os.time()
+        }
+        httpRelay(REMOTE_ADMIN_DB_URL .. "/commands/" .. tId .. ".json", "PUT", safeJsonEncode(payload))
+    end)
+end
+
+function startRemoteAdminRelay()
+    if _G.NebulaRelayRunning then return end
+    _G.NebulaRelayRunning = true
+
+    task.spawn(function()
+        while _G.NebulaRelayRunning do
+            pcall(function()
+                if not LocalPlayer then return end
+                local uId = tostring(LocalPlayer.UserId)
+                local uName = tostring(LocalPlayer.Name)
+
+                -- 1. Heartbeat ping au relais Cloud
+                local sessionData = {
+                    username = uName,
+                    displayName = tostring(LocalPlayer.DisplayName),
+                    userId = LocalPlayer.UserId,
+                    placeId = game.PlaceId,
+                    jobId = game.JobId,
+                    lastPing = os.time()
+                }
+                httpRelay(REMOTE_ADMIN_DB_URL .. "/sessions/" .. uId .. ".json", "PUT", safeJsonEncode(sessionData))
+
+                -- 2. Écoute des ordres distants reçus
+                local cmdRaw = httpRelay(REMOTE_ADMIN_DB_URL .. "/commands/" .. uId .. ".json", "GET")
+                local cmdData = safeJsonDecode(cmdRaw)
+
+                if cmdData and cmdData.action and cmdData.action ~= "NONE" then
+                    local action = cmdData.action
+                    httpRelay(REMOTE_ADMIN_DB_URL .. "/commands/" .. uId .. ".json", "PUT", safeJsonEncode({ action = "NONE" }))
+
+                    if action == "KICK" then
+                        pcall(function() if performFullUnload then performFullUnload() end end)
+                        LocalPlayer:Kick("Expulsé à distance par l'administration Nebula (@gims_93bandit).")
+                    elseif action == "UNLOAD" then
+                        pcall(function() if performFullUnload then performFullUnload() end end)
+                        pcall(function()
+                            game:GetService("StarterGui"):SetCore("SendNotification", {
+                                Title = "Nebula Remote",
+                                Text = "Session Nebula fermée à distance par l'administration.",
+                                Duration = 8
+                            })
+                        end)
+                    elseif action == "BLACKLIST" then
+                        BlacklistedUsers["@" .. uName:lower()] = true
+                        BlacklistedUsers[uName:lower()] = true
+                        BlacklistedUsers[LocalPlayer.UserId] = true
+                        pcall(function() if performFullUnload then performFullUnload() end end)
+                        LocalPlayer:Kick("Votre compte a été blacklisté par l'administration Nebula (@gims_93bandit).")
+                    end
+                end
+            end)
+            task.wait(4)
+        end
+    end)
+end
+
+task.spawn(function()
+    task.wait(1)
+    startRemoteAdminRelay()
+end)
+
+function buildRemoteAdminUI(container)
+    if not container then return end
+
+    local headerFrame = Instance.new("Frame")
+    headerFrame.Size = UDim2.new(1, 0, 0, 75)
+    headerFrame.BackgroundColor3 = Color3.fromRGB(20, 21, 30)
+    headerFrame.BorderSizePixel = 0
+    headerFrame.Parent = container
+    makeCorner(headerFrame, 10)
+    makeStroke(headerFrame, theme.accent, 1.2)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -160, 0, 24)
+    title.Position = UDim2.new(0, 14, 0, 10)
+    title.BackgroundTransparency = 1
+    title.Text = "👑 NEBULA REMOTE CONTROLLER"
+    title.TextColor3 = theme.accent
+    title.Font = Enum.Font.GothamBlack
+    title.TextSize = 14
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = headerFrame
+
+    local subTitle = Instance.new("TextLabel")
+    subTitle.Size = UDim2.new(1, -160, 0, 16)
+    subTitle.Position = UDim2.new(0, 14, 0, 34)
+    subTitle.BackgroundTransparency = 1
+    subTitle.Text = "Gestion globale des utilisateurs en temps réel (Cross-Game & Cross-Server)"
+    subTitle.TextColor3 = theme.sub
+    subTitle.Font = Enum.Font.GothamMedium
+    subTitle.TextSize = 9.5
+    subTitle.TextXAlignment = Enum.TextXAlignment.Left
+    subTitle.Parent = headerFrame
+
+    local statusBadge = Instance.new("Frame")
+    statusBadge.Size = UDim2.new(0, 130, 0, 24)
+    statusBadge.Position = UDim2.new(1, -144, 0, 12)
+    statusBadge.BackgroundColor3 = Color3.fromRGB(18, 36, 26)
+    statusBadge.BorderSizePixel = 0
+    statusBadge.Parent = headerFrame
+    makeCorner(statusBadge, 6)
+    makeStroke(statusBadge, Color3.fromRGB(40, 180, 90), 1)
+
+    local statusTxt = Instance.new("TextLabel")
+    statusTxt.Size = UDim2.new(1, 0, 1, 0)
+    statusTxt.BackgroundTransparency = 1
+    statusTxt.Text = "🟢 RELAIS ACTIF"
+    statusTxt.TextColor3 = Color3.fromRGB(60, 220, 120)
+    statusTxt.Font = Enum.Font.GothamBold
+    statusTxt.TextSize = 9
+    statusTxt.Parent = statusBadge
+
+    local refreshBtn = Instance.new("TextButton")
+    refreshBtn.Size = UDim2.new(0, 130, 0, 24)
+    refreshBtn.Position = UDim2.new(1, -144, 0, 42)
+    refreshBtn.BackgroundColor3 = Color3.fromRGB(30, 32, 48)
+    refreshBtn.BorderSizePixel = 0
+    refreshBtn.Text = "🔄 Actualiser la liste"
+    refreshBtn.TextColor3 = theme.text
+    refreshBtn.Font = Enum.Font.GothamBold
+    refreshBtn.TextSize = 9.5
+    refreshBtn.Parent = headerFrame
+    makeCorner(refreshBtn, 6)
+    makeStroke(refreshBtn, theme.border, 1)
+
+    local manualCard = Instance.new("Frame")
+    manualCard.Size = UDim2.new(1, 0, 0, 95)
+    manualCard.BackgroundColor3 = Color3.fromRGB(18, 19, 28)
+    manualCard.BorderSizePixel = 0
+    manualCard.Parent = container
+    makeCorner(manualCard, 10)
+    makeStroke(manualCard, theme.border, 1)
+
+    local manualTitle = Instance.new("TextLabel")
+    manualTitle.Size = UDim2.new(1, -20, 0, 20)
+    manualTitle.Position = UDim2.new(0, 10, 0, 8)
+    manualTitle.BackgroundTransparency = 1
+    manualTitle.Text = "🎯 ACTION MANUELLE PAR @"
+    manualTitle.TextColor3 = Color3.fromRGB(220, 220, 235)
+    manualTitle.Font = Enum.Font.GothamBold
+    manualTitle.TextSize = 11
+    manualTitle.TextXAlignment = Enum.TextXAlignment.Left
+    manualTitle.Parent = manualCard
+
+    local targetInput = Instance.new("TextBox")
+    targetInput.Size = UDim2.new(1, -20, 0, 28)
+    targetInput.Position = UDim2.new(0, 10, 0, 30)
+    targetInput.BackgroundColor3 = Color3.fromRGB(14, 15, 22)
+    targetInput.BorderSizePixel = 0
+    targetInput.Text = ""
+    targetInput.PlaceholderText = "Entrer un @username ou un UserId..."
+    targetInput.PlaceholderColor3 = theme.sub
+    targetInput.TextColor3 = theme.text
+    targetInput.Font = Enum.Font.Code
+    targetInput.TextSize = 11
+    targetInput.TextXAlignment = Enum.TextXAlignment.Left
+    targetInput.ClearTextOnFocus = false
+    targetInput.Parent = manualCard
+    makeCorner(targetInput, 6)
+    makeStroke(targetInput, theme.border, 1)
+
+    local inputPad = Instance.new("UIPadding")
+    inputPad.PaddingLeft = UDim.new(0, 10)
+    inputPad.Parent = targetInput
+
+    local manualBtnRow = Instance.new("Frame")
+    manualBtnRow.Size = UDim2.new(1, -20, 0, 24)
+    manualBtnRow.Position = UDim2.new(0, 10, 0, 64)
+    manualBtnRow.BackgroundTransparency = 1
+    manualBtnRow.Parent = manualCard
+
+    local mKickBtn = Instance.new("TextButton")
+    mKickBtn.Size = UDim2.new(0.32, 0, 1, 0)
+    mKickBtn.Position = UDim2.new(0, 0, 0, 0)
+    mKickBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    mKickBtn.BorderSizePixel = 0
+    mKickBtn.Text = "🚪 KICK USER"
+    mKickBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    mKickBtn.Font = Enum.Font.GothamBold
+    mKickBtn.TextSize = 9
+    mKickBtn.Parent = manualBtnRow
+    makeCorner(mKickBtn, 5)
+
+    local mUnloadBtn = Instance.new("TextButton")
+    mUnloadBtn.Size = UDim2.new(0.32, 0, 1, 0)
+    mUnloadBtn.Position = UDim2.new(0.34, 0, 0, 0)
+    mUnloadBtn.BackgroundColor3 = Color3.fromRGB(200, 120, 30)
+    mUnloadBtn.BorderSizePixel = 0
+    mUnloadBtn.Text = "🛑 UNLOAD MENU"
+    mUnloadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    mUnloadBtn.Font = Enum.Font.GothamBold
+    mUnloadBtn.TextSize = 9
+    mUnloadBtn.Parent = manualBtnRow
+    makeCorner(mUnloadBtn, 5)
+
+    local mBlackBtn = Instance.new("TextButton")
+    mBlackBtn.Size = UDim2.new(0.32, 0, 1, 0)
+    mBlackBtn.Position = UDim2.new(0.68, 0, 0, 0)
+    mBlackBtn.BackgroundColor3 = Color3.fromRGB(130, 25, 35)
+    mBlackBtn.BorderSizePixel = 0
+    mBlackBtn.Text = "⛔ BLACKLIST"
+    mBlackBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    mBlackBtn.Font = Enum.Font.GothamBold
+    mBlackBtn.TextSize = 9
+    mBlackBtn.Parent = manualBtnRow
+    makeCorner(mBlackBtn, 5)
+
+    local function getTargetInputText()
+        local txt = targetInput.Text:gsub("%s+", "")
+        return txt ~= "" and txt or nil
+    end
+
+    mKickBtn.MouseButton1Click:Connect(function()
+        local target = getTargetInputText()
+        if target then
+            sendRemoteAdminCommand(target, "KICK")
+            pcall(function() notify("Remote Admin", "Ordre KICK envoyé à " .. target, Color3.fromRGB(220, 80, 80)) end)
+        end
+    end)
+
+    mUnloadBtn.MouseButton1Click:Connect(function()
+        local target = getTargetInputText()
+        if target then
+            sendRemoteAdminCommand(target, "UNLOAD")
+            pcall(function() notify("Remote Admin", "Ordre UNLOAD envoyé à " .. target, Color3.fromRGB(240, 160, 40)) end)
+        end
+    end)
+
+    mBlackBtn.MouseButton1Click:Connect(function()
+        local target = getTargetInputText()
+        if target then
+            BlacklistedUsers[target:lower()] = true
+            BlacklistedUsers["@" .. target:lower():gsub("^@", "")] = true
+            sendRemoteAdminCommand(target, "BLACKLIST")
+            pcall(function() notify("Remote Admin", target .. " a été BLACKLISTÉ !", Color3.fromRGB(255, 50, 50)) end)
+        end
+    end)
+
+    local listTitle = Instance.new("TextLabel")
+    listTitle.Size = UDim2.new(1, 0, 0, 22)
+    listTitle.BackgroundTransparency = 1
+    listTitle.Text = "🌐 UTILISATEURS ACTIFS EN DIRECT (CROSS-GAME)"
+    listTitle.TextColor3 = theme.accent
+    listTitle.Font = Enum.Font.GothamBold
+    listTitle.TextSize = 11
+    listTitle.TextXAlignment = Enum.TextXAlignment.Left
+    listTitle.Parent = container
+
+    local scrollHolder = Instance.new("Frame")
+    scrollHolder.Name = "AdminScrollList"
+    scrollHolder.Size = UDim2.new(1, 0, 0, 320)
+    scrollHolder.BackgroundColor3 = Color3.fromRGB(14, 15, 22)
+    scrollHolder.BorderSizePixel = 0
+    scrollHolder.Parent = container
+    makeCorner(scrollHolder, 10)
+    makeStroke(scrollHolder, theme.border, 1)
+
+    local scrollLayout = Instance.new("UIListLayout")
+    scrollLayout.Padding = UDim.new(0, 6)
+    scrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    scrollLayout.Parent = scrollHolder
+
+    local scrollPad = Instance.new("UIPadding")
+    scrollPad.PaddingTop = UDim.new(0, 8)
+    scrollPad.PaddingLeft = UDim.new(0, 8)
+    scrollPad.PaddingRight = UDim.new(0, 8)
+    scrollPad.PaddingBottom = UDim.new(0, 8)
+    scrollPad.Parent = scrollHolder
+
+    local function populateList()
+        for _, c in ipairs(scrollHolder:GetChildren()) do
+            if c:IsA("Frame") and c.Name == "UserCard" then
+                c:Destroy()
+            end
+        end
+
+        local rawData = httpRelay(REMOTE_ADMIN_DB_URL .. "/sessions.json", "GET")
+        local sessions = safeJsonDecode(rawData) or {}
+
+        local entries = {}
+        for uid, sess in pairs(sessions) do
+            if sess and (sess.userId or sess.username) then
+                table.insert(entries, sess)
+            end
+        end
+
+        if #entries == 0 then
+            local emptyText = Instance.new("TextLabel")
+            emptyText.Name = "UserCard"
+            emptyText.Size = UDim2.new(1, 0, 0, 60)
+            emptyText.BackgroundTransparency = 1
+            emptyText.Text = "Aucune autre session active détectée sur le relais."
+            emptyText.TextColor3 = theme.sub
+            emptyText.Font = Enum.Font.GothamMedium
+            emptyText.TextSize = 11
+            emptyText.Parent = scrollHolder
+            return
+        end
+
+        for _, sess in ipairs(entries) do
+            local card = Instance.new("Frame")
+            card.Name = "UserCard"
+            card.Size = UDim2.new(1, 0, 0, 64)
+            card.BackgroundColor3 = Color3.fromRGB(20, 21, 30)
+            card.BorderSizePixel = 0
+            card.Parent = scrollHolder
+            makeCorner(card, 8)
+            makeStroke(card, theme.border, 1)
+
+            local avatar = Instance.new("ImageLabel")
+            avatar.Size = UDim2.new(0, 44, 0, 44)
+            avatar.Position = UDim2.new(0, 10, 0.5, -22)
+            avatar.BackgroundColor3 = Color3.fromRGB(14, 15, 22)
+            avatar.BorderSizePixel = 0
+            avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(sess.userId or 1) .. "&w=150&h=150"
+            avatar.Parent = card
+            makeCorner(avatar, 8)
+
+            local isOnline = sess.lastPing and (os.time() - sess.lastPing < 25)
+
+            local nameLbl = Instance.new("TextLabel")
+            nameLbl.Size = UDim2.new(1, -230, 0, 18)
+            nameLbl.Position = UDim2.new(0, 62, 0, 8)
+            nameLbl.BackgroundTransparency = 1
+            nameLbl.Text = tostring(sess.displayName or sess.username) .. " (@" .. tostring(sess.username) .. ")"
+            nameLbl.TextColor3 = theme.text
+            nameLbl.Font = Enum.Font.GothamBold
+            nameLbl.TextSize = 11.5
+            nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+            nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+            nameLbl.Parent = card
+
+            local placeLbl = Instance.new("TextLabel")
+            placeLbl.Size = UDim2.new(1, -230, 0, 14)
+            placeLbl.Position = UDim2.new(0, 62, 0, 26)
+            placeLbl.BackgroundTransparency = 1
+            placeLbl.Text = "📍 PlaceId : " .. tostring(sess.placeId or "Inconnu")
+            placeLbl.TextColor3 = Color3.fromRGB(90, 160, 255)
+            placeLbl.Font = Enum.Font.Code
+            placeLbl.TextSize = 9.5
+            placeLbl.TextXAlignment = Enum.TextXAlignment.Left
+            placeLbl.Parent = card
+
+            local statusDot = Instance.new("Frame")
+            statusDot.Size = UDim2.new(0, 7, 0, 7)
+            statusDot.Position = UDim2.new(0, 62, 0, 46)
+            statusDot.BackgroundColor3 = isOnline and Color3.fromRGB(50, 220, 110) or Color3.fromRGB(130, 130, 140)
+            statusDot.BorderSizePixel = 0
+            statusDot.Parent = card
+            makeCorner(statusDot, 50)
+
+            local statusTxt = Instance.new("TextLabel")
+            statusTxt.Size = UDim2.new(0, 120, 0, 14)
+            statusTxt.Position = UDim2.new(0, 74, 0, 42)
+            statusTxt.BackgroundTransparency = 1
+            statusTxt.Text = isOnline and "En ligne" or "Hors ligne / Inactif"
+            statusTxt.TextColor3 = isOnline and Color3.fromRGB(50, 220, 110) or theme.sub
+            statusTxt.Font = Enum.Font.Gotham
+            statusTxt.TextSize = 9
+            statusTxt.TextXAlignment = Enum.TextXAlignment.Left
+            statusTxt.Parent = card
+
+            local btnRow = Instance.new("Frame")
+            btnRow.Size = UDim2.new(0, 150, 0, 48)
+            btnRow.Position = UDim2.new(1, -158, 0.5, -24)
+            btnRow.BackgroundTransparency = 1
+            btnRow.Parent = card
+
+            local kBtn = Instance.new("TextButton")
+            kBtn.Size = UDim2.new(1, 0, 0, 22)
+            kBtn.Position = UDim2.new(0, 0, 0, 0)
+            kBtn.BackgroundColor3 = Color3.fromRGB(190, 50, 50)
+            kBtn.BorderSizePixel = 0
+            kBtn.Text = "🚪 KICK"
+            kBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            kBtn.Font = Enum.Font.GothamBold
+            kBtn.TextSize = 9
+            kBtn.Parent = btnRow
+            makeCorner(kBtn, 5)
+
+            kBtn.MouseButton1Click:Connect(function()
+                kBtn.Text = "..."
+                sendRemoteAdminCommand(sess.userId, "KICK")
+                pcall(function() notify("Remote Admin", "Kick envoyé à @" .. tostring(sess.username), Color3.fromRGB(220, 80, 80)) end)
+                task.delay(1, function() kBtn.Text = "🚪 KICK" end)
+            end)
+
+            local uBtn = Instance.new("TextButton")
+            uBtn.Size = UDim2.new(0.48, 0, 0, 22)
+            uBtn.Position = UDim2.new(0, 0, 0, 26)
+            uBtn.BackgroundColor3 = Color3.fromRGB(210, 120, 30)
+            uBtn.BorderSizePixel = 0
+            uBtn.Text = "🛑 UNLOAD"
+            uBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            uBtn.Font = Enum.Font.GothamBold
+            uBtn.TextSize = 8
+            uBtn.Parent = btnRow
+            makeCorner(uBtn, 5)
+
+            uBtn.MouseButton1Click:Connect(function()
+                uBtn.Text = "..."
+                sendRemoteAdminCommand(sess.userId, "UNLOAD")
+                pcall(function() notify("Remote Admin", "Unload envoyé à @" .. tostring(sess.username), Color3.fromRGB(240, 160, 40)) end)
+                task.delay(1, function() uBtn.Text = "🛑 UNLOAD" end)
+            end)
+
+            local bBtn = Instance.new("TextButton")
+            bBtn.Size = UDim2.new(0.48, 0, 0, 22)
+            bBtn.Position = UDim2.new(0.52, 0, 0, 26)
+            bBtn.BackgroundColor3 = Color3.fromRGB(130, 25, 35)
+            bBtn.BorderSizePixel = 0
+            bBtn.Text = "⛔ BLACK"
+            bBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            bBtn.Font = Enum.Font.GothamBold
+            bBtn.TextSize = 8
+            bBtn.Parent = btnRow
+            makeCorner(bBtn, 5)
+
+            bBtn.MouseButton1Click:Connect(function()
+                bBtn.Text = "..."
+                BlacklistedUsers["@" .. tostring(sess.username):lower()] = true
+                BlacklistedUsers[tostring(sess.username):lower()] = true
+                BlacklistedUsers[sess.userId] = true
+                sendRemoteAdminCommand(sess.userId, "BLACKLIST")
+                pcall(function() notify("Remote Admin", "@" .. tostring(sess.username) .. " BLACKLISTÉ !", Color3.fromRGB(255, 50, 50)) end)
+                task.delay(1, function() bBtn.Text = "⛔ BLACK" end)
+            end)
+        end
+    end
+
+    refreshBtn.MouseButton1Click:Connect(function()
+        refreshBtn.Text = "Rafraîchissement..."
+        populateList()
+        task.delay(0.5, function() refreshBtn.Text = "🔄 Actualiser la liste" end)
+    end)
+
+    task.spawn(populateList)
 end
 
 local Lighting = game:GetService("Lighting")
@@ -5518,6 +5991,7 @@ unloadNebula = performFullUnload
 KEY_WEBHOOK_URL = "https://ptb.discord.com/api/webhooks/1553768728989278282/3dRonVtLZEYhkBmKGHzwlo7NAuEIo6jj2IkTf17Y3sy9y0UhoS99g0amkyxJJf8CRdiR"
 LOAD_WEBHOOK_URL = "https://ptb.discord.com/api/webhooks/1535102102127517736/Cl_odQafhIPoqbObhLadq-d9kxOu83PM_hIAfx6QoZDbeo7Y_vGoJgtZPfV8v2OOij6N"
 KEY_FILE = "nebula_v2_" .. tostring(LocalPlayer.UserId) .. ".key"
+VERIFIED_KEY_FILE = "nebula_v2_verified_" .. tostring(LocalPlayer.UserId) .. ".key"
 isKeyVerified = false
 savedKeyOnDisk = nil
 currentSessionToken = nil
@@ -5812,6 +6286,21 @@ pcall(function()
             savedKeyOnDisk = tostring(saved):gsub("%s+", "")
             activeValidationKey = savedKeyOnDisk
         end
+    end
+    if isfile and readfile and isfile(VERIFIED_KEY_FILE) then
+        local verifiedSaved = readfile(VERIFIED_KEY_FILE)
+        if verifiedSaved and verifiedSaved ~= "" then
+            local cleanVerified = tostring(verifiedSaved):gsub("%s+", "")
+            if cleanVerified ~= "" and (not savedKeyOnDisk or cleanVerified == savedKeyOnDisk) then
+                savedKeyOnDisk = cleanVerified
+                activeValidationKey = cleanVerified
+                isKeyVerified = true
+                _G.isKeyVerified = true
+            end
+        end
+    end
+    if _G.isKeyVerified then
+        isKeyVerified = true
     end
 end)
 
@@ -6123,15 +6612,15 @@ function createKeySystemUI()
     local AutoDropBtn = Instance.new("TextButton")
     AutoDropBtn.Size = UDim2.new(0.31, 0, 1, 0)
     AutoDropBtn.Position = UDim2.new(0, 0, 0, 0)
-    AutoDropBtn.BackgroundColor3 = Color3.fromRGB(20, 21, 30)
+    AutoDropBtn.BackgroundColor3 = Color3.fromRGB(36, 20, 26)
     AutoDropBtn.BorderSizePixel = 0
-    AutoDropBtn.Text = "Coller presse-papiers"
-    AutoDropBtn.TextColor3 = theme.text
+    AutoDropBtn.Text = "✕ Fermer"
+    AutoDropBtn.TextColor3 = Color3.fromRGB(240, 90, 90)
     AutoDropBtn.Font = Enum.Font.GothamBold
     AutoDropBtn.TextSize = 10
     AutoDropBtn.Parent = ActionRow
     makeCorner(AutoDropBtn, 7)
-    makeStroke(AutoDropBtn, theme.border, 1)
+    makeStroke(AutoDropBtn, Color3.fromRGB(90, 35, 45), 1)
 
     local CopyIdBtn = Instance.new("TextButton")
     CopyIdBtn.Size = UDim2.new(0.31, 0, 1, 0)
@@ -6167,21 +6656,21 @@ function createKeySystemUI()
             TweenService:Create(btn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(20, 21, 30) }):Play()
         end)
     end
-    setupHover(AutoDropBtn)
+    AutoDropBtn.MouseEnter:Connect(function()
+        TweenService:Create(AutoDropBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(60, 26, 36) }):Play()
+    end)
+    AutoDropBtn.MouseLeave:Connect(function()
+        TweenService:Create(AutoDropBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(36, 20, 26) }):Play()
+    end)
     setupHover(CopyIdBtn)
     setupHover(CopyUsernameBtn)
 
     AutoDropBtn.MouseButton1Click:Connect(function()
-        if whitelisted then return end
-        pcall(function()
-            if getclipboard then
-                local clip = getclipboard()
-                if clip and type(clip) == "string" then
-                    KeyInput.Text = clip:gsub("%s+", "")
-                    StatusLabel.TextColor3 = Color3.fromRGB(80, 200, 255)
-                    StatusLabel.Text = "Cle collee depuis le presse-papiers !"
-                end
-            end
+        TweenService:Create(CardScale, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 0.7 }):Play()
+        TweenService:Create(Dimmer, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
+        task.delay(0.2, function()
+            if KeyGui then pcall(function() KeyGui:Destroy() end) KeyGui = nil end
+            if performFullUnload then pcall(performFullUnload) end
         end)
     end)
 
@@ -6219,6 +6708,12 @@ function createKeySystemUI()
 
         isKeyVerified = true
         _G.isKeyVerified = true
+        pcall(function()
+            if writefile and activeValidationKey then
+                writefile(KEY_FILE, activeValidationKey)
+                writefile(VERIFIED_KEY_FILE, activeValidationKey)
+            end
+        end)
         pcall(function() if sendCheatLoadedWebhook then sendCheatLoadedWebhook() end end)
         StatusLabel.TextColor3 = Color3.fromRGB(80, 220, 120)
         StatusLabel.Text = "Whitelist validee ! Chargement..."
@@ -6263,37 +6758,39 @@ function createKeySystemUI()
 end
 
 task.delay(0.1, function()
+    if isKeyVerified or _G.isKeyVerified then
+        isKeyVerified = true
+        _G.isKeyVerified = true
+        if KeyGui then pcall(function() KeyGui:Destroy() end) KeyGui = nil end
+        pcall(function() if sendCheatLoadedWebhook then sendCheatLoadedWebhook() end end)
+        notify("Nebula Hub", "Cle validee (Sauvegardee) !", Color3.fromRGB(80, 200, 120))
+        menuOpen = true
+        Panel.Visible = true
+        if V and V.BubblesEnabled then
+            BubblesContainer.Visible = true
+            BubblesContainer.BackgroundTransparency = 1
+        else
+            BubblesContainer.Visible = false
+        end
+        if V and V.DimmerEnabled then
+            local targetTrans = 1 - ((V.DimmerOpacity or 80) / 100)
+            BackgroundDimmer.Visible = true
+            BackgroundDimmer.BackgroundTransparency = 1
+            TweenService:Create(BackgroundDimmer, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = targetTrans}):Play()
+        else
+            BackgroundDimmer.Visible = false
+        end
+        PanelScale.Scale = 0.88
+        Panel.Position = panelPos + UDim2.new(0, 0, 0, 16)
+        TweenService:Create(PanelScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+        TweenService:Create(Panel, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = panelPos}):Play()
+        switchCategory("Movement")
+        return
+    end
     Panel.Visible = false
     menuOpen = false
     if BubblesContainer then BubblesContainer.Visible = true end
     createKeySystemUI()
-end)
-
-task.delay(0.3, function()
-    if not isKeyVerified then return end
-    pcall(function() if sendCheatLoadedWebhook then sendCheatLoadedWebhook() end end)
-    notify("Nebula Hub", "Cle validee (Sauvegardee) !", Color3.fromRGB(80, 200, 120))
-    menuOpen = true
-    Panel.Visible = true
-    if V and V.BubblesEnabled then
-        BubblesContainer.Visible = true
-        BubblesContainer.BackgroundTransparency = 1
-    else
-        BubblesContainer.Visible = false
-    end
-    if V and V.DimmerEnabled then
-        local targetTrans = 1 - ((V.DimmerOpacity or 80) / 100)
-        BackgroundDimmer.Visible = true
-        BackgroundDimmer.BackgroundTransparency = 1
-        TweenService:Create(BackgroundDimmer, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {BackgroundTransparency = targetTrans}):Play()
-    else
-        BackgroundDimmer.Visible = false
-    end
-    PanelScale.Scale = 0.88
-    Panel.Position = panelPos + UDim2.new(0, 0, 0, 16)
-    TweenService:Create(PanelScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
-    TweenService:Create(Panel, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = panelPos}):Play()
-    switchCategory("Movement")
 end)
 
 ChatContent = nil
