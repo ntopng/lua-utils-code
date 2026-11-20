@@ -4361,35 +4361,63 @@ RunService.RenderStepped:Connect(function()
 end)
 
 NotificationContainer = Instance.new("Frame")
-NotificationContainer.Name = "NotificationContainer"
+NotificationContainer.Name = "PearlNotificationContainer"
 NotificationContainer.Size = UDim2.new(0, 320, 1, -40)
-NotificationContainer.Position = UDim2.new(1, -340, 0, 20)
+NotificationContainer.Position = UDim2.new(1, -336, 0, 20)
 NotificationContainer.BackgroundTransparency = 1
-NotificationContainer.ZIndex = 200
+NotificationContainer.BorderSizePixel = 0
+NotificationContainer.ZIndex = 500
+NotificationContainer.ClipsDescendants = false
 NotificationContainer.Parent = ScreenGui
 
 local NotificationLayout = Instance.new("UIListLayout")
 NotificationLayout.SortOrder = Enum.SortOrder.LayoutOrder
-NotificationLayout.Padding = UDim.new(0, 10)
+NotificationLayout.Padding = UDim.new(0, 8)
 NotificationLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 NotificationLayout.Parent = NotificationContainer
 
+local lastNotifyKey = nil
+local lastNotifyTime = 0
+local activeNotifCards = {}
+
 function notify(title, text, color)
-	title = tostring(title or "Notification"):gsub("<[^>]->", "")
+	if V and V.Notif == false then return end
+	title = tostring(title or "Pearl Hub"):gsub("<[^>]->", "")
 	text = tostring(text or ""):gsub("<[^>]->", "")
-	local notifColor = color or Colors.Accent
+
+	local key = title .. "|" .. text
+	local now = os.clock()
+	if key == lastNotifyKey and (now - lastNotifyTime) < 1.0 then
+		return
+	end
+	lastNotifyKey = key
+	lastNotifyTime = now
+
+	local notifColor = color or (theme and theme.accent) or Color3.fromRGB(145, 120, 255)
+
+	-- Cap maximum active notifications on screen to 5
+	if #activeNotifCards >= 5 then
+		local oldest = table.remove(activeNotifCards, 1)
+		if oldest and oldest.dismiss then
+			pcall(oldest.dismiss)
+		end
+	end
+
+	local textLen = string.len(text)
+	local cardHeight = textLen > 48 and 72 or 62
 
 	local Card = Instance.new("Frame")
-	Card.Size = UDim2.new(1, 0, 0, 68)
-	Card.Position = UDim2.new(0, 80, 0, 0)
-	Card.BackgroundColor3 = Colors.Card
+	Card.Name = "PearlNotifCard"
+	Card.Size = UDim2.new(1, 0, 0, cardHeight)
+	Card.Position = UDim2.new(0, 120, 0, 0)
+	Card.BackgroundColor3 = Color3.fromRGB(17, 18, 26)
 	Card.BorderSizePixel = 0
 	Card.ClipsDescendants = true
 	Card.BackgroundTransparency = 1
-	Card.ZIndex = 201
+	Card.ZIndex = 501
 
 	local CardScale = Instance.new("UIScale")
-	CardScale.Scale = 0.85
+	CardScale.Scale = 0.8
 	CardScale.Parent = Card
 
 	local UICorner = Instance.new("UICorner")
@@ -4397,99 +4425,290 @@ function notify(title, text, color)
 	UICorner.Parent = Card
 
 	local UIStroke = Instance.new("UIStroke")
-	UIStroke.Color = Colors.Border
-	UIStroke.Thickness = 1
+	UIStroke.Color = notifColor
+	UIStroke.Thickness = 1.2
 	UIStroke.Transparency = 1
+	UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	UIStroke.Parent = Card
 
-	local IconContainer = Instance.new("Frame")
-	IconContainer.Size = UDim2.new(0, 32, 0, 32)
-	IconContainer.Position = UDim2.new(0, 12, 0, 12)
-	IconContainer.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
-	IconContainer.BorderSizePixel = 0
-	IconContainer.Parent = Card
+	local CardGrad = Instance.new("UIGradient")
+	CardGrad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 27, 40)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 15, 22))
+	})
+	CardGrad.Rotation = 45
+	CardGrad.Parent = Card
 
-	local IconCorner = Instance.new("UICorner")
-	IconCorner.CornerRadius = UDim.new(0, 8)
-	IconCorner.Parent = IconContainer
+	-- Left Glowing Accent Pill
+	local LeftPill = Instance.new("Frame")
+	LeftPill.Name = "LeftPill"
+	LeftPill.Size = UDim2.new(0, 3.5, 0.65, 0)
+	LeftPill.Position = UDim2.new(0, 5, 0.5, 0)
+	LeftPill.AnchorPoint = Vector2.new(0, 0.5)
+	LeftPill.BackgroundColor3 = notifColor
+	LeftPill.BorderSizePixel = 0
+	LeftPill.BackgroundTransparency = 1
+	LeftPill.ZIndex = 502
+	LeftPill.Parent = Card
+	local pillCorner = Instance.new("UICorner")
+	pillCorner.CornerRadius = UDim.new(1, 0)
+	pillCorner.Parent = LeftPill
+
+	-- Icon Container
+	local IconBox = Instance.new("Frame")
+	IconBox.Name = "IconBox"
+	IconBox.Size = UDim2.new(0, 34, 0, 34)
+	IconBox.Position = UDim2.new(0, 15, 0.5, 0)
+	IconBox.AnchorPoint = Vector2.new(0, 0.5)
+	IconBox.BackgroundColor3 = Color3.fromRGB(24, 25, 36)
+	IconBox.BorderSizePixel = 0
+	IconBox.BackgroundTransparency = 1
+	IconBox.ZIndex = 502
+	IconBox.Parent = Card
+	local ibCorner = Instance.new("UICorner")
+	ibCorner.CornerRadius = UDim.new(0, 8)
+	ibCorner.Parent = IconBox
+	local ibStroke = Instance.new("UIStroke")
+	ibStroke.Color = Color3.fromRGB(48, 50, 70)
+	ibStroke.Thickness = 1
+	ibStroke.Transparency = 1
+	ibStroke.Parent = IconBox
+
+	-- Category icon selector matching left navigation rail
+	local iconId = nil
+	if CategoryIcons and CategoryIcons[title] then
+		iconId = CategoryIcons[title]
+	else
+		local lContext = string.lower(title .. " " .. text)
+		if CategoryIcons then
+			for catName, catIcon in pairs(CategoryIcons) do
+				if string.find(lContext, string.lower(catName)) then
+					iconId = catIcon
+					break
+				end
+			end
+		end
+	end
+	if not iconId then
+		local lC = string.lower(title .. " " .. text)
+		if string.find(lC, "aim") or string.find(lC, "lock") or string.find(lC, "fov") or string.find(lC, "trigger") then
+			iconId = CategoryIcons and CategoryIcons.Aim or "rbxassetid://7733765307"
+		elseif string.find(lC, "teleport") or string.find(lC, "tp") or string.find(lC, "waypoint") then
+			iconId = CategoryIcons and CategoryIcons.Teleport or "rbxassetid://7733919198"
+		elseif string.find(lC, "esp") or string.find(lC, "visual") or string.find(lC, "chams") then
+			iconId = CategoryIcons and CategoryIcons.ESP or "rbxassetid://7733774602"
+		elseif string.find(lC, "fly") or string.find(lC, "speed") or string.find(lC, "noclip") or string.find(lC, "desync") then
+			iconId = CategoryIcons and CategoryIcons.Movement or "rbxassetid://7733955740"
+		elseif string.find(lC, "veh") or string.find(lC, "car") or string.find(lC, "boat") then
+			iconId = CategoryIcons and CategoryIcons.Vehicle or "rbxassetid://7733708835"
+		elseif string.find(lC, "player") or string.find(lC, "joueur") then
+			iconId = CategoryIcons and CategoryIcons.Joueur or "rbxassetid://7743876054"
+		elseif string.find(lC, "server") or string.find(lC, "troll") or string.find(lC, "kick") then
+			iconId = CategoryIcons and CategoryIcons.Server or "rbxassetid://7734053426"
+		elseif string.find(lC, "keybind") or string.find(lC, "setting") then
+			iconId = CategoryIcons and CategoryIcons.Settings or "rbxassetid://7734053495"
+		else
+			iconId = (CategoryIcons and CategoryIcons.Me) or "rbxassetid://7733964719"
+		end
+	end
 
 	local Icon = Instance.new("ImageLabel")
+	Icon.Name = "Icon"
 	Icon.Size = UDim2.new(0, 18, 0, 18)
-	Icon.Position = UDim2.new(0.5, -9, 0.5, -9)
+	Icon.Position = UDim2.new(0.5, 0, 0.5, 0)
+	Icon.AnchorPoint = Vector2.new(0.5, 0.5)
 	Icon.BackgroundTransparency = 1
-	Icon.Image = "rbxassetid://7733964719"
+	Icon.Image = iconId
 	Icon.ImageColor3 = notifColor
-	Icon.Parent = IconContainer
+	Icon.ImageTransparency = 1
+	Icon.ZIndex = 503
+	Icon.Parent = IconBox
 
+	-- Title Label
 	local TitleLabel = Instance.new("TextLabel")
-	TitleLabel.Size = UDim2.new(1, -62, 0, 18)
-	TitleLabel.Position = UDim2.new(0, 52, 0, 11)
+	TitleLabel.Name = "TitleLabel"
+	TitleLabel.Size = UDim2.new(1, -95, 0, 18)
+	TitleLabel.Position = UDim2.new(0, 58, 0, 10)
 	TitleLabel.BackgroundTransparency = 1
 	TitleLabel.Font = Enum.Font.GothamBold
-	TitleLabel.Text = title
-	TitleLabel.TextColor3 = Colors.Text
-	TitleLabel.TextSize = 13
+	TitleLabel.Text = string.upper(title)
+	TitleLabel.TextColor3 = notifColor
+	TitleLabel.TextSize = 12
 	TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 	TitleLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	TitleLabel.TextTransparency = 1
+	TitleLabel.ZIndex = 502
 	TitleLabel.Parent = Card
 
+	-- Message Label
 	local MessageLabel = Instance.new("TextLabel")
-	MessageLabel.Size = UDim2.new(1, -62, 0, 24)
-	MessageLabel.Position = UDim2.new(0, 52, 0, 29)
+	MessageLabel.Name = "MessageLabel"
+	MessageLabel.Size = UDim2.new(1, -90, 0, cardHeight > 64 and 34 or 22)
+	MessageLabel.Position = UDim2.new(0, 58, 0, 28)
 	MessageLabel.BackgroundTransparency = 1
-	MessageLabel.Font = Enum.Font.Gotham
+	MessageLabel.Font = Enum.Font.GothamMedium
 	MessageLabel.Text = text
-	MessageLabel.TextColor3 = Colors.TextDim
+	MessageLabel.TextColor3 = Color3.fromRGB(230, 230, 240)
 	MessageLabel.TextSize = 11
 	MessageLabel.TextXAlignment = Enum.TextXAlignment.Left
 	MessageLabel.TextYAlignment = Enum.TextYAlignment.Top
 	MessageLabel.TextWrapped = true
+	MessageLabel.TextTransparency = 1
+	MessageLabel.ZIndex = 502
 	MessageLabel.Parent = Card
 
-	local ProgressBarBg = Instance.new("Frame")
-	ProgressBarBg.Size = UDim2.new(1, -20, 0, 3)
-	ProgressBarBg.Position = UDim2.new(0, 10, 1, -5)
-	ProgressBarBg.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
-	ProgressBarBg.BorderSizePixel = 0
-	ProgressBarBg.Parent = Card
+	-- Close Button
+	local CloseBtn = Instance.new("TextButton")
+	CloseBtn.Name = "CloseBtn"
+	CloseBtn.Size = UDim2.new(0, 20, 0, 20)
+	CloseBtn.Position = UDim2.new(1, -26, 0, 7)
+	CloseBtn.BackgroundTransparency = 1
+	CloseBtn.Text = "X"
+	CloseBtn.TextColor3 = Color3.fromRGB(130, 134, 152)
+	CloseBtn.Font = Enum.Font.GothamBold
+	CloseBtn.TextSize = 11
+	CloseBtn.TextTransparency = 1
+	CloseBtn.ZIndex = 504
+	CloseBtn.Parent = Card
 
-	local BarCorner = Instance.new("UICorner")
-	BarCorner.CornerRadius = UDim.new(1, 0)
-	BarCorner.Parent = ProgressBarBg
+	-- Progress Bar
+	local ProgressBarBg = Instance.new("Frame")
+	ProgressBarBg.Name = "ProgressBarBg"
+	ProgressBarBg.Size = UDim2.new(1, -24, 0, 2)
+	ProgressBarBg.Position = UDim2.new(0, 12, 1, -4)
+	ProgressBarBg.BackgroundColor3 = Color3.fromRGB(28, 30, 42)
+	ProgressBarBg.BorderSizePixel = 0
+	ProgressBarBg.BackgroundTransparency = 1
+	ProgressBarBg.ZIndex = 502
+	ProgressBarBg.Parent = Card
+	local pbCorner = Instance.new("UICorner")
+	pbCorner.CornerRadius = UDim.new(1, 0)
+	pbCorner.Parent = ProgressBarBg
 
 	local ProgressBar = Instance.new("Frame")
+	ProgressBar.Name = "ProgressBar"
 	ProgressBar.Size = UDim2.new(1, 0, 1, 0)
 	ProgressBar.BackgroundColor3 = notifColor
 	ProgressBar.BorderSizePixel = 0
+	ProgressBar.ZIndex = 503
 	ProgressBar.Parent = ProgressBarBg
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(1, 0)
+	fillCorner.Parent = ProgressBar
 
-	local FillCorner = Instance.new("UICorner")
-	FillCorner.CornerRadius = UDim.new(1, 0)
-	FillCorner.Parent = ProgressBar
+	local BarGrad = Instance.new("UIGradient")
+	BarGrad.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, notifColor),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 160, 255))
+	})
+	BarGrad.Parent = ProgressBar
 
 	Card.Parent = NotificationContainer
 
-	CreateTween(Card, {BackgroundTransparency = 0, Position = UDim2.new(0, 0, 0, 0)}, 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-	CreateTween(CardScale, {Scale = 1}, 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-	CreateTween(UIStroke, {Transparency = 0}, 0.3)
-	CreateTween(ProgressBar, {Size = UDim2.new(0, 0, 1, 0)}, 3.5, Enum.EasingStyle.Linear)
+	local notifEntry = {card = Card, dismissed = false}
+	table.insert(activeNotifCards, notifEntry)
 
-	task.delay(3.5, function()
-		local closeTween = CreateTween(Card, {
-			BackgroundTransparency = 1,
-			Position = UDim2.new(0, 100, 0, 0)
-		}, 0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
-		CreateTween(CardScale, {Scale = 0.8}, 0.3)
-		CreateTween(UIStroke, {Transparency = 1}, 0.25)
+	-- Audio Feedback
+	pcall(function()
+		local sound = Instance.new("Sound")
+		sound.SoundId = "rbxassetid://6895079853"
+		sound.Volume = 0.35
+		sound.Parent = game:GetService("SoundService")
+		sound:Play()
+		game:GetService("Debris"):AddItem(sound, 1.5)
+	end)
+
+	-- Entrance Animation (Fluid Slide & Bouncy Pop)
+	local enterDuration = 0.38
+	CreateTween(Card, {Position = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 0.04}, enterDuration, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	CreateTween(CardScale, {Scale = 1}, enterDuration, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	CreateTween(UIStroke, {Transparency = 0.45}, enterDuration, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+	CreateTween(LeftPill, {BackgroundTransparency = 0}, 0.25)
+	CreateTween(IconBox, {BackgroundTransparency = 0}, 0.25)
+	CreateTween(ibStroke, {Transparency = 0.4}, 0.25)
+	CreateTween(Icon, {ImageTransparency = 0}, 0.25)
+	CreateTween(TitleLabel, {TextTransparency = 0}, 0.25)
+	CreateTween(MessageLabel, {TextTransparency = 0}, 0.25)
+	CreateTween(CloseBtn, {TextTransparency = 0.4}, 0.25)
+	CreateTween(ProgressBarBg, {BackgroundTransparency = 0.5}, 0.25)
+
+	-- Progress bar timer shrink
+	CreateTween(ProgressBar, {Size = UDim2.new(0, 0, 1, 0)}, 3.2, Enum.EasingStyle.Linear)
+
+	local isHovered = false
+	local function dismissNotif()
+		if notifEntry.dismissed then return end
+		notifEntry.dismissed = true
+
+		-- Remove from active list
+		for idx, entry in ipairs(activeNotifCards) do
+			if entry == notifEntry then
+				table.remove(activeNotifCards, idx)
+				break
+			end
+		end
+
+		local exitDuration = 0.28
+		local exitTween = CreateTween(Card, {
+			Position = UDim2.new(0, 120, 0, 0),
+			BackgroundTransparency = 1
+		}, exitDuration, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+
+		CreateTween(CardScale, {Scale = 0.8}, exitDuration, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+		CreateTween(UIStroke, {Transparency = 1}, 0.2)
+		CreateTween(LeftPill, {BackgroundTransparency = 1}, 0.2)
+		CreateTween(IconBox, {BackgroundTransparency = 1}, 0.2)
+		CreateTween(ibStroke, {Transparency = 1}, 0.2)
+		CreateTween(Icon, {ImageTransparency = 1}, 0.2)
 		CreateTween(TitleLabel, {TextTransparency = 1}, 0.2)
 		CreateTween(MessageLabel, {TextTransparency = 1}, 0.2)
-		CreateTween(Icon, {ImageTransparency = 1}, 0.2)
+		CreateTween(CloseBtn, {TextTransparency = 1}, 0.2)
+		CreateTween(ProgressBarBg, {BackgroundTransparency = 1}, 0.2)
 
-		closeTween.Completed:Connect(function()
-			Card:Destroy()
+		exitTween.Completed:Connect(function()
+			-- Smooth vertical collapse so cards below glide up
+			local collapseTween = CreateTween(Card, {Size = UDim2.new(1, 0, 0, 0)}, 0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+			collapseTween.Completed:Connect(function()
+				Card:Destroy()
+			end)
 		end)
+	end
+	notifEntry.dismiss = dismissNotif
+
+	-- Interactivity (Hover Effect)
+	Card.MouseEnter:Connect(function()
+		isHovered = true
+		CreateTween(UIStroke, {Transparency = 0.1, Color = Color3.fromRGB(175, 145, 255)}, 0.15)
+		CreateTween(Card, {BackgroundColor3 = Color3.fromRGB(25, 26, 38)}, 0.15)
+		CreateTween(CloseBtn, {TextTransparency = 0}, 0.15)
+	end)
+	Card.MouseLeave:Connect(function()
+		isHovered = false
+		CreateTween(UIStroke, {Transparency = 0.45, Color = notifColor}, 0.2)
+		CreateTween(Card, {BackgroundColor3 = Color3.fromRGB(17, 18, 26)}, 0.2)
+		CreateTween(CloseBtn, {TextTransparency = 0.4}, 0.2)
+	end)
+
+	CloseBtn.MouseEnter:Connect(function()
+		CreateTween(CloseBtn, {TextColor3 = Color3.fromRGB(255, 80, 80)}, 0.15)
+	end)
+	CloseBtn.MouseLeave:Connect(function()
+		CreateTween(CloseBtn, {TextColor3 = Color3.fromRGB(130, 134, 152)}, 0.15)
+	end)
+	CloseBtn.MouseButton1Click:Connect(dismissNotif)
+
+	-- Auto dismiss after 3.2s (pauses if mouse is hovering)
+	task.delay(3.2, function()
+		while isHovered and not notifEntry.dismissed do
+			task.wait(0.25)
+		end
+		if not notifEntry.dismissed then
+			dismissNotif()
+		end
 	end)
 end
+_G.notify = notify
+_G.PearlNotify = notify
 
 defaultWindowSize = UDim2.new(0, 800, 0, 540)
 defaultWindowPos = UDim2.new(0.5, -400, 0.5, -270)
@@ -8272,90 +8491,7 @@ V.FPSConn = RunService.RenderStepped:Connect(function()
 end)
 addConnection(V.FPSConn)
 
-NotificationContainer = Instance.new("Frame")
-NotificationContainer.Name ="NotificationContainer"
-NotificationContainer.Size = UDim2.new(0, 300, 1, -20)
-NotificationContainer.Position = UDim2.new(1, -320, 0, 20)
-NotificationContainer.BackgroundTransparency = 1
-NotificationContainer.Parent = ScreenGui
-
-NotifList = Instance.new("UIListLayout")
-NotifList.Padding = UDim.new(0, 10)
-NotifList.VerticalAlignment = Enum.VerticalAlignment.Top
-NotifList.Parent = NotificationContainer
-
-lastNotifyKey = nil
-lastNotifyTime = 0
-
-function notify(title, text, color)
-    if not V.Notif then return end
-    if type(title) == "string" then title = string.gsub(title, "<[^>]->", "") end
-    if type(text) == "string" then text = string.gsub(text, "<[^>]->", "") end
-    local key = tostring(title) .. "|" .. tostring(text)
-    if key == lastNotifyKey and os.clock() - lastNotifyTime < 1.5 then
-        return
-    end
-    lastNotifyKey = key
-    lastNotifyTime = os.clock()
-    color = color or Color3.fromRGB(180, 180, 195)
-
-    local NotifFrame = Instance.new("Frame")
-    NotifFrame.Size = UDim2.new(1, 0, 0, 60)
-    NotifFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    NotifFrame.BorderSizePixel = 0
-    NotifFrame.BackgroundTransparency = 1
-    NotifFrame.Parent = NotificationContainer
-
-    local NotifCorner = Instance.new("UICorner")
-    NotifCorner.CornerRadius = UDim.new(0, 8)
-    NotifCorner.Parent = NotifFrame
-
-    local NotifStroke = Instance.new("UIStroke")
-    NotifStroke.Thickness = 1
-    NotifStroke.Color = color
-    NotifStroke.Transparency = 1
-    NotifStroke.Parent = NotifFrame
-
-    local TitleLbl = Instance.new("TextLabel")
-    TitleLbl.Size = UDim2.new(1, -20, 0, 20)
-    TitleLbl.Position = UDim2.new(0, 10, 0, 8)
-    TitleLbl.BackgroundTransparency = 1
-    TitleLbl.Text = title
-    TitleLbl.TextColor3 = color
-    TitleLbl.Font = Enum.Font.GothamBold
-    TitleLbl.TextSize = 14
-    TitleLbl.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLbl.TextTransparency = 1
-    TitleLbl.Parent = NotifFrame
-
-    local TextLbl = Instance.new("TextLabel")
-    TextLbl.Size = UDim2.new(1, -20, 0, 20)
-    TextLbl.Position = UDim2.new(0, 10, 0, 30)
-    TextLbl.BackgroundTransparency = 1
-    TextLbl.Text = text
-    TextLbl.TextColor3 = Color3.fromRGB(195, 195, 208)
-    TextLbl.Font = Enum.Font.GothamMedium
-    TextLbl.TextSize = 12
-    TextLbl.TextXAlignment = Enum.TextXAlignment.Left
-    TextLbl.TextTransparency = 1
-    TextLbl.Parent = NotifFrame
-
-    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-    TweenService:Create(NotifFrame, tweenInfo, {BackgroundTransparency = 0}):Play()
-    TweenService:Create(NotifStroke, tweenInfo, {Transparency = 0}):Play()
-    TweenService:Create(TitleLbl, tweenInfo, {TextTransparency = 0}):Play()
-    TweenService:Create(TextLbl, tweenInfo, {TextTransparency = 0}):Play()
-
-    task.delay(3, function()
-        local tweenOut = TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
-        TweenService:Create(NotifFrame, tweenOut, {BackgroundTransparency = 1}):Play()
-        TweenService:Create(NotifStroke, tweenOut, {Transparency = 1}):Play()
-        TweenService:Create(TitleLbl, tweenOut, {TextTransparency = 1}):Play()
-        TweenService:Create(TextLbl, tweenOut, {TextTransparency = 1}):Play()
-        task.wait(0.6)
-        NotifFrame:Destroy()
-    end)
-end
+-- [Pearl Hub Notifications active: Unified under master notify engine]
 
 initStep = "definitions fonctions"
 function toggleFlyAction(overrideState)
@@ -10242,6 +10378,48 @@ createToggle("Deplacement Clavier AZERTY (ZQSD)", true, function(enabled)
     V.KeyboardLayout = enabled and "AZERTY" or "QWERTY"
     notify("Movement", enabled and "Touches AZERTY (Z:Avancer Q:Gauche S:Reculer D:Droite) ACTIVES" or "Mode QWERTY Actif", Color3.fromRGB(80, 200, 120))
 end, MovementContent, "AZERTYLayout")
+createLabel("FIVEM BUNNYHOP (INERTIE BOOST)", MovementContent)
+do
+    local bhopEnabled = false
+    local bhopConn = nil
+    local lastJumpTick = 0
+
+    createToggle("BunnyHop Auto FiveM (Inertie Boost)", false, function(enabled)
+        bhopEnabled = enabled
+        if bhopConn then bhopConn:Disconnect() bhopConn = nil end
+        if enabled then
+            bhopConn = RunService.Heartbeat:Connect(function()
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    if not char then return end
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if not hum or not hrp or hum.Health <= 0 then return end
+
+                    local moveDir = hum.MoveDirection
+                    if moveDir.Magnitude > 0.1 then
+                        if hum.FloorMaterial ~= Enum.Material.Air and (tick() - lastJumpTick > 0.15) then
+                            lastJumpTick = tick()
+                            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+
+                            local vel = hrp.AssemblyLinearVelocity
+                            local horizVel = Vector3.new(vel.X, 0, vel.Z)
+                            local currentSpeed = horizVel.Magnitude
+                            local targetSpeed = math.clamp(math.max(currentSpeed * 1.08, 38), 35, 260)
+                            local boostDir = moveDir.Unit
+                            hrp.AssemblyLinearVelocity = Vector3.new(boostDir.X * targetSpeed, math.max(vel.Y, 48), boostDir.Z * targetSpeed)
+                        end
+                    end
+                end)
+            end)
+            addConnection(bhopConn)
+            notify("Movement", "BunnyHop Auto FiveM ACTIVÉ", Color3.fromRGB(80, 200, 120))
+        else
+            notify("Movement", "BunnyHop Auto FiveM DÉSACTIVÉ", Color3.fromRGB(255, 90, 90))
+        end
+    end, MovementContent, "FiveMBhop")
+end
+
 createLabel("SPEED & JUMP", MovementContent)
 _, _, ToggleSpeed = createToggle("Enable Walk Speed", false, function(enabled)
     V.SpeedEnabled = enabled
@@ -11188,6 +11366,103 @@ end, MeContent,"InfJump")
 createLabel("VISUALS & INTERACTIONS", MeContent)
 createToggle("Instant Interact (Universal)", false, function(enabled) toggleInstantInteract(enabled) end, MeContent,"InstInteract")
 createToggle("Infinite Interact Range", false, function(enabled) toggleInfiniteRange(enabled) end, MeContent,"InfRange")
+
+createLabel("SHADERS RTX & RENDERING FIVEM", MeContent)
+do
+    local rtxEnabled = false
+    local currentPreset = "FiveM Ultra"
+    local rtxBloom, rtxCc, rtxSun = nil, nil, nil
+
+    local function applyRTXPreset(presetName)
+        pcall(function()
+            if not rtxEnabled then return end
+            if not rtxBloom or not rtxBloom.Parent then
+                rtxBloom = Lighting:FindFirstChild("PearlRTXBloom") or Instance.new("BloomEffect", Lighting)
+                rtxBloom.Name = "PearlRTXBloom"
+            end
+            if not rtxCc or not rtxCc.Parent then
+                rtxCc = Lighting:FindFirstChild("PearlRTXCC") or Instance.new("ColorCorrectionEffect", Lighting)
+                rtxCc.Name = "PearlRTXCC"
+            end
+            if not rtxSun or not rtxSun.Parent then
+                rtxSun = Lighting:FindFirstChild("PearlRTXSun") or Instance.new("SunRaysEffect", Lighting)
+                rtxSun.Name = "PearlRTXSun"
+            end
+
+            if presetName == "FiveM Ultra" then
+                rtxBloom.Intensity = 0.45
+                rtxBloom.Size = 24
+                rtxBloom.Threshold = 0.8
+                rtxCc.Contrast = 0.16
+                rtxCc.Saturation = 0.22
+                rtxCc.Brightness = 0.02
+                rtxCc.TintColor = Color3.fromRGB(255, 252, 248)
+                rtxSun.Intensity = 0.15
+                rtxSun.Spread = 0.8
+            elseif presetName == "Cyberpunk Neon" then
+                rtxBloom.Intensity = 0.95
+                rtxBloom.Size = 38
+                rtxBloom.Threshold = 0.65
+                rtxCc.Contrast = 0.28
+                rtxCc.Saturation = 0.55
+                rtxCc.Brightness = -0.02
+                rtxCc.TintColor = Color3.fromRGB(240, 225, 255)
+                rtxSun.Intensity = 0.25
+                rtxSun.Spread = 1
+            elseif presetName == "Clean Competitive" then
+                rtxBloom.Intensity = 0.1
+                rtxBloom.Size = 10
+                rtxBloom.Threshold = 0.95
+                rtxCc.Contrast = 0.1
+                rtxCc.Saturation = 0.12
+                rtxCc.Brightness = 0.04
+                rtxCc.TintColor = Color3.fromRGB(255, 255, 255)
+                rtxSun.Intensity = 0.05
+            elseif presetName == "Golden Sunset" then
+                rtxBloom.Intensity = 0.55
+                rtxBloom.Size = 30
+                rtxBloom.Threshold = 0.75
+                rtxCc.Contrast = 0.18
+                rtxCc.Saturation = 0.35
+                rtxCc.Brightness = 0.01
+                rtxCc.TintColor = Color3.fromRGB(255, 220, 185)
+                rtxSun.Intensity = 0.3
+                rtxSun.Spread = 0.9
+            end
+        end)
+    end
+
+    local function cleanupRTX()
+        pcall(function()
+            if rtxBloom then rtxBloom:Destroy() rtxBloom = nil end
+            if rtxCc then rtxCc:Destroy() rtxCc = nil end
+            if rtxSun then rtxSun:Destroy() rtxSun = nil end
+        end)
+    end
+
+    createToggle("Shaders RTX FiveM (Rendu Réaliste)", false, function(enabled)
+        rtxEnabled = enabled
+        if enabled then
+            applyRTXPreset(currentPreset)
+            notify("Me", "Shaders RTX FiveM ACTIVÉ (" .. currentPreset .. ")", Color3.fromRGB(80, 200, 120))
+        else
+            cleanupRTX()
+            notify("Me", "Shaders RTX FiveM DÉSACTIVÉ", Color3.fromRGB(255, 90, 90))
+        end
+    end, MeContent, "RTXShaders")
+
+    local presets = {"FiveM Ultra", "Cyberpunk Neon", "Clean Competitive", "Golden Sunset"}
+    createValueButton(MeContent, "Preset Graphique FiveM", "FiveM Ultra", function()
+        local idx = table.find(presets, currentPreset) or 1
+        idx = (idx % #presets) + 1
+        currentPreset = presets[idx]
+        if rtxEnabled then
+            applyRTXPreset(currentPreset)
+        end
+        notify("Me", "Preset Graphique: " .. currentPreset, Color3.fromRGB(145, 120, 255))
+        return currentPreset
+    end, "RTXPreset")
+end
 
 createLabel("CAMERA", MeContent)
 createSlider("FOV Changer", 70, 120, 70, function(val)
@@ -14072,6 +14347,115 @@ do
     end
 end
 
+createLabel("FIVEM HITMARKER & AUDIO FEEDBACK", AimContent)
+do
+    local hmEnabled = false
+    local hmGui = nil
+    local hmConn = nil
+    local hitDebounce = 0
+
+    local function createHitmarkerGui()
+        if hmGui then pcall(function() hmGui:Destroy() end) end
+        hmGui = Instance.new("ScreenGui")
+        hmGui.Name = "PearlHitmarkerGui"
+        hmGui.ResetOnSpawn = false
+        hmGui.DisplayOrder = 999
+        hmGui.Parent = parentTarget
+
+        local CenterFrame = Instance.new("Frame")
+        CenterFrame.Name = "Center"
+        CenterFrame.Size = UDim2.new(0, 30, 0, 30)
+        CenterFrame.Position = UDim2.new(0.5, -15, 0.5, -15)
+        CenterFrame.BackgroundTransparency = 1
+        CenterFrame.Parent = hmGui
+
+        local function makeLine(rot, posX, posY)
+            local line = Instance.new("Frame")
+            line.Size = UDim2.new(0, 9, 0, 2)
+            line.Position = UDim2.new(0.5, posX, 0.5, posY)
+            line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            line.BorderSizePixel = 0
+            line.Rotation = rot
+            line.BackgroundTransparency = 1
+            line.Parent = CenterFrame
+            local c = Instance.new("UICorner", line)
+            c.CornerRadius = UDim.new(1, 0)
+            return line
+        end
+
+        local lines = {
+            makeLine(45, 4, 4),
+            makeLine(-45, -13, 4),
+            makeLine(-45, 4, -6),
+            makeLine(45, -13, -6)
+        }
+
+        local function triggerHit(isHeadshot)
+            local col = isHeadshot and Color3.fromRGB(255, 55, 55) or Color3.fromRGB(255, 255, 255)
+            for _, l in ipairs(lines) do
+                l.BackgroundColor3 = col
+                l.BackgroundTransparency = 0
+            end
+            CenterFrame.Size = UDim2.new(0, 38, 0, 38)
+            CenterFrame.Position = UDim2.new(0.5, -19, 0.5, -19)
+            TweenService:Create(CenterFrame, TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 26, 0, 26),
+                Position = UDim2.new(0.5, -13, 0.5, -13)
+            }):Play()
+
+            pcall(function()
+                local s = Instance.new("Sound")
+                s.SoundId = "rbxassetid://9069609268"
+                s.Volume = 0.55
+                s.Pitch = isHeadshot and 1.25 or 1.0
+                s.Parent = game:GetService("SoundService")
+                s:Play()
+                game:GetService("Debris"):AddItem(s, 1)
+            end)
+
+            task.delay(0.12, function()
+                for _, l in ipairs(lines) do
+                    TweenService:Create(l, TweenInfo.new(0.12, Enum.EasingStyle.Linear), {BackgroundTransparency = 1}):Play()
+                end
+            end)
+        end
+
+        return triggerHit
+    end
+
+    local triggerHitFn = nil
+
+    createToggle("Hitmarker & Hitsound FiveM (CoD / Rust)", false, function(enabled)
+        hmEnabled = enabled
+        if hmConn then hmConn:Disconnect() hmConn = nil end
+        if enabled then
+            triggerHitFn = createHitmarkerGui()
+            hmConn = UserInputService.InputBegan:Connect(function(input, gpe)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 and not gpe then
+                    local now = tick()
+                    if now - hitDebounce > 0.08 then
+                        hitDebounce = now
+                        local mouse = LocalPlayer:GetMouse()
+                        local target = mouse and mouse.Target
+                        if target then
+                            local hum = target:FindFirstAncestorOfClass("Model")
+                            if hum and hum:FindFirstChildOfClass("Humanoid") and hum ~= LocalPlayer.Character then
+                                local isHead = target.Name:lower():find("head") ~= nil
+                                if triggerHitFn then triggerHitFn(isHead) end
+                            end
+                        end
+                    end
+                end
+            end)
+            addConnection(hmConn)
+            notify("Aim", "Hitmarker FiveM ACTIVÉ", Color3.fromRGB(80, 200, 120))
+        else
+            if hmGui then pcall(function() hmGui:Destroy() end) hmGui = nil end
+            notify("Aim", "Hitmarker FiveM DÉSACTIVÉ", Color3.fromRGB(255, 90, 90))
+        end
+    end, AimContent, "FiveMHitmarker")
+end
+
 createLabel("TRIGGERBOT & AUTO-SHOOT", AimContent)
 createToggle("TriggerBot Instantané (Réticule)", false, function(enabled)
     toggleTriggerbot(enabled)
@@ -14239,6 +14623,8 @@ pcall(function()
     TeleportContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
     TeleportContent.CanvasSize = UDim2.new(0, 0, 0, 0)
 
+    createLabel("WAYPOINTS", TeleportContent)
+
     local refreshTPMiniList = nil
     local TPMiniGui = nil
 
@@ -14265,51 +14651,67 @@ pcall(function()
 
         local MainFrame = Instance.new("Frame")
         MainFrame.Name = "MainFrame"
-        MainFrame.Size = UDim2.new(0, 260, 0, 310)
-        MainFrame.Position = UDim2.new(0.82, -260, 0.35, 0)
-        MainFrame.BackgroundColor3 = theme.panel
+        MainFrame.Size = UDim2.new(0, 270, 0, 320)
+        MainFrame.Position = UDim2.new(0.82, -270, 0.35, 0)
+        MainFrame.BackgroundColor3 = theme.panel or Color3.fromRGB(14, 15, 22)
         MainFrame.BorderSizePixel = 0
         MainFrame.ClipsDescendants = true
         MainFrame.Active = true
         MainFrame.Parent = TPMiniGui
-        makeCorner(MainFrame, 14)
-        makeStroke(MainFrame, theme.border, 1.2)
+        makeCorner(MainFrame, 12)
+        local mainStroke = makeStroke(MainFrame, theme.border or Color3.fromRGB(44, 46, 62), 1.2)
+
+        local MainGrad = Instance.new("UIGradient")
+        MainGrad.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(24, 25, 36)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(13, 14, 20))
+        })
+        MainGrad.Rotation = 45
+        MainGrad.Parent = MainFrame
 
         local Header = Instance.new("Frame")
         Header.Name = "Header"
-        Header.Size = UDim2.new(1, 0, 0, 44)
-        Header.BackgroundColor3 = theme.panel2
+        Header.Size = UDim2.new(1, 0, 0, 42)
+        Header.BackgroundColor3 = theme.panel2 or Color3.fromRGB(18, 19, 28)
         Header.BorderSizePixel = 0
         Header.Active = true
         Header.Parent = MainFrame
-        makeCorner(Header, 14)
+        makeCorner(Header, 12)
 
         local HeaderLine = Instance.new("Frame")
         HeaderLine.Size = UDim2.new(1, 0, 0, 1)
         HeaderLine.Position = UDim2.new(0, 0, 1, -1)
-        HeaderLine.BackgroundColor3 = theme.border
+        HeaderLine.BackgroundColor3 = theme.border or Color3.fromRGB(44, 46, 62)
         HeaderLine.BackgroundTransparency = 0.5
         HeaderLine.BorderSizePixel = 0
         HeaderLine.Parent = Header
 
+        local HeaderIcon = Instance.new("ImageLabel")
+        HeaderIcon.Size = UDim2.new(0, 18, 0, 18)
+        HeaderIcon.Position = UDim2.new(0, 10, 0.5, -9)
+        HeaderIcon.BackgroundTransparency = 1
+        HeaderIcon.Image = (CategoryIcons and CategoryIcons.Teleport) or "rbxassetid://7733919198"
+        HeaderIcon.ImageColor3 = theme.accent or Color3.fromRGB(145, 120, 255)
+        HeaderIcon.Parent = Header
+
         local TitleLogo = Instance.new("TextLabel")
-        TitleLogo.Size = UDim2.new(1, -70, 0, 18)
-        TitleLogo.Position = UDim2.new(0, 12, 0, 6)
+        TitleLogo.Size = UDim2.new(1, -75, 0, 16)
+        TitleLogo.Position = UDim2.new(0, 34, 0, 6)
         TitleLogo.BackgroundTransparency = 1
-        TitleLogo.Text = "Pearl"
-        TitleLogo.TextColor3 = theme.accent
-        TitleLogo.Font = Enum.Font.GothamBlack
-        TitleLogo.TextSize = 14
+        TitleLogo.Text = "PEARL"
+        TitleLogo.TextColor3 = theme.accent or Color3.fromRGB(145, 120, 255)
+        TitleLogo.Font = Enum.Font.GothamBold
+        TitleLogo.TextSize = 13
         TitleLogo.TextXAlignment = Enum.TextXAlignment.Left
         TitleLogo.Parent = Header
 
         local TitleSub = Instance.new("TextLabel")
-        TitleSub.Size = UDim2.new(1, -70, 0, 12)
-        TitleSub.Position = UDim2.new(0, 12, 0, 24)
+        TitleSub.Size = UDim2.new(1, -75, 0, 12)
+        TitleSub.Position = UDim2.new(0, 34, 0, 22)
         TitleSub.BackgroundTransparency = 1
         TitleSub.Text = "WAYPOINTS TP"
-        TitleSub.TextColor3 = theme.sub
-        TitleSub.Font = Enum.Font.Code
+        TitleSub.TextColor3 = theme.sub or Color3.fromRGB(130, 134, 152)
+        TitleSub.Font = Enum.Font.GothamMedium
         TitleSub.TextSize = 9
         TitleSub.TextXAlignment = Enum.TextXAlignment.Left
         TitleSub.Parent = Header
@@ -14319,17 +14721,17 @@ pcall(function()
         CloseBtn.Position = UDim2.new(1, -30, 0.5, -12)
         CloseBtn.BackgroundTransparency = 1
         CloseBtn.BorderSizePixel = 0
-        CloseBtn.Text = "✕"
-        CloseBtn.TextColor3 = theme.sub
+        CloseBtn.Text = "X"
+        CloseBtn.TextColor3 = theme.sub or Color3.fromRGB(130, 134, 152)
         CloseBtn.Font = Enum.Font.GothamBold
-        CloseBtn.TextSize = 16
+        CloseBtn.TextSize = 12
         CloseBtn.Parent = Header
 
         CloseBtn.MouseEnter:Connect(function()
-            TweenService:Create(CloseBtn, TweenInfo.new(0.15), {TextColor3 = theme.danger}):Play()
+            TweenService:Create(CloseBtn, TweenInfo.new(0.15), {TextColor3 = theme.danger or Color3.fromRGB(255, 80, 80)}):Play()
         end)
         CloseBtn.MouseLeave:Connect(function()
-            TweenService:Create(CloseBtn, TweenInfo.new(0.15), {TextColor3 = theme.sub}):Play()
+            TweenService:Create(CloseBtn, TweenInfo.new(0.15), {TextColor3 = theme.sub or Color3.fromRGB(130, 134, 152)}):Play()
         end)
 
         CloseBtn.MouseButton1Click:Connect(function()
@@ -14340,6 +14742,7 @@ pcall(function()
             end
         end)
 
+        -- Smooth Dragging
         local isDragging = false
         local dragStart = nil
         local startPos = nil
@@ -14349,9 +14752,11 @@ pcall(function()
                 isDragging = true
                 dragStart = input.Position
                 startPos = MainFrame.Position
+                mainStroke.Color = theme.accent or Color3.fromRGB(145, 120, 255)
                 input.Changed:Connect(function()
                     if input.UserInputState == Enum.UserInputState.End then
                         isDragging = false
+                        mainStroke.Color = theme.border or Color3.fromRGB(44, 46, 62)
                     end
                 end)
             end
@@ -14364,36 +14769,40 @@ pcall(function()
             end
         end)
 
+        -- Quick Save Current Position Button
         local MiniQuickAddBtn = Instance.new("TextButton")
         MiniQuickAddBtn.Size = UDim2.new(1, -16, 0, 32)
-        MiniQuickAddBtn.Position = UDim2.new(0, 8, 0, 52)
-        MiniQuickAddBtn.BackgroundColor3 = theme.card
+        MiniQuickAddBtn.Position = UDim2.new(0, 8, 0, 50)
+        MiniQuickAddBtn.BackgroundColor3 = theme.card or Color3.fromRGB(23, 24, 35)
         MiniQuickAddBtn.BorderSizePixel = 0
-        MiniQuickAddBtn.Text = "+ Ajouter Position Actuelle"
-        MiniQuickAddBtn.TextColor3 = theme.text
-        MiniQuickAddBtn.Font = Enum.Font.GothamBold
+        MiniQuickAddBtn.Text = "+ Sauvegarder Position Actuelle"
+        MiniQuickAddBtn.TextColor3 = theme.text or Color3.fromRGB(235, 235, 242)
+        MiniQuickAddBtn.Font = Enum.Font.GothamMedium
         MiniQuickAddBtn.TextSize = 11
-        MiniQuickAddBtn.AutoButtonColor = false
         MiniQuickAddBtn.Parent = MainFrame
         makeCorner(MiniQuickAddBtn, 8)
-        makeStroke(MiniQuickAddBtn, theme.border, 1)
+        local quickAddStroke = makeStroke(MiniQuickAddBtn, theme.border or Color3.fromRGB(44, 46, 62), 1)
 
         MiniQuickAddBtn.MouseEnter:Connect(function()
-            TweenService:Create(MiniQuickAddBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.cardHover}):Play()
+            TweenService:Create(MiniQuickAddBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.cardHover or Color3.fromRGB(31, 33, 47)}):Play()
+            TweenService:Create(quickAddStroke, TweenInfo.new(0.15), {Color = theme.accent or Color3.fromRGB(145, 120, 255)}):Play()
         end)
         MiniQuickAddBtn.MouseLeave:Connect(function()
-            TweenService:Create(MiniQuickAddBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.card}):Play()
+            TweenService:Create(MiniQuickAddBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.card or Color3.fromRGB(23, 24, 35)}):Play()
+            TweenService:Create(quickAddStroke, TweenInfo.new(0.15), {Color = theme.border or Color3.fromRGB(44, 46, 62)}):Play()
         end)
 
         local ScrollList = Instance.new("ScrollingFrame")
-        ScrollList.Size = UDim2.new(1, -16, 1, -94)
-        ScrollList.Position = UDim2.new(0, 8, 0, 90)
+        ScrollList.Name = "ScrollList"
+        ScrollList.Size = UDim2.new(1, -16, 1, -92)
+        ScrollList.Position = UDim2.new(0, 8, 0, 88)
         ScrollList.BackgroundTransparency = 1
         ScrollList.BorderSizePixel = 0
-        ScrollList.ScrollBarThickness = 2
-        ScrollList.ScrollBarImageColor3 = theme.border
         ScrollList.CanvasSize = UDim2.new(0, 0, 0, 0)
         ScrollList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        ScrollList.ScrollBarThickness = 2
+        ScrollList.ScrollBarImageColor3 = theme.accent or Color3.fromRGB(145, 120, 255)
+        ScrollList.ScrollBarImageTransparency = 0.3
         ScrollList.Parent = MainFrame
 
         local ListLayout = Instance.new("UIListLayout")
@@ -14403,105 +14812,106 @@ pcall(function()
 
         local function renderMiniList()
             if not ScrollList or not ScrollList.Parent then return end
-            for _, c in ipairs(ScrollList:GetChildren()) do
-                if c:IsA("Frame") or c:IsA("TextLabel") then
-                    c:Destroy()
+            for _, child in pairs(ScrollList:GetChildren()) do
+                if child:IsA("Frame") or child:IsA("TextLabel") then
+                    child:Destroy()
                 end
             end
 
-            local hasPoints = false
-            for k, wp in pairs(Pearl.TeleportPoints) do
-                hasPoints = true
-                local itemRow = Instance.new("Frame")
-                itemRow.Size = UDim2.new(1, -4, 0, 34)
-                itemRow.BackgroundColor3 = theme.card
-                itemRow.BorderSizePixel = 0
-                itemRow.Parent = ScrollList
-                makeCorner(itemRow, 6)
-                makeStroke(itemRow, theme.border, 1)
+            local count = 0
+            if Pearl and Pearl.TeleportPoints then
+                for wpKey, wpData in pairs(Pearl.TeleportPoints) do
+                    count = count + 1
+                    local itemRow = Instance.new("Frame")
+                    itemRow.Size = UDim2.new(1, 0, 0, 36)
+                    itemRow.BackgroundColor3 = theme.card or Color3.fromRGB(23, 24, 35)
+                    itemRow.BorderSizePixel = 0
+                    itemRow.Parent = ScrollList
+                    makeCorner(itemRow, 8)
+                    makeStroke(itemRow, theme.border or Color3.fromRGB(44, 46, 62), 1)
 
-                itemRow.MouseEnter:Connect(function()
-                    TweenService:Create(itemRow, TweenInfo.new(0.15), {BackgroundColor3 = theme.cardHover}):Play()
-                end)
-                itemRow.MouseLeave:Connect(function()
-                    TweenService:Create(itemRow, TweenInfo.new(0.15), {BackgroundColor3 = theme.card}):Play()
-                end)
+                    itemRow.MouseEnter:Connect(function()
+                        TweenService:Create(itemRow, TweenInfo.new(0.15), {BackgroundColor3 = theme.cardHover or Color3.fromRGB(31, 33, 47)}):Play()
+                    end)
+                    itemRow.MouseLeave:Connect(function()
+                        TweenService:Create(itemRow, TweenInfo.new(0.15), {BackgroundColor3 = theme.card or Color3.fromRGB(23, 24, 35)}):Play()
+                    end)
 
-                local nameLbl = Instance.new("TextLabel")
-                nameLbl.Size = UDim2.new(1, -100, 1, 0)
-                nameLbl.Position = UDim2.new(0, 8, 0, 0)
-                nameLbl.BackgroundTransparency = 1
-                nameLbl.Text = tostring(wp.Name)
-                nameLbl.TextColor3 = theme.text
-                nameLbl.Font = Enum.Font.GothamMedium
-                nameLbl.TextSize = 11
-                nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-                nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
-                nameLbl.Parent = itemRow
+                    local nameLbl = Instance.new("TextLabel")
+                    nameLbl.Size = UDim2.new(1, -88, 1, 0)
+                    nameLbl.Position = UDim2.new(0, 10, 0, 0)
+                    nameLbl.BackgroundTransparency = 1
+                    nameLbl.Text = tostring(wpData.Name or "Point")
+                    nameLbl.TextColor3 = theme.text or Color3.fromRGB(235, 235, 242)
+                    nameLbl.Font = Enum.Font.GothamMedium
+                    nameLbl.TextSize = 11
+                    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+                    nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+                    nameLbl.Parent = itemRow
 
-                local tpBtn = Instance.new("TextButton")
-                tpBtn.Size = UDim2.new(0, 42, 0, 24)
-                tpBtn.Position = UDim2.new(1, -92, 0.5, -12)
-                tpBtn.BackgroundColor3 = theme.accent
-                tpBtn.BorderSizePixel = 0
-                tpBtn.Text = "TP"
-                tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                tpBtn.Font = Enum.Font.GothamBold
-                tpBtn.TextSize = 10
-                tpBtn.Parent = itemRow
-                makeCorner(tpBtn, 5)
+                    local tpBtn = Instance.new("TextButton")
+                    tpBtn.Size = UDim2.new(0, 42, 0, 24)
+                    tpBtn.Position = UDim2.new(1, -74, 0.5, -12)
+                    tpBtn.BackgroundColor3 = theme.accent or Color3.fromRGB(145, 120, 255)
+                    tpBtn.BorderSizePixel = 0
+                    tpBtn.Text = "TP"
+                    tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    tpBtn.Font = Enum.Font.GothamBold
+                    tpBtn.TextSize = 10
+                    tpBtn.Parent = itemRow
+                    makeCorner(tpBtn, 6)
 
-                tpBtn.MouseButton1Click:Connect(function()
-                    playClick()
-                    local char = LocalPlayer.Character
-                    if char and char:FindFirstChild("HumanoidRootPart") then
-                        char.HumanoidRootPart.CFrame = CFrame.new(wp.Position)
-                        notify("Teleport", "Téléporté à " .. tostring(wp.Name), Color3.fromRGB(80, 200, 120))
-                    end
-                end)
+                    tpBtn.MouseButton1Click:Connect(function()
+                        local char = LocalPlayer.Character
+                        if char and char:FindFirstChild("HumanoidRootPart") then
+                            char.HumanoidRootPart.CFrame = CFrame.new(wpData.Position)
+                            notify("Teleport", "Téléporté à " .. tostring(wpData.Name), Color3.fromRGB(80, 200, 120))
+                        end
+                    end)
 
-                local delBtn = Instance.new("TextButton")
-                delBtn.Size = UDim2.new(0, 42, 0, 24)
-                delBtn.Position = UDim2.new(1, -46, 0.5, -12)
-                delBtn.BackgroundColor3 = Color3.fromRGB(36, 18, 22)
-                delBtn.BorderSizePixel = 0
-                delBtn.Text = "Suppr"
-                delBtn.TextColor3 = theme.sub
-                delBtn.Font = Enum.Font.GothamBold
-                delBtn.TextSize = 10
-                delBtn.Parent = itemRow
-                makeCorner(delBtn, 5)
+                    local delBtn = Instance.new("TextButton")
+                    delBtn.Size = UDim2.new(0, 22, 0, 22)
+                    delBtn.Position = UDim2.new(1, -28, 0.5, -11)
+                    delBtn.BackgroundTransparency = 1
+                    delBtn.BorderSizePixel = 0
+                    delBtn.Text = "X"
+                    delBtn.TextColor3 = theme.sub or Color3.fromRGB(130, 134, 152)
+                    delBtn.Font = Enum.Font.GothamBold
+                    delBtn.TextSize = 11
+                    delBtn.Parent = itemRow
 
-                delBtn.MouseEnter:Connect(function()
-                    TweenService:Create(delBtn, TweenInfo.new(0.15), {TextColor3 = theme.danger}):Play()
-                end)
-                delBtn.MouseLeave:Connect(function()
-                    TweenService:Create(delBtn, TweenInfo.new(0.15), {TextColor3 = theme.sub}):Play()
-                end)
+                    delBtn.MouseEnter:Connect(function()
+                        TweenService:Create(delBtn, TweenInfo.new(0.15), {TextColor3 = theme.danger or Color3.fromRGB(255, 80, 80)}):Play()
+                    end)
+                    delBtn.MouseLeave:Connect(function()
+                        TweenService:Create(delBtn, TweenInfo.new(0.15), {TextColor3 = theme.sub or Color3.fromRGB(130, 134, 152)}):Play()
+                    end)
 
-                delBtn.MouseButton1Click:Connect(function()
-                    playClick()
-                    Pearl.TeleportPoints[k] = nil
-                    renderMiniList()
-                    if _G.PearlRefreshWaypointList then _G.PearlRefreshWaypointList() end
-                    notify("Teleport", "Point supprimé : " .. tostring(wp.Name), Color3.fromRGB(255, 90, 90))
-                end)
+                    delBtn.MouseButton1Click:Connect(function()
+                        Pearl.TeleportPoints[wpKey] = nil
+                        renderMiniList()
+                        if _G.PearlRefreshWaypointList then
+                            pcall(_G.PearlRefreshWaypointList)
+                        end
+                        notify("Teleport", "Waypoint supprimé", Color3.fromRGB(255, 90, 90))
+                    end)
+                end
             end
 
-            if not hasPoints then
+            if count == 0 then
                 local emptyLbl = Instance.new("TextLabel")
-                emptyLbl.Size = UDim2.new(1, 0, 0, 40)
+                emptyLbl.Size = UDim2.new(1, 0, 0, 60)
                 emptyLbl.BackgroundTransparency = 1
-                emptyLbl.Text = "Aucun waypoint"
-                emptyLbl.TextColor3 = theme.sub
-                emptyLbl.Font = Enum.Font.Gotham
-                emptyLbl.TextSize = 10.5
+                emptyLbl.Text = "Aucun waypoint sauvegardé.\nClique sur '+ Sauvegarder' pour en créer !"
+                emptyLbl.TextColor3 = theme.sub or Color3.fromRGB(130, 134, 152)
+                emptyLbl.Font = Enum.Font.GothamMedium
+                emptyLbl.TextSize = 10
+                emptyLbl.TextWrapped = true
                 emptyLbl.Parent = ScrollList
             end
         end
 
         MiniQuickAddBtn.MouseButton1Click:Connect(function()
-            playClick()
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
                 local count = 0
@@ -14513,7 +14923,7 @@ pcall(function()
                 }
                 renderMiniList()
                 if _G.PearlRefreshWaypointList then
-                    _G.PearlRefreshWaypointList()
+                    pcall(_G.PearlRefreshWaypointList)
                 end
                 notify("Teleport", "Point '" .. newName .. "' enregistré !", Color3.fromRGB(80, 200, 120))
             end
@@ -14523,245 +14933,106 @@ pcall(function()
         renderMiniList()
     end
 
-    -- ====================================================================
-    -- SECTION 1 : TÉLÉPORTATION AUX JOUEURS
-    -- ====================================================================
-    createLabel("TÉLÉPORTATION AUX JOUEURS", TeleportContent)
-
-    local selectedTPPlayer = nil
-    local tpPlayerBtnFrame, tpPlayerBtnObj, tpPlayerValue = createValueButton(TeleportContent, "Joueur Cible TP", "Aucun", function()
-        local playerList = {}
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer then
-                table.insert(playerList, p)
-            end
-        end
-        if #playerList == 0 then
-            notify("Teleport", "Aucun autre joueur sur le serveur !", Color3.fromRGB(255, 170, 0))
-            return "Aucun"
-        end
-        local curIdx = 0
-        for idx, p in ipairs(playerList) do
-            if p == selectedTPPlayer then
-                curIdx = idx
-                break
-            end
-        end
-        local nextIdx = (curIdx % #playerList) + 1
-        selectedTPPlayer = playerList[nextIdx]
-        return selectedTPPlayer.DisplayName .. " (@" .. selectedTPPlayer.Name .. ")"
-    end)
-
-    createButton("Téléporter sur le Joueur (Instant TP)", function()
-        if not selectedTPPlayer or not selectedTPPlayer.Parent then
-            notify("Teleport", "Veuillez d'abord sélectionner un joueur !", Color3.fromRGB(255, 170, 0))
-            return
-        end
-        if _G.teleportToPlayer then
-            _G.teleportToPlayer(selectedTPPlayer)
-        elseif teleportToPlayer then
-            teleportToPlayer(selectedTPPlayer)
-        end
-    end, TeleportContent)
-
-    createButton("Téléporter (Bypass Anti-Cheat / Micro-sauts)", function()
-        if not selectedTPPlayer or not selectedTPPlayer.Parent then
-            notify("Teleport", "Veuillez d'abord sélectionner un joueur !", Color3.fromRGB(255, 170, 0))
-            return
-        end
-        local myChar = LocalPlayer.Character
-        local tChar = selectedTPPlayer.Character
-        if not myChar or not tChar then return end
-        local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-        local tRoot = tChar:FindFirstChild("HumanoidRootPart")
-        if not myRoot or not tRoot then return end
-
-        task.spawn(function()
-            local startPos = myRoot.Position
-            local endPos = tRoot.Position + Vector3.new(0, 2, 2)
-            local totalDist = (endPos - startPos).Magnitude
-            local stepSize = 15
-            local steps = math.ceil(totalDist / stepSize)
-            if steps < 1 then steps = 1 end
-            notify("Teleport", "TP Bypass AC en cours (" .. steps .. " micro-sauts)...", Color3.fromRGB(80, 200, 120))
-            for i = 1, steps do
-                local alpha = i / steps
-                local interpPos = startPos:Lerp(endPos, alpha)
-                pcall(function()
-                    myRoot.CFrame = CFrame.new(interpPos) * (myRoot.CFrame - myRoot.CFrame.Position)
-                end)
-                game:GetService("RunService").Heartbeat:Wait()
-                game:GetService("RunService").Heartbeat:Wait()
-            end
-            notify("Teleport", "Téléporté avec succès à " .. selectedTPPlayer.DisplayName, Color3.fromRGB(80, 200, 120))
-        end)
-    end, TeleportContent)
-
-    createButton("Téléporter au-dessus (+15 studs / High Ground)", function()
-        if not selectedTPPlayer or not selectedTPPlayer.Parent then
-            notify("Teleport", "Veuillez d'abord sélectionner un joueur !", Color3.fromRGB(255, 170, 0))
-            return
-        end
-        local myChar = LocalPlayer.Character
-        local tChar = selectedTPPlayer.Character
-        if myChar and tChar then
-            local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-            local tRoot = tChar:FindFirstChild("HumanoidRootPart")
-            if myRoot and tRoot then
-                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 15, 0)
-                notify("Teleport", "Téléporté au-dessus de " .. selectedTPPlayer.DisplayName, Color3.fromRGB(80, 200, 120))
-            end
-        end
-    end, TeleportContent)
-
-    createButton("Téléporter derrière (-5 studs / Backstab)", function()
-        if not selectedTPPlayer or not selectedTPPlayer.Parent then
-            notify("Teleport", "Veuillez d'abord sélectionner un joueur !", Color3.fromRGB(255, 170, 0))
-            return
-        end
-        local myChar = LocalPlayer.Character
-        local tChar = selectedTPPlayer.Character
-        if myChar and tChar then
-            local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-            local tRoot = tChar:FindFirstChild("HumanoidRootPart")
-            if myRoot and tRoot then
-                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 5)
-                notify("Teleport", "Téléporté dans le dos de " .. selectedTPPlayer.DisplayName, Color3.fromRGB(80, 200, 120))
-            end
-        end
-    end, TeleportContent)
-
-    -- ====================================================================
-    -- SECTION 2 : WAYPOINTS & POINTS DE REPÈRE
-    -- ====================================================================
-    createLabel("WAYPOINTS & POINTS DE REPÈRE", TeleportContent)
-
     createToggle("Mini-Interface TP Flottante (Draggable)", false, function(enabled)
         toggleTPMiniWindow(enabled)
     end, TeleportContent, "TPMiniWindow")
 
-    createButton("Sauvegarder ma Position Actuelle (Ajout Rapide)", function()
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            local count = 0
-            for _ in pairs(Pearl.TeleportPoints) do count = count + 1 end
-            local newName = "Point_" .. tostring(count + 1)
-            Pearl.TeleportPoints[newName .. "_" .. tostring(os.clock())] = {
-                Position = char.HumanoidRootPart.Position,
-                Name = newName
-            }
-            if _G.PearlRefreshWaypointList then _G.PearlRefreshWaypointList() end
-            if refreshTPMiniList then pcall(refreshTPMiniList) end
-            notify("Teleport", "Point '" .. newName .. "' enregistré avec succès !", Color3.fromRGB(80, 200, 120))
-        else
-            notify("Teleport", "Personnage introuvable !", Color3.fromRGB(255, 90, 90))
+    -- Waypoint Creation & List in Main Teleport Tab
+    local WaypointInputCard = createCard(TeleportContent, 0, 46)
+
+    local WaypointNameBox = Instance.new("TextBox")
+    WaypointNameBox.Size = UDim2.new(1, -95, 0, 30)
+    WaypointNameBox.Position = UDim2.new(0, 10, 0.5, -15)
+    WaypointNameBox.BackgroundColor3 = theme.cardHover or Color3.fromRGB(31, 33, 47)
+    WaypointNameBox.BorderSizePixel = 0
+    WaypointNameBox.PlaceholderText = "Nom du waypoint..."
+    WaypointNameBox.PlaceholderColor3 = theme.sub or Color3.fromRGB(130, 134, 152)
+    WaypointNameBox.Text = ""
+    WaypointNameBox.TextColor3 = theme.text or Color3.fromRGB(235, 235, 242)
+    WaypointNameBox.Font = Enum.Font.GothamMedium
+    WaypointNameBox.TextSize = 12
+    WaypointNameBox.TextXAlignment = Enum.TextXAlignment.Left
+    WaypointNameBox.ClearTextOnFocus = false
+    WaypointNameBox.ZIndex = 9
+    WaypointNameBox.Parent = WaypointInputCard
+    makeCorner(WaypointNameBox, 6)
+    makeStroke(WaypointNameBox, theme.border or Color3.fromRGB(44, 46, 62), 1)
+
+    local WaypointNamePadding = Instance.new("UIPadding")
+    WaypointNamePadding.PaddingLeft = UDim.new(0, 10)
+    WaypointNamePadding.Parent = WaypointNameBox
+
+    local AddWaypointBtn = Instance.new("TextButton")
+    AddWaypointBtn.Size = UDim2.new(0, 75, 0, 30)
+    AddWaypointBtn.Position = UDim2.new(1, -80, 0.5, -15)
+    AddWaypointBtn.BackgroundColor3 = theme.accent or Color3.fromRGB(145, 120, 255)
+    AddWaypointBtn.BorderSizePixel = 0
+    AddWaypointBtn.Text = "Ajouter"
+    AddWaypointBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    AddWaypointBtn.Font = Enum.Font.GothamBold
+    AddWaypointBtn.TextSize = 11
+    AddWaypointBtn.ZIndex = 9
+    AddWaypointBtn.Parent = WaypointInputCard
+    makeCorner(AddWaypointBtn, 6)
+
+    registerSearchCard(WaypointInputCard, "Waypoint Sauvegarder Ajouter Position", TeleportContent)
+
+    local WaypointListContainer = Instance.new("Frame")
+    WaypointListContainer.Name = "WaypointListContainer"
+    WaypointListContainer.Size = UDim2.new(1, 0, 0, 0)
+    WaypointListContainer.AutomaticSize = Enum.AutomaticSize.Y
+    WaypointListContainer.BackgroundTransparency = 1
+    WaypointListContainer.BorderSizePixel = 0
+    WaypointListContainer.Parent = TeleportContent
+
+    local WpListLayout = Instance.new("UIListLayout")
+    WpListLayout.Padding = UDim.new(0, 6)
+    WpListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    WpListLayout.Parent = WaypointListContainer
+
+    local function refreshMainWaypointList()
+        if not WaypointListContainer or not WaypointListContainer.Parent then return end
+        for _, child in pairs(WaypointListContainer:GetChildren()) do
+            if child:IsA("Frame") then child:Destroy() end
         end
-    end, TeleportContent)
 
-    do
-        local WaypointInputCard = createCard(TeleportContent, 0, 44)
-        local WaypointNameBox = Instance.new("TextBox")
-        WaypointNameBox.Size = UDim2.new(1, -95, 0, 30)
-        WaypointNameBox.Position = UDim2.new(0, 10, 0.5, -15)
-        WaypointNameBox.BackgroundColor3 = Color3.fromRGB(24, 25, 34)
-        WaypointNameBox.BorderSizePixel = 0
-        WaypointNameBox.PlaceholderText = "Nom du Waypoint personnalisé..."
-        WaypointNameBox.PlaceholderColor3 = Colors.TextDim
-        WaypointNameBox.Text = ""
-        WaypointNameBox.TextColor3 = Colors.Text
-        WaypointNameBox.Font = Enum.Font.GothamMedium
-        WaypointNameBox.TextSize = 11.5
-        WaypointNameBox.TextXAlignment = Enum.TextXAlignment.Left
-        WaypointNameBox.ClearTextOnFocus = false
-        WaypointNameBox.Parent = WaypointInputCard
-        makeCorner(WaypointNameBox, 6)
-        makeStroke(WaypointNameBox, Colors.Border, 1)
-
-        local boxPad = Instance.new("UIPadding")
-        boxPad.PaddingLeft = UDim.new(0, 8)
-        boxPad.Parent = WaypointNameBox
-
-        local AddWpBtn = Instance.new("TextButton")
-        AddWpBtn.Size = UDim2.new(0, 75, 0, 30)
-        AddWpBtn.Position = UDim2.new(1, -82, 0.5, -15)
-        AddWpBtn.BackgroundColor3 = Colors.Accent
-        AddWpBtn.BorderSizePixel = 0
-        AddWpBtn.Text = "Ajouter"
-        AddWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        AddWpBtn.Font = Enum.Font.GothamBold
-        AddWpBtn.TextSize = 11
-        AddWpBtn.AutoButtonColor = false
-        AddWpBtn.Parent = WaypointInputCard
-        makeCorner(AddWpBtn, 6)
-
-        local WaypointCardFrame = createCard(TeleportContent, 0, 185)
-        local WpScroll = Instance.new("ScrollingFrame")
-        WpScroll.Size = UDim2.new(1, -16, 1, -16)
-        WpScroll.Position = UDim2.new(0, 8, 0, 8)
-        WpScroll.BackgroundTransparency = 1
-        WpScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-        WpScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        WpScroll.ScrollBarThickness = 3
-        WpScroll.ScrollBarImageColor3 = Colors.Accent
-        WpScroll.ScrollBarImageTransparency = 0.5
-        WpScroll.BorderSizePixel = 0
-        WpScroll.Parent = WaypointCardFrame
-
-        local WpListLayout = Instance.new("UIListLayout")
-        WpListLayout.Padding = UDim.new(0, 6)
-        WpListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        WpListLayout.Parent = WpScroll
-
-        local wpEmptyLabel = Instance.new("TextLabel")
-        wpEmptyLabel.Size = UDim2.new(1, 0, 0, 40)
-        wpEmptyLabel.BackgroundTransparency = 1
-        wpEmptyLabel.Text = "Aucun point de téléportation enregistré"
-        wpEmptyLabel.TextColor3 = Colors.TextDim
-        wpEmptyLabel.Font = Enum.Font.Gotham
-        wpEmptyLabel.TextSize = 11
-        wpEmptyLabel.Parent = WpScroll
-
-        local function refreshFullWaypointList()
-            for _, child in pairs(WpScroll:GetChildren()) do
-                if child:IsA("Frame") then child:Destroy() end
-            end
-            local hasPoints = false
+        local count = 0
+        if Pearl and Pearl.TeleportPoints then
             for wpKey, wpData in pairs(Pearl.TeleportPoints) do
-                hasPoints = true
-                local row = Instance.new("Frame")
-                row.Size = UDim2.new(1, -6, 0, 36)
-                row.BackgroundColor3 = Color3.fromRGB(20, 21, 28)
-                row.BorderSizePixel = 0
-                row.Parent = WpScroll
-                makeCorner(row, 6)
-                makeStroke(row, Colors.Border, 1)
+                count = count + 1
+                local card = Instance.new("Frame")
+                card.Size = UDim2.new(1, 0, 0, 42)
+                card.BackgroundColor3 = theme.card or Color3.fromRGB(23, 24, 35)
+                card.BorderSizePixel = 0
+                card.Parent = WaypointListContainer
+                makeCorner(card, 8)
+                makeStroke(card, theme.border or Color3.fromRGB(44, 46, 62), 1)
 
-                local lbl = Instance.new("TextLabel")
-                lbl.Size = UDim2.new(1, -125, 1, 0)
-                lbl.Position = UDim2.new(0, 10, 0, 0)
-                lbl.BackgroundTransparency = 1
-                lbl.Text = tostring(wpData.Name)
-                lbl.TextColor3 = Colors.Text
-                lbl.Font = Enum.Font.GothamMedium
-                lbl.TextSize = 11.5
-                lbl.TextXAlignment = Enum.TextXAlignment.Left
-                lbl.TextTruncate = Enum.TextTruncate.AtEnd
-                lbl.Parent = row
+                local nameLbl = Instance.new("TextLabel")
+                nameLbl.Size = UDim2.new(1, -145, 1, 0)
+                nameLbl.Position = UDim2.new(0, 14, 0, 0)
+                nameLbl.BackgroundTransparency = 1
+                nameLbl.Text = tostring(wpData.Name or "Point")
+                nameLbl.TextColor3 = theme.text or Color3.fromRGB(235, 235, 242)
+                nameLbl.Font = Enum.Font.GothamMedium
+                nameLbl.TextSize = 12
+                nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+                nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+                nameLbl.Parent = card
 
                 local tpBtn = Instance.new("TextButton")
-                tpBtn.Size = UDim2.new(0, 50, 0, 24)
-                tpBtn.Position = UDim2.new(1, -112, 0.5, -12)
-                tpBtn.BackgroundColor3 = Colors.Accent
+                tpBtn.Size = UDim2.new(0, 65, 0, 26)
+                tpBtn.Position = UDim2.new(1, -115, 0.5, -13)
+                tpBtn.BackgroundColor3 = theme.accent or Color3.fromRGB(145, 120, 255)
                 tpBtn.BorderSizePixel = 0
                 tpBtn.Text = "TP"
                 tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
                 tpBtn.Font = Enum.Font.GothamBold
-                tpBtn.TextSize = 10.5
-                tpBtn.Parent = row
-                makeCorner(tpBtn, 5)
+                tpBtn.TextSize = 11
+                tpBtn.Parent = card
+                makeCorner(tpBtn, 6)
 
                 tpBtn.MouseButton1Click:Connect(function()
-                    playClick()
                     local char = LocalPlayer.Character
                     if char and char:FindFirstChild("HumanoidRootPart") then
                         char.HumanoidRootPart.CFrame = CFrame.new(wpData.Position)
@@ -14770,39 +15041,32 @@ pcall(function()
                 end)
 
                 local delBtn = Instance.new("TextButton")
-                delBtn.Size = UDim2.new(0, 55, 0, 24)
-                delBtn.Position = UDim2.new(1, -58, 0.5, -12)
-                delBtn.BackgroundColor3 = Color3.fromRGB(46, 20, 24)
+                delBtn.Size = UDim2.new(0, 36, 0, 26)
+                delBtn.Position = UDim2.new(1, -44, 0.5, -13)
+                delBtn.BackgroundColor3 = Color3.fromRGB(45, 24, 28)
                 delBtn.BorderSizePixel = 0
-                delBtn.Text = "Suppr"
-                delBtn.TextColor3 = Color3.fromRGB(255, 95, 95)
+                delBtn.Text = "X"
+                delBtn.TextColor3 = Color3.fromRGB(255, 90, 90)
                 delBtn.Font = Enum.Font.GothamBold
-                delBtn.TextSize = 10.5
-                delBtn.Parent = row
-                makeCorner(delBtn, 5)
-                makeStroke(delBtn, Color3.fromRGB(120, 35, 45), 1)
+                delBtn.TextSize = 12
+                delBtn.Parent = card
+                makeCorner(delBtn, 6)
+                makeStroke(delBtn, Color3.fromRGB(80, 35, 40), 1)
 
                 delBtn.MouseButton1Click:Connect(function()
-                    playClick()
                     Pearl.TeleportPoints[wpKey] = nil
-                    refreshFullWaypointList()
+                    refreshMainWaypointList()
                     if refreshTPMiniList then pcall(refreshTPMiniList) end
-                    notify("Teleport", "Point supprimé : " .. tostring(wpData.Name), Color3.fromRGB(255, 90, 90))
+                    notify("Teleport", "Waypoint supprimé", Color3.fromRGB(255, 90, 90))
                 end)
             end
-            wpEmptyLabel.Visible = not hasPoints
         end
+    end
+    _G.PearlRefreshWaypointList = refreshMainWaypointList
 
-        _G.PearlRefreshWaypointList = refreshFullWaypointList
-
-        AddWpBtn.MouseButton1Click:Connect(function()
-            playClick()
-            local name = WaypointNameBox.Text:match("^%s*(.-)%s*$")
-            if not name or name == "" then
-                local count = 0
-                for _ in pairs(Pearl.TeleportPoints) do count = count + 1 end
-                name = "Point_" .. tostring(count + 1)
-            end
+    AddWaypointBtn.MouseButton1Click:Connect(function()
+        local name = WaypointNameBox.Text
+        if name and name ~= "" then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
                 Pearl.TeleportPoints[name .. "_" .. tostring(os.clock())] = {
@@ -14810,226 +15074,16 @@ pcall(function()
                     Name = name
                 }
                 WaypointNameBox.Text = ""
-                refreshFullWaypointList()
+                refreshMainWaypointList()
                 if refreshTPMiniList then pcall(refreshTPMiniList) end
-                notify("Teleport", "Waypoint '" .. name .. "' ajouté !", Color3.fromRGB(80, 200, 120))
+                notify("Teleport", "Waypoint '" .. name .. "' créé !", Color3.fromRGB(80, 200, 120))
             end
-        end)
-
-        refreshFullWaypointList()
-    end
-
-    -- ====================================================================
-    -- SECTION 3 : CLICK TP & OUTILS DE TÉLÉPORTATION
-    -- ====================================================================
-    createLabel("CLICK TP & OUTILS", TeleportContent)
-
-    local clickTPConn = nil
-    local function toggleCtrlClickTP(enabled)
-        V.CtrlClickTP = enabled
-        if clickTPConn then clickTPConn:Disconnect() clickTPConn = nil end
-        if enabled then
-            clickTPConn = UserInputService.InputBegan:Connect(function(input, gpe)
-                if gpe then return end
-                if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
-                        local mouse = LocalPlayer:GetMouse()
-                        if mouse and mouse.Hit then
-                            local char = LocalPlayer.Character
-                            if char and char:FindFirstChild("HumanoidRootPart") then
-                                char.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
-                                notify("Teleport", "Click TP (CTRL+Clic) effectué !", Color3.fromRGB(80, 200, 120))
-                            end
-                        end
-                    end
-                end
-            end)
-            addConnection(clickTPConn)
-            notify("Teleport", "Click TP (Maintenir CTRL + Clic Gauche) ACTIF", Color3.fromRGB(80, 200, 120))
         else
-            notify("Teleport", "Click TP DESACTIVE", Color3.fromRGB(255, 90, 90))
+            notify("Teleport", "Veuillez entrer un nom de point !", Color3.fromRGB(255, 170, 0))
         end
-    end
-    _G.toggleCtrlClickTP = toggleCtrlClickTP
+    end)
 
-    createToggle("Click TP (Maintenir CTRL + Clic Gauche)", false, function(enabled)
-        toggleCtrlClickTP(enabled)
-    end, TeleportContent, "CtrlClickTP")
-
-    local toolClickTPConn = nil
-    local tpToolInstance = nil
-    local function toggleClickTPTool(enabled)
-        V.ClickTPTool = enabled
-        if not enabled then
-            if toolClickTPConn then toolClickTPConn:Disconnect() toolClickTPConn = nil end
-            if tpToolInstance then pcall(function() tpToolInstance:Destroy() end) tpToolInstance = nil end
-            notify("Teleport", "Outil Click TP retiré de l'inventaire", Color3.fromRGB(255, 90, 90))
-            return
-        end
-
-        local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
-        if not backpack then return end
-        tpToolInstance = Instance.new("Tool")
-        tpToolInstance.Name = "Teleport Tool"
-        tpToolInstance.RequiresHandle = false
-        tpToolInstance.CanBeDropped = false
-        tpToolInstance.Parent = backpack
-
-        toolClickTPConn = tpToolInstance.Activated:Connect(function()
-            local mouse = LocalPlayer:GetMouse()
-            if mouse and mouse.Hit then
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    char.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
-                    notify("Teleport", "Téléporté avec l'outil !", Color3.fromRGB(80, 200, 120))
-                end
-            end
-        end)
-        addConnection(toolClickTPConn)
-        notify("Teleport", "Outil Click TP ajouté à votre inventaire !", Color3.fromRGB(80, 200, 120))
-    end
-    _G.toggleClickTPTool = toggleClickTPTool
-
-    createToggle("Outil Click TP dans l'Inventaire (Equiper & Cliquer)", false, function(enabled)
-        toggleClickTPTool(enabled)
-    end, TeleportContent, "ClickTPTool")
-
-    -- ====================================================================
-    -- SECTION 4 : TÉLÉPORTATION PAR COORDONNÉES (X, Y, Z)
-    -- ====================================================================
-    createLabel("TÉLÉPORTATION PAR COORDONNÉES (X, Y, Z)", TeleportContent)
-
-    do
-        local CoordCard = createCard(TeleportContent, 0, 78)
-        local xBox = Instance.new("TextBox")
-        xBox.Size = UDim2.new(0.31, -4, 0, 28)
-        xBox.Position = UDim2.new(0, 8, 0, 6)
-        xBox.BackgroundColor3 = Color3.fromRGB(24, 25, 34)
-        xBox.BorderSizePixel = 0
-        xBox.PlaceholderText = "X"
-        xBox.PlaceholderColor3 = Colors.TextDim
-        xBox.Text = ""
-        xBox.TextColor3 = Colors.Text
-        xBox.Font = Enum.Font.Code
-        xBox.TextSize = 11
-        xBox.ClearTextOnFocus = false
-        xBox.Parent = CoordCard
-        makeCorner(xBox, 5)
-        makeStroke(xBox, Colors.Border, 1)
-
-        local yBox = Instance.new("TextBox")
-        yBox.Size = UDim2.new(0.31, -4, 0, 28)
-        yBox.Position = UDim2.new(0.34, 0, 0, 6)
-        yBox.BackgroundColor3 = Color3.fromRGB(24, 25, 34)
-        yBox.BorderSizePixel = 0
-        yBox.PlaceholderText = "Y"
-        yBox.PlaceholderColor3 = Colors.TextDim
-        yBox.Text = ""
-        yBox.TextColor3 = Colors.Text
-        yBox.Font = Enum.Font.Code
-        yBox.TextSize = 11
-        yBox.ClearTextOnFocus = false
-        yBox.Parent = CoordCard
-        makeCorner(yBox, 5)
-        makeStroke(yBox, Colors.Border, 1)
-
-        local zBox = Instance.new("TextBox")
-        zBox.Size = UDim2.new(0.31, -4, 0, 28)
-        zBox.Position = UDim2.new(0.67, 0, 0, 6)
-        zBox.BackgroundColor3 = Color3.fromRGB(24, 25, 34)
-        zBox.BorderSizePixel = 0
-        zBox.PlaceholderText = "Z"
-        zBox.PlaceholderColor3 = Colors.TextDim
-        zBox.Text = ""
-        zBox.TextColor3 = Colors.Text
-        zBox.Font = Enum.Font.Code
-        zBox.TextSize = 11
-        zBox.ClearTextOnFocus = false
-        zBox.Parent = CoordCard
-        makeCorner(zBox, 5)
-        makeStroke(zBox, Colors.Border, 1)
-
-        local tpCoordBtn = Instance.new("TextButton")
-        tpCoordBtn.Size = UDim2.new(1, -16, 0, 28)
-        tpCoordBtn.Position = UDim2.new(0, 8, 0, 40)
-        tpCoordBtn.BackgroundColor3 = Colors.Accent
-        tpCoordBtn.BorderSizePixel = 0
-        tpCoordBtn.Text = "Téléporter à ces Coordonnées (X, Y, Z)"
-        tpCoordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        tpCoordBtn.Font = Enum.Font.GothamBold
-        tpCoordBtn.TextSize = 11
-        tpCoordBtn.AutoButtonColor = false
-        tpCoordBtn.Parent = CoordCard
-        makeCorner(tpCoordBtn, 6)
-
-        tpCoordBtn.MouseButton1Click:Connect(function()
-            playClick()
-            local nx = tonumber(xBox.Text)
-            local ny = tonumber(yBox.Text)
-            local nz = tonumber(zBox.Text)
-            if not nx or not ny or not nz then
-                notify("Teleport", "Coordonnées X, Y ou Z invalides !", Color3.fromRGB(255, 90, 90))
-                return
-            end
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                char.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(nx, ny, nz))
-                notify("Teleport", string.format("TP vers (%.1f, %.1f, %.1f)", nx, ny, nz), Color3.fromRGB(80, 200, 120))
-            end
-        end)
-    end
-
-    createButton("Copier mes Coordonnées Actuelles (Presse-papier)", function()
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            local p = char.HumanoidRootPart.Position
-            local str = string.format("%.2f, %.2f, %.2f", p.X, p.Y, p.Z)
-            pcall(function()
-                if setclipboard then
-                    setclipboard(str)
-                    notify("Teleport", "Coordonnées copiées : " .. str, Color3.fromRGB(80, 200, 120))
-                else
-                    notify("Teleport", "Pos: " .. str, Color3.fromRGB(80, 200, 120))
-                end
-            end)
-        end
-    end, TeleportContent)
-
-    -- ====================================================================
-    -- SECTION 5 : ZONES DU MONDE & SÉCURITÉ
-    -- ====================================================================
-    createLabel("ZONES DU MONDE & SÉCURITÉ", TeleportContent)
-
-    createButton("Téléporter au Spawn du Jeu", function()
-        local spawns = {}
-        pcall(function()
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj:IsA("SpawnLocation") then
-                    table.insert(spawns, obj)
-                end
-            end
-        end)
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            if #spawns > 0 then
-                hrp.CFrame = spawns[1].CFrame + Vector3.new(0, 4, 0)
-                notify("Teleport", "Téléporté au SpawnLocation principal !", Color3.fromRGB(80, 200, 120))
-            else
-                hrp.CFrame = CFrame.new(0, 50, 0)
-                notify("Teleport", "Téléporté aux coordonnées d'origine (0, 50, 0)", Color3.fromRGB(80, 200, 120))
-            end
-        end
-    end, TeleportContent)
-
-    createButton("Safe Sky TP (+500 studs dans les airs)", function()
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.CFrame = hrp.CFrame + Vector3.new(0, 500, 0)
-            notify("Teleport", "Safe Sky TP : +500 studs dans le ciel !", Color3.fromRGB(80, 200, 120))
-        end
-    end, TeleportContent)
+    refreshMainWaypointList()
 end)
 
 _G.teleportToPlayer = function(targetPlayer)
@@ -17722,25 +17776,126 @@ do
     end, FunContent, "WaterWalk")
 end
 
+createLabel("FIVEM ROPE & AURA FLING", FunContent)
+do
+    local grappleEnabled = false
+    local grappleInputConn = nil
+    local activeRopeBeam = nil
+
+    createToggle("Grappin Physique FiveM (Touche T)", false, function(enabled)
+        grappleEnabled = enabled
+        if grappleInputConn then grappleInputConn:Disconnect() grappleInputConn = nil end
+        if enabled then
+            grappleInputConn = UserInputService.InputBegan:Connect(function(input, gpe)
+                if gpe then return end
+                if input.KeyCode == Enum.KeyCode.T then
+                    pcall(function()
+                        local char = LocalPlayer.Character
+                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        local cam = workspace.CurrentCamera
+                        if not hrp or not cam then return end
+
+                        local mousePos = UserInputService:GetMouseLocation()
+                        local ray = cam:ViewportPointToRay(mousePos.X, mousePos.Y)
+                        local rayParams = RaycastParams.new()
+                        rayParams.FilterDescendantsInstances = {char}
+                        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+                        local hitResult = workspace:Raycast(ray.Origin, ray.Direction * 600, rayParams)
+                        if hitResult then
+                            local hitPos = hitResult.Position
+
+                            pcall(function()
+                                if activeRopeBeam then activeRopeBeam:Destroy() activeRopeBeam = nil end
+                                local p1 = Instance.new("Part")
+                                p1.Size = Vector3.new(0.2, 0.2, (hitPos - hrp.Position).Magnitude)
+                                p1.CFrame = CFrame.new(hrp.Position:Lerp(hitPos, 0.5), hitPos)
+                                p1.Anchored = true
+                                p1.CanCollide = false
+                                p1.Material = Enum.Material.Neon
+                                p1.Color = theme.accent or Color3.fromRGB(145, 120, 255)
+                                p1.Parent = workspace
+                                activeRopeBeam = p1
+                                task.delay(0.65, function()
+                                    if activeRopeBeam == p1 then
+                                        p1:Destroy()
+                                        activeRopeBeam = nil
+                                    end
+                                end)
+                            end)
+
+                            pcall(function()
+                                local s = Instance.new("Sound")
+                                s.SoundId = "rbxassetid://6895079853"
+                                s.Volume = 0.5
+                                s.Pitch = 1.6
+                                s.Parent = game:GetService("SoundService")
+                                s:Play()
+                                game:GetService("Debris"):AddItem(s, 1)
+                            end)
+
+                            local pullDir = (hitPos - hrp.Position).Unit
+                            local dist = (hitPos - hrp.Position).Magnitude
+                            local speed = math.clamp(dist * 2.8, 110, 240)
+                            hrp.AssemblyLinearVelocity = (pullDir * speed) + Vector3.new(0, 32, 0)
+                            notify("Fun", "Grappin accroché !", Color3.fromRGB(80, 200, 120))
+                        end
+                    end)
+                end
+            end)
+            addConnection(grappleInputConn)
+            notify("Fun", "Grappin FiveM ACTIVÉ (Vise et appuie sur T)", Color3.fromRGB(80, 200, 120))
+        else
+            if activeRopeBeam then pcall(function() activeRopeBeam:Destroy() end) activeRopeBeam = nil end
+            notify("Fun", "Grappin FiveM DÉSACTIVÉ", Color3.fromRGB(255, 90, 90))
+        end
+    end, FunContent, "FiveMGrapple")
+
+    local flingEnabled = false
+    local flingConn = nil
+
+    createToggle("Aura Fling / Répulsion 360°", false, function(enabled)
+        flingEnabled = enabled
+        if flingConn then flingConn:Disconnect() flingConn = nil end
+        if enabled then
+            flingConn = RunService.Heartbeat:Connect(function()
+                pcall(function()
+                    local myChar = LocalPlayer.Character
+                    local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                    if not myHrp then return end
+
+                    for _, p in pairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer and p.Character then
+                            local tHrp = p.Character:FindFirstChild("HumanoidRootPart")
+                            local tHum = p.Character:FindFirstChildOfClass("Humanoid")
+                            if tHrp and tHum and tHum.Health > 0 then
+                                local dist = (tHrp.Position - myHrp.Position).Magnitude
+                                if dist < 9 then
+                                    local pushDir = (tHrp.Position - myHrp.Position).Unit
+                                    if pushDir.Magnitude < 0.1 then pushDir = Vector3.new(0, 1, 0) end
+                                    tHrp.AssemblyLinearVelocity = (pushDir * 280) + Vector3.new(0, 120, 0)
+                                    tHrp.AssemblyAngularVelocity = Vector3.new(0, 9999, 0)
+                                    pcall(function() tHum.PlatformStand = true end)
+                                    task.delay(0.5, function() pcall(function() tHum.PlatformStand = false end) end)
+                                end
+                            end
+                        end
+                    end
+                end)
+            end)
+            addConnection(flingConn)
+            notify("Fun", "Aura Fling 360° ACTIVÉ", Color3.fromRGB(80, 200, 120))
+        else
+            notify("Fun", "Aura Fling 360° DÉSACTIVÉ", Color3.fromRGB(255, 90, 90))
+        end
+    end, FunContent, "FiveMAuraFling")
+end
+
 createLabel("PRE-MADE SCRIPTS", ScriptsContent)
 do
-    ScriptsContent.ScrollBarThickness = 0
-    ScriptsContent.AutomaticCanvasSize = Enum.AutomaticSize.None
-    ScriptsContent.CanvasSize = UDim2.new(1, 0, 1, 0)
-
-    local ScriptScroll = Instance.new("ScrollingFrame")
-    ScriptScroll.Size = UDim2.new(1, 0, 1, -30)
-    ScriptScroll.Position = UDim2.new(0, 0, 0, 30)
-    ScriptScroll.BackgroundTransparency = 1
-    ScriptScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    ScriptScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    ScriptScroll.ScrollBarThickness = 2
-    ScriptScroll.ScrollBarImageColor3 = Color3.fromRGB(50, 50, 55)
-    ScriptScroll.Parent = ScriptsContent
-
-    local ScriptListLayout = Instance.new("UIListLayout")
-    ScriptListLayout.Padding = UDim.new(0, 5)
-    ScriptListLayout.Parent = ScriptScroll
+    ScriptsContent.ScrollBarThickness = 3
+    ScriptsContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    ScriptsContent.CanvasSize = UDim2.new(0, 0, 0, 0)
 
     local function destroyGuiByName(guiName)
         for _, child in pairs(parentTarget:GetChildren()) do
@@ -17752,7 +17907,7 @@ do
 
     local ScriptsList = {
         { 
-            Name ="Flick", 
+            Name = "Flick", 
             Code = flick_script, 
             Destroy = function() 
                 destroyGuiByName("EternalFlick_GUI")
@@ -17775,14 +17930,14 @@ do
             end 
         },
         { 
-            Name ="Murder Mystery",
+            Name = "Murder Mystery", 
             Code = murder_mystery, 
             Destroy = function() 
                 destroyGuiByName("UpdateGui")
             end 
         },
         { 
-            Name ="Grow Garden 2", 
+            Name = "Grow Garden 2", 
             Code = grow_garden, 
             Destroy = function() 
                 destroyGuiByName("UpdateGui")
@@ -17796,7 +17951,7 @@ do
             end 
         },
         { 
-            Name ="Tsunami Brainrot", 
+            Name = "Tsunami Brainrot", 
             Code = tsunami_brainrot, 
             Destroy = function() 
                 destroyGuiByName("UpdateGui")
@@ -17809,48 +17964,62 @@ do
         }
     }
 
-        local function buildScriptRow(scriptData)
-        local row = Instance.new("Frame")
-        row.Size = UDim2.new(1, 0, 0, 38)
-        row.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-        row.BorderSizePixel = 0
-        row.Parent = ScriptScroll
-        makeCorner(row, 8)
+    local function buildScriptRow(scriptData)
+        local card = createCard(ScriptsContent, 0, 46)
 
         local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(0.4, 0, 1, 0)
+        lbl.Size = UDim2.new(1, -170, 1, 0)
         lbl.Position = UDim2.new(0, 14, 0, 0)
         lbl.BackgroundTransparency = 1
         lbl.Text = scriptData.Name
-        lbl.TextColor3 = Color3.fromRGB(195, 195, 208)
+        lbl.TextColor3 = theme.text or Color3.fromRGB(235, 235, 242)
         lbl.Font = Enum.Font.GothamMedium
         lbl.TextSize = 12
         lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.Parent = row
+        lbl.ZIndex = 9
+        lbl.Parent = card
 
         local loadBtn = Instance.new("TextButton")
-        loadBtn.Size = UDim2.new(0, 60, 0, 26)
-        loadBtn.Position = UDim2.new(1, -130, 0.5, -13)
-        loadBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+        loadBtn.Size = UDim2.new(0, 68, 0, 26)
+        loadBtn.Position = UDim2.new(1, -160, 0.5, -13)
+        loadBtn.BackgroundColor3 = theme.cardHover or Color3.fromRGB(31, 33, 47)
         loadBtn.BorderSizePixel = 0
         loadBtn.Text = "Load"
-        loadBtn.TextColor3 = Color3.fromRGB(195, 195, 208)
-        loadBtn.Font = Enum.Font.GothamMedium
+        loadBtn.TextColor3 = theme.accent or Color3.fromRGB(145, 120, 255)
+        loadBtn.Font = Enum.Font.GothamBold
         loadBtn.TextSize = 11
-        loadBtn.Parent = row
-        makeCorner(loadBtn, 5)
+        loadBtn.ZIndex = 9
+        loadBtn.Parent = card
+        makeCorner(loadBtn, 6)
+        local loadStroke = makeStroke(loadBtn, theme.border or Color3.fromRGB(44, 46, 62), 1)
+
+        loadBtn.MouseEnter:Connect(function()
+            TweenService:Create(loadBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.accent or Color3.fromRGB(145, 120, 255), TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        end)
+        loadBtn.MouseLeave:Connect(function()
+            TweenService:Create(loadBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.cardHover or Color3.fromRGB(31, 33, 47), TextColor3 = theme.accent or Color3.fromRGB(145, 120, 255)}):Play()
+        end)
 
         local destBtn = Instance.new("TextButton")
-        destBtn.Size = UDim2.new(0, 60, 0, 26)
-        destBtn.Position = UDim2.new(1, -65, 0.5, -13)
-        destBtn.BackgroundColor3 = Color3.fromRGB(40, 22, 22)
+        destBtn.Size = UDim2.new(0, 74, 0, 26)
+        destBtn.Position = UDim2.new(1, -84, 0.5, -13)
+        destBtn.BackgroundColor3 = Color3.fromRGB(45, 24, 28)
         destBtn.BorderSizePixel = 0
         destBtn.Text = "Destroy"
-        destBtn.TextColor3 = Color3.fromRGB(170, 110, 110)
-        destBtn.Font = Enum.Font.GothamMedium
-        destBtn.TextSize = 10
-        destBtn.Parent = row
-        makeCorner(destBtn, 5)
+        destBtn.TextColor3 = Color3.fromRGB(255, 90, 90)
+        destBtn.Font = Enum.Font.GothamBold
+        destBtn.TextSize = 11
+        destBtn.ZIndex = 9
+        destBtn.Parent = card
+        makeCorner(destBtn, 6)
+        makeStroke(destBtn, Color3.fromRGB(80, 35, 40), 1)
+
+        destBtn.MouseEnter:Connect(function()
+            TweenService:Create(destBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(70, 25, 30), TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+        end)
+        destBtn.MouseLeave:Connect(function()
+            TweenService:Create(destBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(45, 24, 28), TextColor3 = Color3.fromRGB(255, 90, 90)}):Play()
+        end)
 
         loadBtn.MouseButton1Click:Connect(function()
             pcall(function()
@@ -17867,6 +18036,8 @@ do
             pcall(scriptData.Destroy)
             notify("Scripts", scriptData.Name .. " destroyed!", Color3.fromRGB(255, 90, 90))
         end)
+
+        registerSearchCard(card, scriptData.Name .. " Script Pre-Made Load Destroy", ScriptsContent)
     end
 
     for _, scriptData in ipairs(ScriptsList) do
