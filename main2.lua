@@ -4008,7 +4008,7 @@ V.FOV = 70
 DefaultConfig = {
     KeyboardLayout = "AZERTY",
     CurrentTheme = "Violet Void",
-    RecordMovement = "Y", ReplayMovement = "O", MovementReplayNoclip = true, MovementReplaySpeed = 1,
+    RecordMovement = "Y", ReplayMovement = "O", MovementReplayNoclip = true, MovementReplaySpeed = 100,
     Speed = 16, SpeedEnabled = false, SpeedMethod = "Humanoid", Jump = 50, JumpEnabled = false, 
     WallClimb = false, AutoBhop = false, SuperJumpCharge = false, InfiniteStamina = false,
     Fly = false, FlySpeed = 150, DesyncFly = false, DesyncFlySpeed = 150,
@@ -6876,11 +6876,12 @@ function createSlider(name, min, max, default, callback, parent, configKey)
 
 	if configKey then
 		if V[configKey] ~= nil and type(V[configKey]) == "number" then
-			default = V[configKey]
+			default = math.clamp(V[configKey], min, max)
 		else
 			V[configKey] = default
 		end
 	end
+	default = math.clamp(default, min, max)
 
 	local title = Instance.new("TextLabel")
 	title.Size = UDim2.new(0.6, -10, 0, 18)
@@ -6933,8 +6934,9 @@ function createSlider(name, min, max, default, callback, parent, configKey)
 	trkCorner.CornerRadius = UDim.new(1, 0)
 	trkCorner.Parent = track
 
+	local initPct = math.clamp((default - min) / (max - min), 0, 1)
 	local fill = Instance.new("Frame")
-	fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+	fill.Size = UDim2.new(initPct, 0, 1, 0)
 	fill.BackgroundColor3 = Colors.Accent
 	fill.BorderSizePixel = 0
 	fill.ZIndex = 9
@@ -6990,7 +6992,7 @@ function createSlider(name, min, max, default, callback, parent, configKey)
 
 	local function setSliderValue(val)
 		local clamped = math.clamp(val, min, max)
-		local pct = (clamped - min) / (max - min)
+		local pct = math.clamp((clamped - min) / (max - min), 0, 1)
 		valLbl.Text = tostring(clamped)
 		fill.Size = UDim2.new(pct, 0, 1, 0)
 		if configKey then V[configKey] = clamped end
@@ -8342,7 +8344,7 @@ CodeContent = ContentFrames["Code"]
 initStep = "V defaults"
 V.KeyboardLayout = "AZERTY"
 V.MovementReplayNoclip = true
-V.MovementReplaySpeed = 1
+V.MovementReplaySpeed = 100
 V.Speed = 16
 V.SpeedEnabled = false
 V.SpeedMethod = "Humanoid"
@@ -8391,6 +8393,7 @@ V.ESPNPC = false
 V.ESPTeamCheck = false
 V.ESPDesyncResolver = false
 V.StreamerMode = false
+V.AutoPanicStaff = false
 V.FreecamTPTargetMode = "Ground"
 V.FreecamCharVisible = false
 V.AntiFling = false
@@ -10981,9 +10984,9 @@ do
 
     local changes = {
         { text = "- Ajout Option Streamer Spoof (Protection)", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Ajout Auto-Panic Staff & Notifs (Protection)", color = Color3.fromRGB(46, 204, 113) },
         { text = "- Ajout Anti-Desync Resolver (Visuels ESP)", color = Color3.fromRGB(46, 204, 113) },
-        { text = "- Retrait Anti-Aim / Desync (Protection)", color = Color3.fromRGB(235, 75, 75) },
-        { text = "- Retrait Hitbox Resolver (Protection)", color = Color3.fromRGB(235, 75, 75) },
+        { text = "- Retrait Anti-Aim / Desync & Hitbox Resolver", color = Color3.fromRGB(235, 75, 75) },
         { text = "- Correction bug vitesse (Restore WalkSpeed Unload)", color = Color3.fromRGB(245, 245, 250) },
     }
 
@@ -11670,6 +11673,128 @@ createSlider("Body Scale (Taille Globale)", 5, 30, 10, function(val)
 end, MeContent,"BodyScale")
 
 initStep = "cablage Protection"
+
+function isRobloxAdminOrStaff(player)
+    if not player or not player:IsA("Player") then return false, "" end
+    local isStaff = false
+    local reason = ""
+
+    pcall(function()
+        if game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId then
+            isStaff = true
+            reason = "Créateur du Jeu"
+        end
+    end)
+    if isStaff then return true, reason end
+
+    pcall(function()
+        if game.CreatorType == Enum.CreatorType.Group and game.CreatorId > 0 then
+            local rank = player:GetRankInGroup(game.CreatorId)
+            if rank >= 200 then
+                isStaff = true
+                reason = "Staff / Dév Groupe (" .. tostring(rank) .. ")"
+            elseif rank > 0 then
+                local role = string.lower(player:GetRoleInGroup(game.CreatorId) or "")
+                if role:find("admin") or role:find("mod") or role:find("owner") or role:find("dev") or role:find("staff") or role:find("creator") or role:find("manage") then
+                    isStaff = true
+                    reason = "Staff Groupe (" .. player:GetRoleInGroup(game.CreatorId) .. ")"
+                end
+            end
+        end
+    end)
+    if isStaff then return true, reason end
+
+    pcall(function()
+        if player:IsInGroup(1200769) and player:GetRankInGroup(1200769) > 0 then
+            isStaff = true
+            reason = "Roblox Staff Officiel"
+        end
+    end)
+    if isStaff then return true, reason end
+
+    pcall(function()
+        if player:IsInGroup(2868472) and player:GetRankInGroup(2868472) > 0 then
+            isStaff = true
+            reason = "Roblox QA Tester"
+        end
+    end)
+    if isStaff then return true, reason end
+
+    pcall(function()
+        if player:IsInGroup(4199740) and player:GetRankInGroup(4199740) > 0 then
+            isStaff = true
+            reason = "Roblox Intern"
+        end
+    end)
+    if isStaff then return true, reason end
+
+    return false, ""
+end
+_G.isRobloxAdminOrStaff = isRobloxAdminOrStaff
+
+function triggerStaffPanic(staffPlayer, reason)
+    pcall(function()
+        notify("URGENCE ANTI-BAN", "Staff detecte (" .. tostring(reason) .. ") ! Evacuation...", Color3.fromRGB(255, 40, 40))
+        task.wait(0.15)
+        local ts = game:GetService("TeleportService")
+        local success = pcall(function()
+            ts:Teleport(game.PlaceId, LocalPlayer)
+        end)
+        if not success then
+            LocalPlayer:Kick("\n\n[PEARL PROTECTION ANTI-BAN]\nUn membre du Staff / Moderateur a ete detecte (" .. tostring(reason) .. ").\nVotre compte a ete deconnecte instantanement pour eviter tout ban !\n")
+        end
+    end)
+end
+_G.triggerStaffPanic = triggerStaffPanic
+
+createLabel("STAFF & ANTI-BAN", ProtectionContent)
+
+createToggle("Admin / Staff Join Toast Notifs", false, function(enabled)
+    V.AdminJoinNotif = enabled
+    notify("Protection", "Notifs Admin Join " .. (enabled and "ON" or "OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+    if enabled then
+        task.spawn(function()
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer then
+                    local isStaff, reason = isRobloxAdminOrStaff(p)
+                    if isStaff then
+                        pcall(function()
+                            game:GetService("StarterGui"):SetCore("SendNotification", {
+                                Title = "⚠️ ADMIN DÉJÀ PRÉSENT !",
+                                Text = p.DisplayName .. " (@" .. p.Name .. ") [" .. reason .. "] est dans le serveur !",
+                                Duration = 10,
+                                Icon = "rbxthumb://type=AvatarHeadShot&id=" .. p.UserId .. "&w=150&h=150"
+                            })
+                        end)
+                        notify("ADMIN DÉTECTÉ", p.DisplayName .. " (" .. reason .. ")", Color3.fromRGB(255, 60, 60))
+                        if V.AutoPanicStaff then
+                            triggerStaffPanic(p, reason)
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end, ProtectionContent, "AdminJoinNotif")
+
+createToggle("Auto-Panic / Staff Auto-Leave", false, function(enabled)
+    V.AutoPanicStaff = enabled
+    notify("Protection", "Auto-Panic Staff " .. (enabled and "ACTIF" or "DÉSACTIVÉ"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+    if enabled then
+        task.spawn(function()
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer then
+                    local isStaff, reason = isRobloxAdminOrStaff(p)
+                    if isStaff then
+                        triggerStaffPanic(p, reason)
+                        break
+                    end
+                end
+            end
+        end)
+    end
+end, ProtectionContent, "AutoPanicStaff")
+
 createLabel("DEFENSE & SAFETY", ProtectionContent)
 
 function toggleAntiFling(enabled)
@@ -13116,7 +13241,8 @@ function toggleMovementReplaying(forceState)
             local totTime = movementRecordData[ptsCount].t
             if totTime <= 0.01 then return end
 
-            local speed = V.MovementReplaySpeed or 1
+            local rawSpeed = V.MovementReplaySpeed or 100
+            local speed = (rawSpeed > 10) and (rawSpeed / 100) or rawSpeed
             if speed <= 0 then speed = 1 end
 
             local elapsed = ((tick() - replayStartTime) * speed) % totTime
@@ -13417,7 +13543,7 @@ createToggle("Noclip pendant le Rejeu", true, function(enabled)
 end, MeContent, "MovementReplayNoclip")
 
 createSlider("Vitesse du Rejeu (%)", 25, 300, 100, function(val)
-    V.MovementReplaySpeed = val / 100
+    V.MovementReplaySpeed = val
 end, MeContent, "MovementReplaySpeed")
 
 initStep = "cablage ESP"
@@ -16866,30 +16992,7 @@ createToggle("Player Join/Leave Toast Notifs", false, function(enabled)
     notify("Server","Notifs Join/Leave".. (enabled and"ON"or"OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
 end, ServerContent,"PlayerJoinLeaveNotifs")
 
-createToggle("Admin / Staff Join Toast Notifs", false, function(enabled)
-    V.AdminJoinNotif = enabled
-    notify("Server", "Notifs Admin Join " .. (enabled and "ON" or "OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
-    if enabled then
-        task.spawn(function()
-            for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer then
-                    local isStaff, reason = isRobloxAdminOrStaff(p)
-                    if isStaff then
-                        pcall(function()
-                            game:GetService("StarterGui"):SetCore("SendNotification", {
-                                Title = "⚠️ ADMIN DÉJÀ PRÉSENT !",
-                                Text = p.DisplayName .. " (@" .. p.Name .. ") [" .. reason .. "] est dans le serveur !",
-                                Duration = 10,
-                                Icon = "rbxthumb://type=AvatarHeadShot&id=" .. p.UserId .. "&w=150&h=150"
-                            })
-                        end)
-                        notify("ADMIN DÉTECTÉ", p.DisplayName .. " (" .. reason .. ")", Color3.fromRGB(255, 60, 60))
-                    end
-                end
-            end
-        end)
-    end
-end, ServerContent, "AdminJoinNotif")
+-- AdminJoinNotif deplace dans ProtectionContent
 createButton("Rejoin Server", function()
     notify("Server","Rejoining server...", Color3.fromRGB(180, 180, 195))
     task.spawn(function()
@@ -20761,19 +20864,24 @@ Players.PlayerAdded:Connect(function(p)
             Icon ="rbxthumb://type=AvatarHeadShot&id=".. p.UserId .."&w=150&h=150"
         })
     end
-    if V.AdminJoinNotif then
+    if V.AdminJoinNotif or V.AutoPanicStaff then
         task.spawn(function()
             local isStaff, reason = isRobloxAdminOrStaff(p)
             if isStaff then
-                pcall(function()
-                    game:GetService("StarterGui"):SetCore("SendNotification", {
-                        Title = "⚠️ ALERTE ADMIN REJOINT !",
-                        Text = p.DisplayName .. " (@" .. p.Name .. ") [" .. reason .. "] a rejoint la partie !",
-                        Duration = 12,
-                        Icon = "rbxthumb://type=AvatarHeadShot&id=" .. p.UserId .. "&w=150&h=150"
-                    })
-                end)
-                notify("ADMIN REJOINT", p.DisplayName .. " (" .. reason .. ")", Color3.fromRGB(255, 50, 50))
+                if V.AdminJoinNotif then
+                    pcall(function()
+                        game:GetService("StarterGui"):SetCore("SendNotification", {
+                            Title = "⚠️ ALERTE ADMIN REJOINT !",
+                            Text = p.DisplayName .. " (@" .. p.Name .. ") [" .. reason .. "] a rejoint la partie !",
+                            Duration = 12,
+                            Icon = "rbxthumb://type=AvatarHeadShot&id=" .. p.UserId .. "&w=150&h=150"
+                        })
+                    end)
+                    notify("ADMIN REJOINT", p.DisplayName .. " (" .. reason .. ")", Color3.fromRGB(255, 50, 50))
+                end
+                if V.AutoPanicStaff then
+                    if triggerStaffPanic then triggerStaffPanic(p, reason) end
+                end
             end
         end)
     end
