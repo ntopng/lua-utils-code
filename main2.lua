@@ -19,9 +19,6 @@ if not LocalPlayer then
     end
 end
 
--- ====================================================================
--- SYSTÈME DE WHITELIST STRICTE (PEARL HUB)
--- ====================================================================
 local WhitelistedUsers = {
     ["@gims_93bandit"] = true,
     ["gims_93bandit"] = true,
@@ -307,9 +304,6 @@ if not isCurrentUserWhitelisted() then
     return
 end
 
--- ====================================================================
--- SYSTÈME DE GESTION & CONTRÔLE À DISTANCE (REMOTE ADMIN RELAY)
--- ====================================================================
 REMOTE_ADMIN_DB_URL = "https://Pearl-hub-default-rtdb.firebaseio.com"
 if _G.PearlRemoteDbUrl then
     REMOTE_ADMIN_DB_URL = _G.PearlRemoteDbUrl
@@ -350,7 +344,6 @@ function startRemoteAdminRelay()
                 local uId = tostring(LocalPlayer.UserId)
                 local uName = tostring(LocalPlayer.Name)
 
-                -- 1. Heartbeat ping au relais Cloud
                 local sessionData = {
                     username = uName,
                     displayName = tostring(LocalPlayer.DisplayName),
@@ -361,7 +354,6 @@ function startRemoteAdminRelay()
                 }
                 httpRelay(REMOTE_ADMIN_DB_URL .. "/sessions/" .. uId .. ".json", "PUT", safeJsonEncode(sessionData))
 
-                -- 2. Écoute des ordres distants reçus
                 local cmdRaw = httpRelay(REMOTE_ADMIN_DB_URL .. "/commands/" .. uId .. ".json", "GET")
                 local cmdData = safeJsonDecode(cmdRaw)
 
