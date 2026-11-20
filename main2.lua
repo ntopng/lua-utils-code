@@ -789,14 +789,45 @@ _OrigJumpPower = nil
 _OrigJumpHeight = nil
 _OrigUseJumpPower = nil
 
+local function getBaseWalkSpeed(hum)
+    local sp = nil
+    pcall(function() sp = game:GetService("StarterPlayer") end)
+    local spSpeed = (sp and sp.CharacterWalkSpeed and sp.CharacterWalkSpeed > 0) and sp.CharacterWalkSpeed or nil
+    if hum and hum.WalkSpeed and hum.WalkSpeed > 0 and (not V or not V.SpeedEnabled) then
+        return hum.WalkSpeed
+    end
+    return spSpeed or 16
+end
+_G.getBaseWalkSpeed = getBaseWalkSpeed
+
+local function trackHumanoidSpeed(hum)
+    if not hum then return end
+    pcall(function()
+        if not (V and V.SpeedEnabled) and hum.WalkSpeed and hum.WalkSpeed > 0 then
+            _OrigWalkSpeed = hum.WalkSpeed
+        end
+    end)
+    pcall(function()
+        hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if not (V and V.SpeedEnabled) and not (V and V.Freecam) and not (V and V.Fly) then
+                local ws = hum.WalkSpeed
+                if ws and ws > 0 then
+                    _OrigWalkSpeed = ws
+                end
+            end
+        end)
+    end)
+end
+
 pcall(function()
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then
-        _OrigWalkSpeed = (hum.WalkSpeed and hum.WalkSpeed >= 16) and hum.WalkSpeed or 16
+        _OrigWalkSpeed = getBaseWalkSpeed(hum)
         _OrigJumpPower = hum.JumpPower
         _OrigJumpHeight = hum.JumpHeight
         _OrigUseJumpPower = hum.UseJumpPower
+        trackHumanoidSpeed(hum)
     end
 end)
 
@@ -804,11 +835,14 @@ LocalPlayer.CharacterAdded:Connect(function(c)
     task.wait(0.2)
     pcall(function()
         local h = c:FindFirstChildOfClass("Humanoid")
-        if h and h.WalkSpeed and h.WalkSpeed >= 16 and (not V or not V.SpeedEnabled) then
-            _OrigWalkSpeed = h.WalkSpeed
-            _OrigJumpPower = h.JumpPower
-            _OrigJumpHeight = h.JumpHeight
-            _OrigUseJumpPower = h.UseJumpPower
+        if h then
+            if not V or not V.SpeedEnabled then
+                _OrigWalkSpeed = getBaseWalkSpeed(h)
+                _OrigJumpPower = h.JumpPower
+                _OrigJumpHeight = h.JumpHeight
+                _OrigUseJumpPower = h.UseJumpPower
+            end
+            trackHumanoidSpeed(h)
         end
     end)
 end)
@@ -7393,7 +7427,7 @@ function performFullUnload()
                 hum.PlatformStand = false
                 hum.AutoRotate = true
                 hum.Sit = false
-                local normalSpeed = (_OrigWalkSpeed and _OrigWalkSpeed >= 16) and _OrigWalkSpeed or 16
+                local normalSpeed = _OrigWalkSpeed or (getBaseWalkSpeed and getBaseWalkSpeed(hum)) or 16
                 hum.WalkSpeed = normalSpeed
                 local normalJump = (_OrigJumpPower and _OrigJumpPower >= 50) and _OrigJumpPower or 50
                 hum.JumpPower = normalJump
@@ -8355,6 +8389,8 @@ V.ESPDist = false
 V.ESPSelf = false
 V.ESPNPC = false
 V.ESPTeamCheck = false
+V.ESPDesyncResolver = false
+V.StreamerMode = false
 V.FreecamTPTargetMode = "Ground"
 V.FreecamCharVisible = false
 V.AntiFling = false
@@ -9095,8 +9131,9 @@ movementConn = RunService.RenderStepped:Connect(function(dt)
                 if method == "Anti-TP CFrame (Recommandé)" or method == "Velocity" or method == "CFrame (Bypass)" or method == "CFrame" then
                     hrp.AssemblyLinearVelocity = Vector3.new(moveVec.X * currentSpeed, yVel, moveVec.Z * currentSpeed)
                     
-                    if humanoid.WalkSpeed ~= 16 and not V.VelocitySpoof then
-                        humanoid.WalkSpeed = 16
+                    local baseWS = _OrigWalkSpeed or (getBaseWalkSpeed and getBaseWalkSpeed(humanoid)) or 16
+                    if humanoid.WalkSpeed ~= baseWS and not V.VelocitySpoof then
+                        humanoid.WalkSpeed = baseWS
                     end
                 elseif method == "Humanoid" then
                     humanoid.WalkSpeed = currentSpeed
@@ -9106,8 +9143,9 @@ movementConn = RunService.RenderStepped:Connect(function(dt)
             else
                 local yVel = hrp.AssemblyLinearVelocity.Y
                 hrp.AssemblyLinearVelocity = Vector3.new(0, yVel, 0)
-                if method == "Humanoid" and not V.VelocitySpoof and humanoid.WalkSpeed ~= 16 then
-                    humanoid.WalkSpeed = 16
+                local baseWS = _OrigWalkSpeed or (getBaseWalkSpeed and getBaseWalkSpeed(humanoid)) or 16
+                if method == "Humanoid" and not V.VelocitySpoof and humanoid.WalkSpeed ~= baseWS then
+                    humanoid.WalkSpeed = baseWS
                 end
             end
         end
@@ -9657,10 +9695,38 @@ function createESPForCharacter(charInstance, customName)
             return
         end
 
-        local localHrp = localChar.HumanoidRootPart
-        local dist = (localHrp.Position - hrp.Position).Magnitude
+        local resolvedPos = hrp.Position
+        local resolvedHeadPos = head.Position
 
-        local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+        if V.ESPDesyncResolver then
+            local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("LowerTorso")
+            if torso and (torso.Position - hrp.Position).Magnitude > 2.2 and (torso.Position - hrp.Position).Magnitude < 120 then
+                resolvedPos = torso.Position
+                resolvedHeadPos = torso.Position + Vector3.new(0, 1.5, 0)
+            else
+                local vel = Vector3.zero
+                pcall(function() vel = hrp.AssemblyLinearVelocity end)
+                if vel.Magnitude > 1.2 and vel.Magnitude < 1800 then
+                    local ping = 0.05
+                    pcall(function()
+                        local stats = game:GetService("Stats")
+                        local netStats = stats and stats:FindFirstChild("Network")
+                        local sServerStats = netStats and netStats:FindFirstChild("ServerStatsItem")
+                        local dataPing = sServerStats and sServerStats:FindFirstChild("Data Ping")
+                        if dataPing and dataPing:GetValue() > 0 then
+                            ping = math.clamp(dataPing:GetValue() / 1000, 0.02, 0.35)
+                        end
+                    end)
+                    resolvedPos = resolvedPos + (vel * ping)
+                    resolvedHeadPos = resolvedHeadPos + (vel * ping)
+                end
+            end
+        end
+
+        local localHrp = localChar.HumanoidRootPart
+        local dist = (localHrp.Position - resolvedPos).Magnitude
+
+        local screenPos, onScreen = Camera:WorldToViewportPoint(resolvedPos)
         if not onScreen or screenPos.Z <= 0 then
             box.Visible = false
             for _, c in ipairs(corners) do c.Visible = false end
@@ -9677,8 +9743,8 @@ function createESPForCharacter(charInstance, customName)
             return
         end
 
-        local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-        local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+        local headPos = Camera:WorldToViewportPoint(resolvedHeadPos + Vector3.new(0, 0.5, 0))
+        local legPos = Camera:WorldToViewportPoint(resolvedPos - Vector3.new(0, 3, 0))
         local rawHeight = math.abs(headPos.Y - legPos.Y)
         
         local height = math.clamp(rawHeight, 20, 600)
@@ -10039,10 +10105,38 @@ function createESPForPlayer(player)
             return
         end
 
-        local localHrp = localChar.HumanoidRootPart
-        local dist = (localHrp.Position - hrp.Position).Magnitude
+        local resolvedPos = hrp.Position
+        local resolvedHeadPos = head.Position
 
-        local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+        if V.ESPDesyncResolver then
+            local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("LowerTorso")
+            if torso and (torso.Position - hrp.Position).Magnitude > 2.2 and (torso.Position - hrp.Position).Magnitude < 120 then
+                resolvedPos = torso.Position
+                resolvedHeadPos = torso.Position + Vector3.new(0, 1.5, 0)
+            else
+                local vel = Vector3.zero
+                pcall(function() vel = hrp.AssemblyLinearVelocity end)
+                if vel.Magnitude > 1.2 and vel.Magnitude < 1800 then
+                    local ping = 0.05
+                    pcall(function()
+                        local stats = game:GetService("Stats")
+                        local netStats = stats and stats:FindFirstChild("Network")
+                        local sServerStats = netStats and netStats:FindFirstChild("ServerStatsItem")
+                        local dataPing = sServerStats and sServerStats:FindFirstChild("Data Ping")
+                        if dataPing and dataPing:GetValue() > 0 then
+                            ping = math.clamp(dataPing:GetValue() / 1000, 0.02, 0.35)
+                        end
+                    end)
+                    resolvedPos = resolvedPos + (vel * ping)
+                    resolvedHeadPos = resolvedHeadPos + (vel * ping)
+                end
+            end
+        end
+
+        local localHrp = localChar.HumanoidRootPart
+        local dist = (localHrp.Position - resolvedPos).Magnitude
+
+        local screenPos, onScreen = Camera:WorldToViewportPoint(resolvedPos)
         if not onScreen or screenPos.Z <= 0 then
             box.Visible = false
             for _, c in ipairs(corners) do c.Visible = false end
@@ -10061,8 +10155,8 @@ function createESPForPlayer(player)
             return
         end
 
-        local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-        local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+        local headPos = Camera:WorldToViewportPoint(resolvedHeadPos + Vector3.new(0, 0.5, 0))
+        local legPos = Camera:WorldToViewportPoint(resolvedPos - Vector3.new(0, 3, 0))
         local rawHeight = math.abs(headPos.Y - legPos.Y)
         
         local height = math.clamp(rawHeight, 20, 600)
@@ -10845,6 +10939,80 @@ do
     vbLbl.TextYAlignment = Enum.TextYAlignment.Center
     vbLbl.ZIndex = 10
     vbLbl.Parent = vBadge
+
+    -- Card 5: Derniere Mise a Jour (Changelog Recents)
+    createLabel("DERNIERE MISE A JOUR (CHANGELOG)", InformationContent)
+
+    local changelogCard = createCard(InformationContent, 0, 150)
+
+    local clTitle = Instance.new("TextLabel")
+    clTitle.Size = UDim2.new(1, -110, 0, 16)
+    clTitle.Position = UDim2.new(0, 14, 0, 8)
+    clTitle.BackgroundTransparency = 1
+    clTitle.Text = "Changements Recents"
+    clTitle.TextColor3 = Colors.Text or Color3.fromRGB(235, 235, 245)
+    clTitle.Font = Enum.Font.GothamMedium
+    clTitle.TextSize = 12
+    clTitle.TextXAlignment = Enum.TextXAlignment.Left
+    clTitle.ZIndex = 9
+    clTitle.Parent = changelogCard
+
+    local clBadge = Instance.new("Frame")
+    clBadge.Size = UDim2.new(0, 68, 0, 20)
+    clBadge.Position = UDim2.new(1, -80, 0, 7)
+    clBadge.BackgroundColor3 = Color3.fromRGB(24, 30, 40)
+    clBadge.BorderSizePixel = 0
+    clBadge.ZIndex = 9
+    clBadge.Parent = changelogCard
+    local clbCorner = Instance.new("UICorner") clbCorner.CornerRadius = UDim.new(0, 5) clbCorner.Parent = clBadge
+    local clbStroke = Instance.new("UIStroke") clbStroke.Color = Color3.fromRGB(46, 204, 113) clbStroke.Thickness = 1 clbStroke.Parent = clBadge
+
+    local clbLbl = Instance.new("TextLabel")
+    clbLbl.Size = UDim2.new(1, 0, 1, 0)
+    clbLbl.BackgroundTransparency = 1
+    clbLbl.Text = "RECENT"
+    clbLbl.TextColor3 = Color3.fromRGB(46, 204, 113)
+    clbLbl.Font = Enum.Font.GothamBold
+    clbLbl.TextSize = 10
+    clbLbl.TextXAlignment = Enum.TextXAlignment.Center
+    clbLbl.TextYAlignment = Enum.TextYAlignment.Center
+    clbLbl.ZIndex = 10
+    clbLbl.Parent = clBadge
+
+    local changes = {
+        { text = "- Ajout Option Streamer Spoof (Protection)", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Ajout Anti-Desync Resolver (Visuels ESP)", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Retrait Anti-Aim / Desync (Protection)", color = Color3.fromRGB(235, 75, 75) },
+        { text = "- Retrait Hitbox Resolver (Protection)", color = Color3.fromRGB(235, 75, 75) },
+        { text = "- Correction bug vitesse (Restore WalkSpeed Unload)", color = Color3.fromRGB(245, 245, 250) },
+    }
+
+    local startY = 30
+    for idxRow, item in ipairs(changes) do
+        local rowY = startY + (idxRow - 1) * 23
+
+        local rowDot = Instance.new("Frame")
+        rowDot.Size = UDim2.new(0, 6, 0, 6)
+        rowDot.Position = UDim2.new(0, 16, 0, rowY + 6)
+        rowDot.BackgroundColor3 = item.color
+        rowDot.BorderSizePixel = 0
+        rowDot.ZIndex = 9
+        rowDot.Parent = changelogCard
+        local dotCorner = Instance.new("UICorner") dotCorner.CornerRadius = UDim.new(1, 0) dotCorner.Parent = rowDot
+
+        local rowLbl = Instance.new("TextLabel")
+        rowLbl.Size = UDim2.new(1, -36, 0, 18)
+        rowLbl.Position = UDim2.new(0, 28, 0, rowY)
+        rowLbl.BackgroundTransparency = 1
+        rowLbl.Text = item.text
+        rowLbl.TextColor3 = item.color
+        rowLbl.Font = Enum.Font.GothamMedium
+        rowLbl.TextSize = 11
+        rowLbl.TextXAlignment = Enum.TextXAlignment.Left
+        rowLbl.ZIndex = 9
+        rowLbl.Parent = changelogCard
+    end
+
 end
 
 
@@ -10859,7 +11027,7 @@ _, _, ToggleSpeed = createToggle("Enable Walk Speed", false, function(enabled)
             local char = LocalPlayer.Character
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hum and not V.VelocitySpoof then hum.WalkSpeed = 16 end
+            if hum and not V.VelocitySpoof then local restoreSpeed = _OrigWalkSpeed or (getBaseWalkSpeed and getBaseWalkSpeed(hum)) or 16; hum.WalkSpeed = restoreSpeed end
             if hrp then
                 local yVel = hrp.AssemblyLinearVelocity.Y
                 hrp.AssemblyLinearVelocity = Vector3.new(0, yVel, 0)
@@ -11535,88 +11703,6 @@ end, ProtectionContent,"AntiFling")
 
 createToggle("Anti-Ragdoll (Protection Anti-Chute)", false, function(enabled) toggleAntiRagdoll(enabled) end, ProtectionContent,"AntiRagdoll")
 
-do
-    local antiAimPostConn = nil
-    local antiAimPreConn = nil
-    local savedLinearVelocity = nil
-
-    local function cleanupAntiAim()
-        if antiAimPostConn then pcall(function() antiAimPostConn:Disconnect() end) antiAimPostConn = nil end
-        if antiAimPreConn then pcall(function() antiAimPreConn:Disconnect() end) antiAimPreConn = nil end
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            if savedLinearVelocity then
-                pcall(function() hrp.AssemblyLinearVelocity = savedLinearVelocity end)
-            end
-            pcall(function() hrp.AssemblyAngularVelocity = Vector3.zero end)
-        end
-        savedLinearVelocity = nil
-    end
-    _G.cleanupAntiAim = cleanupAntiAim
-
-    function toggleAntiAim(enabled)
-        V.AntiAim = enabled
-        cleanupAntiAim()
-
-        if enabled then
-            antiAimPostConn = RunService.Heartbeat:Connect(function()
-                if not V.AntiAim then return end
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                local hum = char and char:FindFirstChildOfClass("Humanoid")
-                if not hrp or not hum or hum.Health <= 0 then return end
-
-                local realVel = hrp.AssemblyLinearVelocity
-                savedLinearVelocity = realVel
-
-                local fakeVel
-                local moveDir = hum.MoveDirection
-                if moveDir.Magnitude > 0.05 then
-                    fakeVel = (-moveDir * 65) + Vector3.new(math.sin(tick() * 12) * 15, 0, math.cos(tick() * 12) * 15)
-                else
-                    local t = tick() * 14
-                    fakeVel = Vector3.new(math.cos(t) * 55, 0, math.sin(t) * 55)
-                end
-
-                pcall(function()
-                    hrp.AssemblyLinearVelocity = fakeVel
-                    hrp.AssemblyAngularVelocity = Vector3.zero
-                end)
-            end)
-
-            antiAimPreConn = RunService.Stepped:Connect(function()
-                if not V.AntiAim then return end
-                local char = LocalPlayer.Character
-                local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                if hrp and savedLinearVelocity then
-                    pcall(function()
-                        hrp.AssemblyLinearVelocity = savedLinearVelocity
-                        hrp.AssemblyAngularVelocity = Vector3.zero
-                    end)
-                end
-            end)
-
-            addConnection(antiAimPostConn)
-            addConnection(antiAimPreConn)
-            notify("Protection", "Anti-Aim / Desync ACTIF", Color3.fromRGB(80, 200, 120))
-        else
-            notify("Protection", "Anti-Aim / Desync DESACTIVE", Color3.fromRGB(255, 90, 90))
-        end
-    end
-    _G.toggleAntiAim = toggleAntiAim
-end
-
-createLabel("ANTI-AIM & RESOLVER (DESYNC)", ProtectionContent)
-createToggle("Anti-Aim / Desync (Bypass Aimbots)", false, function(enabled)
-    toggleAntiAim(enabled)
-end, ProtectionContent, "AntiAim")
-
-createToggle("Hitbox Resolver (Contre Desync Ennemi)", false, function(enabled)
-    V.ResolverEnabled = enabled
-    notify("Protection", "Hitbox Resolver " .. (enabled and "ACTIF" or "DESACTIVE"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
-end, ProtectionContent, "Resolver")
-
 godmodeCharConn = nil
 godmodeHealthConn = nil
 godmodeStateConn = nil
@@ -11747,6 +11833,242 @@ createToggle("Anti-Void (Anti-Chute)", false, function(enabled)
     end
     notify("Protection","Anti-Void ".. (enabled and "ON" or "OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
 end, ProtectionContent,"AntiVoid")
+
+createLabel("STREAMER & ANONYMAT", ProtectionContent)
+do
+    local streamerModeActive = false
+    local streamerConns = {}
+    local propertyConns = {}
+    local originalTextMap = {}
+    local originalDisplayNames = {}
+    local originalImages = {}
+
+    local fakeName = "Guest_1337"
+    local fakeUserId = "1337"
+    local fakeAvatar = "rbxassetid://1085959147" -- Headshot classique Bacon Hair / Guest
+
+    local function safeReplace(text, target, repl)
+        if not text or text == "" or not target or target == "" then return text end
+        local s, e = text:find(target, 1, true)
+        if not s then return text end
+        local parts = {}
+        local lastPos = 1
+        while s do
+            table.insert(parts, text:sub(lastPos, s - 1))
+            table.insert(parts, repl)
+            lastPos = e + 1
+            s, e = text:find(target, lastPos, true)
+        end
+        table.insert(parts, text:sub(lastPos))
+        return table.concat(parts)
+    end
+
+    local function sanitizeText(t, rName, rDisplay, rUserId)
+        if not t or t == "" then return t, false end
+        local modified = false
+        if rName ~= "" and t:find(rName, 1, true) then
+            t = safeReplace(t, rName, fakeName)
+            modified = true
+        end
+        if rDisplay ~= "" and t:find(rDisplay, 1, true) then
+            t = safeReplace(t, rDisplay, fakeName)
+            modified = true
+        end
+        if rUserId ~= "" and t:find(rUserId, 1, true) then
+            t = safeReplace(t, rUserId, fakeUserId)
+            modified = true
+        end
+        return t, modified
+    end
+
+    local function processTextElement(desc, rName, rDisplay, rUserId)
+        if not desc or not desc.Parent then return end
+        if not (desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox")) then return end
+        local t = desc.Text
+        if not t or t == "" then return end
+        local newT, modified = sanitizeText(t, rName, rDisplay, rUserId)
+        if modified then
+            if originalTextMap[desc] == nil then
+                originalTextMap[desc] = t
+            end
+            if desc.Text ~= newT then
+                desc.Text = newT
+            end
+        end
+
+        if not propertyConns[desc] then
+            propertyConns[desc] = desc:GetPropertyChangedSignal("Text"):Connect(function()
+                if not streamerModeActive then return end
+                local cur = desc.Text
+                if not cur or cur == "" then return end
+                local cleaned, wasMod = sanitizeText(cur, rName, rDisplay, rUserId)
+                if wasMod and desc.Text ~= cleaned then
+                    desc.Text = cleaned
+                end
+            end)
+        end
+    end
+
+    local function processImageElement(desc, rUserId)
+        if not desc or not desc.Parent then return end
+        if not (desc:IsA("ImageLabel") or desc:IsA("ImageButton")) then return end
+        local img = desc.Image or ""
+        local isPfp = false
+        if rUserId ~= "" and img:find(rUserId, 1, true) then
+            isPfp = true
+        else
+            local nameLower = desc.Name:lower()
+            if nameLower:find("avatar", 1, true) or nameLower:find("profile", 1, true) or nameLower:find("pfp", 1, true) or nameLower:find("headshot", 1, true) then
+                isPfp = true
+            end
+        end
+        if isPfp then
+            if originalImages[desc] == nil then
+                originalImages[desc] = img
+            end
+            if desc.Image ~= fakeAvatar then
+                desc.Image = fakeAvatar
+            end
+        end
+    end
+
+    local function hookCharacter(char, rName, rDisplay, rUserId)
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            if originalDisplayNames[hum] == nil then
+                originalDisplayNames[hum] = hum.DisplayName
+            end
+            pcall(function() hum.DisplayName = fakeName end)
+        end
+
+        for _, desc in ipairs(char:GetDescendants()) do
+            processTextElement(desc, rName, rDisplay, rUserId)
+        end
+
+        local cConn = char.DescendantAdded:Connect(function(desc)
+            if not streamerModeActive then return end
+            processTextElement(desc, rName, rDisplay, rUserId)
+        end)
+        table.insert(streamerConns, cConn)
+    end
+
+    local function applyStreamerSpoof()
+        local rName = LocalPlayer.Name or ""
+        local rDisplay = LocalPlayer.DisplayName or ""
+        local rUserId = tostring(LocalPlayer.UserId or "")
+
+        -- 1. Perso local
+        hookCharacter(LocalPlayer.Character, rName, rDisplay, rUserId)
+
+        -- Listener pour le respawn
+        local charAddedConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
+            if not streamerModeActive then return end
+            task.wait(0.1)
+            hookCharacter(newChar, rName, rDisplay, rUserId)
+        end)
+        table.insert(streamerConns, charAddedConn)
+
+        -- 2. PlayerGui initial scan + event listener
+        local pGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+        if pGui then
+            for _, desc in ipairs(pGui:GetDescendants()) do
+                processTextElement(desc, rName, rDisplay, rUserId)
+                processImageElement(desc, rUserId)
+            end
+
+            local pGuiConn = pGui.DescendantAdded:Connect(function(desc)
+                if not streamerModeActive then return end
+                processTextElement(desc, rName, rDisplay, rUserId)
+                processImageElement(desc, rUserId)
+            end)
+            table.insert(streamerConns, pGuiConn)
+        end
+
+        -- 3. CoreGui initial scan + event listener (safe pcall)
+        pcall(function()
+            local coreGui = game:GetService("CoreGui")
+            for _, desc in ipairs(coreGui:GetDescendants()) do
+                processTextElement(desc, rName, rDisplay, rUserId)
+                processImageElement(desc, rUserId)
+            end
+
+            local coreConn = coreGui.DescendantAdded:Connect(function(desc)
+                if not streamerModeActive then return end
+                processTextElement(desc, rName, rDisplay, rUserId)
+                processImageElement(desc, rUserId)
+            end)
+            table.insert(streamerConns, coreConn)
+        end)
+    end
+
+    local function restoreStreamerOriginals()
+        for _, conn in ipairs(streamerConns) do
+            pcall(function() conn:Disconnect() end)
+        end
+        table.clear(streamerConns)
+
+        for desc, conn in pairs(propertyConns) do
+            pcall(function() conn:Disconnect() end)
+        end
+        table.clear(propertyConns)
+
+        for obj, origText in pairs(originalTextMap) do
+            if obj and obj.Parent then
+                pcall(function() obj.Text = origText end)
+            end
+        end
+        table.clear(originalTextMap)
+
+        for obj, origImg in pairs(originalImages) do
+            if obj and obj.Parent then
+                pcall(function() obj.Image = origImg end)
+            end
+        end
+        table.clear(originalImages)
+
+        for hum, origDisp in pairs(originalDisplayNames) do
+            if hum and hum.Parent then
+                pcall(function() hum.DisplayName = origDisp end)
+            end
+        end
+        table.clear(originalDisplayNames)
+    end
+
+    local function toggleStreamerMode(enabled)
+        streamerModeActive = enabled
+        V.StreamerMode = enabled
+
+        restoreStreamerOriginals()
+
+        if enabled then
+            applyStreamerSpoof()
+            notify("Protection", "Mode Streamer ACTIF (Identite Spoofee : " .. fakeName .. ")", Color3.fromRGB(80, 200, 120))
+        else
+            notify("Protection", "Mode Streamer DESACTIVE (Identite Restauree)", Color3.fromRGB(255, 90, 90))
+        end
+    end
+
+    createToggle("Mode Streamer (Spoof Identite)", false, function(enabled)
+        toggleStreamerMode(enabled)
+    end, ProtectionContent, "StreamerMode")
+
+    local fakeNamesList = {"Guest_1337", "Noob_Player", "BaconHair", "Anonymous", "Player1"}
+    createButton("Changer Pseudo Fake", function()
+        local cur = fakeName
+        local idx = 1
+        for i, n in ipairs(fakeNamesList) do
+            if n == cur then idx = i break end
+        end
+        idx = (idx % #fakeNamesList) + 1
+        fakeName = fakeNamesList[idx]
+        if streamerModeActive then
+            restoreStreamerOriginals()
+            applyStreamerSpoof()
+        end
+        notify("Protection", "Nouveau Pseudo Fake : " .. fakeName, Color3.fromRGB(145, 120, 255))
+    end, ProtectionContent, "Changer")
+end
 
 
 createLabel("PLAYER PHYSICS", MeContent)
@@ -13322,6 +13644,11 @@ createToggle("NPCs ESP (Entités / PNJ)", false, function(enabled)
     V.ESPNPC = enabled
     refreshESP()
 end, ESPContent, "ESPNPC")
+
+createToggle("Anti-Desync Resolver (Visuels)", false, function(enabled)
+    V.ESPDesyncResolver = enabled
+    notify("ESP", "Anti-Desync Resolver " .. (enabled and "ACTIF" or "DESACTIVE"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, ESPContent, "ESPDesyncResolver")
 createToggle("X-Ray (Vision murs optimisée)", false, function(enabled)
     toggleXRay(enabled)
 end, ESPContent, "XRay")
