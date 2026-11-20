@@ -4235,6 +4235,7 @@ local Colors = {
 }
 
 local CategoryIcons = {
+	Information = "rbxassetid://7733964719",
 	Movement = "rbxassetid://7733955740",
 	Me = "rbxassetid://7743875962",
 	Protection = "rbxassetid://7734056608",
@@ -4857,7 +4858,7 @@ PanelTitle.Size = UDim2.new(0, 220, 1, 0)
 PanelTitle.Position = UDim2.new(0, 22, 0, 0)
 PanelTitle.BackgroundTransparency = 1
 PanelTitle.Font = Enum.Font.GothamBold
-PanelTitle.Text = "Movement"
+PanelTitle.Text = "Information"
 PanelTitle.TextColor3 = Colors.Text
 PanelTitle.TextSize = 17
 PanelTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -5417,6 +5418,7 @@ function createToggleCard(parent, text, subtext, order, getter, setter)
 end
 
 categories = {
+	{ key = "Information", title = "Information" },
 	{ key = "Movement", title = "Movement" },
 	{ key = "Me", title = "Me" },
 	{ key = "Protection", title = "Protection" },
@@ -6631,7 +6633,7 @@ end
 
 minimized = false
 panelPos = defaultWindowPos
-currentCategory = "Movement"
+currentCategory = "Information"
 railButtons = {}
 
 function switchCategory(key)
@@ -8294,6 +8296,7 @@ createKeySystemUI()
 end)
 
 ChatContent = nil
+InformationContent = ContentFrames["Information"]
 SpyContent = ContentFrames["Spy"]
 ProtectionContent = ContentFrames["Protection"]
 MovementContent = ContentFrames["Movement"]
@@ -8452,27 +8455,6 @@ function addConnection(conn)
     table.insert(C.All, conn)
 end
 
-V.AntiBlockConn = RunService.Heartbeat:Connect(function()
-    pcall(function()
-        local char = LocalPlayer.Character
-        if char then
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local parts = workspace:GetPartBoundsInBox(hrp.CFrame, Vector3.new(8, 8, 8))
-                for _, part in ipairs(parts) do
-                    local name = part.Name:lower()
-                    local isBarrier = (name:match("block") or name:match("trap") or name:match("barrier") or name:match("anticheat")) and part.Size.Magnitude < 6
-                    if isBarrier then
-                        if part.Parent ~= char and not part:IsDescendantOf(char) then
-                            part:Destroy()
-                        end
-                    end
-                end
-            end
-        end
-    end)
-end)
-addConnection(V.AntiBlockConn)
 
 currentFPS = 60
 frames = 0
@@ -8657,6 +8639,11 @@ invisSound.Parent = game:GetService("Workspace")
 
 invisOriginalTrans = {}
 local invisActive = false
+local invisOriginalTrans = {}
+local invisOriginalModifiers = {}
+local invisOriginalShadows = {}
+local invisOriginalEffects = {}
+local invisOrigDisplayNameType = nil
 
 function toggleInvisibility(enabled)
     local targetState
@@ -8680,83 +8667,100 @@ function toggleInvisibility(enabled)
             pcall(function() if invisSound then invisSound:Play() end end)
 
             if invisActive then
-                -- Sauvegarder les transparences originales
+                -- Sauvegarder les etats originaux
                 invisOriginalTrans = {}
+                invisOriginalModifiers = {}
+                invisOriginalShadows = {}
+                invisOriginalEffects = {}
+                invisOrigDisplayNameType = hum.DisplayDistanceType
+
+                -- Cacher le nom au-dessus de la tete
+                pcall(function() hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end)
+
                 for _, descendant in ipairs(char:GetDescendants()) do
                     if descendant:IsA("BasePart") then
                         invisOriginalTrans[descendant] = descendant.Transparency
-                        local pName = descendant.Name:lower()
-                        if pName == "humanoidrootpart" or pName:find("root") or pName:find("hitbox") or pName:find("collision") or descendant.Transparency >= 0.95 then
-                            descendant.Transparency = 1
-                            descendant.LocalTransparencyModifier = 1
-                        else
-                            -- Vue fantôme à 50% de transparence pour que le joueur voie parfaitement son personnage
-                            descendant.Transparency = 0.5
-                            descendant.LocalTransparencyModifier = 0.5
-                        end
+                        invisOriginalModifiers[descendant] = descendant.LocalTransparencyModifier
+                        invisOriginalShadows[descendant] = descendant.CastShadow
+                        descendant.Transparency = 1
+                        descendant.LocalTransparencyModifier = 1
+                        descendant.CastShadow = false
                     elseif descendant:IsA("Decal") then
                         invisOriginalTrans[descendant] = descendant.Transparency
-                        if descendant.Transparency < 0.95 then
-                            descendant.Transparency = 0.5
-                        end
+                        descendant.Transparency = 1
+                    elseif descendant:IsA("ParticleEmitter") or descendant:IsA("Trail") or descendant:IsA("Beam") or descendant:IsA("Fire") or descendant:IsA("Smoke") or descendant:IsA("Sparkles") or descendant:IsA("Highlight") then
+                        invisOriginalEffects[descendant] = descendant.Enabled
+                        descendant.Enabled = false
                     end
                 end
 
                 if V.InvisConn then V.InvisConn:Disconnect() end
+                -- RenderStepped force l'invisibilite totale a 100% pour contrer le CameraScript natif de Roblox
                 V.InvisConn = RunService.RenderStepped:Connect(function()
                     local c = LocalPlayer.Character
                     if not c or not invisActive then return end
                     for _, part in ipairs(c:GetDescendants()) do
                         if part:IsA("BasePart") then
-                            local pName = part.Name:lower()
-                            if pName == "humanoidrootpart" or pName:find("root") or pName:find("hitbox") or pName:find("collision") then
-                                part.Transparency = 1
-                                part.LocalTransparencyModifier = 1
-                            else
-                                if part.Transparency ~= 0.5 and (not invisOriginalTrans[part] or invisOriginalTrans[part] < 0.95) then
-                                    part.Transparency = 0.5
-                                    part.LocalTransparencyModifier = 0.5
-                                end
-                            end
+                            part.Transparency = 1
+                            part.LocalTransparencyModifier = 1
                         elseif part:IsA("Decal") then
-                            if part.Transparency ~= 0.5 and (not invisOriginalTrans[part] or invisOriginalTrans[part] < 0.95) then
-                                part.Transparency = 0.5
-                            end
+                            part.Transparency = 1
+                        elseif part:IsA("ParticleEmitter") or part:IsA("Trail") or part:IsA("Beam") or part:IsA("Highlight") then
+                            if part.Enabled then part.Enabled = false end
                         end
                     end
                 end)
                 addConnection(V.InvisConn)
 
-                notify("Invisibility", "Mode Invisible Actif", Color3.fromRGB(80, 200, 120))
+                notify("Invisibility", "Mode Invisible Actif (100% Invisible)", Color3.fromRGB(80, 200, 120))
             else
                 if V.InvisConn then V.InvisConn:Disconnect() V.InvisConn = nil end
 
-                if invisOriginalTrans and next(invisOriginalTrans) then
-                    for part, origTrans in pairs(invisOriginalTrans) do
-                        if part and part.Parent then
-                            pcall(function()
-                                part.Transparency = origTrans
-                                if part:IsA("BasePart") then
-                                    part.LocalTransparencyModifier = (origTrans >= 0.95) and 1 or 0
+                -- Restaurer le nom au-dessus de la tete
+                pcall(function()
+                    hum.DisplayDistanceType = invisOrigDisplayNameType or Enum.HumanoidDisplayDistanceType.Viewer
+                end)
+
+                -- Restaurer les transparences exactes
+                for part, origTrans in pairs(invisOriginalTrans) do
+                    if part and part.Parent then
+                        pcall(function()
+                            part.Transparency = origTrans
+                            if part:IsA("BasePart") then
+                                local origMod = invisOriginalModifiers[part]
+                                part.LocalTransparencyModifier = origMod or ((origTrans >= 0.95) and 1 or 0)
+                                if invisOriginalShadows[part] ~= nil then
+                                    part.CastShadow = invisOriginalShadows[part]
                                 end
-                            end)
-                        end
-                    end
-                    invisOriginalTrans = {}
-                else
-                    for _, part in ipairs(char:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            local pName = part.Name:lower()
-                            if pName == "humanoidrootpart" or pName:find("root") or pName:find("hitbox") or pName:find("collision") then
-                                part.Transparency = 1
-                                part.LocalTransparencyModifier = 1
-                            elseif part.Transparency == 0.5 then
-                                part.Transparency = 0
-                                part.LocalTransparencyModifier = 0
                             end
-                        elseif part:IsA("Decal") and part.Transparency == 0.5 then
+                        end)
+                    end
+                end
+
+                for effect, origEnabled in pairs(invisOriginalEffects) do
+                    if effect and effect.Parent then
+                        pcall(function() effect.Enabled = origEnabled end)
+                    end
+                end
+
+                table.clear(invisOriginalTrans)
+                table.clear(invisOriginalModifiers)
+                table.clear(invisOriginalShadows)
+                table.clear(invisOriginalEffects)
+
+                -- Securite : restaurer les parties du corps si non sauvegardees
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        local pName = part.Name:lower()
+                        if pName == "humanoidrootpart" or pName:find("root") or pName:find("hitbox") then
+                            part.Transparency = 1
+                            part.LocalTransparencyModifier = 1
+                        elseif part.Transparency == 1 then
                             part.Transparency = 0
+                            part.LocalTransparencyModifier = 0
                         end
+                    elseif part:IsA("Decal") and part.Transparency == 1 then
+                        part.Transparency = 0
                     end
                 end
 
@@ -8767,7 +8771,10 @@ function toggleInvisibility(enabled)
 end
 
 addConnection(LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.5)
+    task.wait(0.4)
+    if V and V.Invis then
+        toggleInvisibility(true)
+    end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if hum then
         if V and V.AntiRagdoll then
@@ -10372,12 +10379,486 @@ function toggleClickTP(enabled)
         notify("Fun","Épée Click TP retirée.", Color3.fromRGB(255, 90, 90))
     end
 end
+initStep = "cablage Information"
+-- ==============================================================
+-- [INFORMATIONS & STATUT DU SCRIPT]
+-- ==============================================================
+-- Change facilement le statut ici :
+-- "FONCTIONNEL" = Point Vert (100% Operationnel)
+-- "PROBLEMES"   = Point Jaune (Quelques problemes / instable)
+-- "OFFLINE"     = Point Rouge (Ne marche pas / patche)
+local SCRIPT_STATUS = "FONCTIONNEL"
+
+do
+    InformationContent.ScrollBarThickness = 3
+    InformationContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    InformationContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+    -- Fonction de copie multi-executors dediee au Discord
+    local function safeSetClipboard(str)
+        str = tostring(str)
+        local fn = setclipboard 
+            or toclipboard 
+            or set_clipboard 
+            or writeclipboard
+            or (syn and syn.write_clipboard) 
+            or (Clipboard and Clipboard.set)
+        if not fn and getgenv then
+            local g = getgenv()
+            fn = g.setclipboard or g.toclipboard or g.set_clipboard or g.writeclipboard
+        end
+        if not fn and getfenv then
+            local env = getfenv(0)
+            fn = env.setclipboard or env.toclipboard or env.set_clipboard
+        end
+        if not fn and _G then
+            fn = _G.setclipboard or _G.toclipboard
+        end
+        
+        local success = false
+        if fn then
+            local ok = pcall(function() fn(str) end)
+            if ok then success = true end
+        end
+        return success
+    end
+
+    createLabel("STATUT DU SCRIPT", InformationContent)
+
+    -- Status Hero Card parfaitement centree
+    local statusCard = createCard(InformationContent, 0, 64)
+
+    local statusColor = Color3.fromRGB(46, 204, 113)
+    local statusTitle = "Statut : 100% Fonctionnel"
+    local statusDesc = "Toutes les options sont a jour et fonctionnent parfaitement."
+    local statusBadge = "ACTIF"
+
+    local currentStatusUpper = string.upper(tostring(SCRIPT_STATUS or "FONCTIONNEL"))
+    if currentStatusUpper == "PROBLEMES" or currentStatusUpper == "PROBLEME" or currentStatusUpper == "WARNING" then
+        statusColor = Color3.fromRGB(241, 196, 15)
+        statusTitle = "Statut : Quelques problemes"
+        statusDesc = "Certaines fonctionnalites sont instables ou en cours de fix."
+        statusBadge = "INSTABLE"
+    elseif currentStatusUpper == "OFFLINE" or currentStatusUpper == "DOWN" or currentStatusUpper == "PATCH" or currentStatusUpper == "PATCHED" then
+        statusColor = Color3.fromRGB(231, 76, 60)
+        statusTitle = "Statut : Ne fonctionne pas"
+        statusDesc = "Le script rencontre des dysfonctionnements majeurs (patche)."
+        statusBadge = "OFFLINE"
+    end
+
+    -- 1. Onde radar dynamique (Expansion & Fade)
+    local ping = Instance.new("Frame")
+    ping.AnchorPoint = Vector2.new(0.5, 0.5)
+    ping.Size = UDim2.new(0, 10, 0, 10)
+    ping.Position = UDim2.new(0, 26, 0.5, 0)
+    ping.BackgroundColor3 = statusColor
+    ping.BackgroundTransparency = 0.35
+    ping.BorderSizePixel = 0
+    ping.ZIndex = 8
+    ping.Parent = statusCard
+    local pingCorner = Instance.new("UICorner")
+    pingCorner.CornerRadius = UDim.new(1, 0)
+    pingCorner.Parent = ping
+
+    -- 2. Halo doux en arriere-plan
+    local halo = Instance.new("Frame")
+    halo.AnchorPoint = Vector2.new(0.5, 0.5)
+    halo.Size = UDim2.new(0, 18, 0, 18)
+    halo.Position = UDim2.new(0, 26, 0.5, 0)
+    halo.BackgroundColor3 = statusColor
+    halo.BackgroundTransparency = 0.75
+    halo.BorderSizePixel = 0
+    halo.ZIndex = 9
+    halo.Parent = statusCard
+    local haloCorner = Instance.new("UICorner")
+    haloCorner.CornerRadius = UDim.new(1, 0)
+    haloCorner.Parent = halo
+
+    -- 3. Point vert central net et respirant
+    local dot = Instance.new("Frame")
+    dot.AnchorPoint = Vector2.new(0.5, 0.5)
+    dot.Size = UDim2.new(0, 10, 0, 10)
+    dot.Position = UDim2.new(0, 26, 0.5, 0)
+    dot.BackgroundColor3 = statusColor
+    dot.BorderSizePixel = 0
+    dot.ZIndex = 10
+    dot.Parent = statusCard
+    local dotCorner = Instance.new("UICorner")
+    dotCorner.CornerRadius = UDim.new(1, 0)
+    dotCorner.Parent = dot
+
+    local dotScale = Instance.new("UIScale")
+    dotScale.Scale = 1
+    dotScale.Parent = dot
+
+    -- Animations ultra-fluides C++ natives (zero lag, zero saccade)
+    local pingAnim = TweenService:Create(ping, TweenInfo.new(
+        1.3,
+        Enum.EasingStyle.Quart,
+        Enum.EasingDirection.Out,
+        -1,
+        false
+    ), {
+        Size = UDim2.new(0, 30, 0, 30),
+        BackgroundTransparency = 1
+    })
+    pingAnim:Play()
+
+    local dotPulse = TweenService:Create(dotScale, TweenInfo.new(
+        1.1,
+        Enum.EasingStyle.Sine,
+        Enum.EasingDirection.InOut,
+        -1,
+        true
+    ), {
+        Scale = 1.2
+    })
+    dotPulse:Play()
+
+    -- Container des textes pour un centrage vertical mathematique parfait
+    local sTextContainer = Instance.new("Frame")
+    sTextContainer.Size = UDim2.new(1, -165, 0, 36)
+    sTextContainer.Position = UDim2.new(0, 48, 0.5, -18)
+    sTextContainer.BackgroundTransparency = 1
+    sTextContainer.BorderSizePixel = 0
+    sTextContainer.ZIndex = 9
+    sTextContainer.Parent = statusCard
+
+    local sTitleLbl = Instance.new("TextLabel")
+    sTitleLbl.Size = UDim2.new(1, 0, 0, 18)
+    sTitleLbl.Position = UDim2.new(0, 0, 0, 0)
+    sTitleLbl.BackgroundTransparency = 1
+    sTitleLbl.Text = statusTitle
+    sTitleLbl.TextColor3 = statusColor
+    sTitleLbl.Font = Enum.Font.GothamBold
+    sTitleLbl.TextSize = 13
+    sTitleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    sTitleLbl.ZIndex = 9
+    sTitleLbl.Parent = sTextContainer
+
+    local sDescLbl = Instance.new("TextLabel")
+    sDescLbl.Size = UDim2.new(1, 0, 0, 16)
+    sDescLbl.Position = UDim2.new(0, 0, 0, 19)
+    sDescLbl.BackgroundTransparency = 1
+    sDescLbl.Text = statusDesc
+    sDescLbl.TextColor3 = Colors.TextDim or Color3.fromRGB(150, 150, 170)
+    sDescLbl.Font = Enum.Font.Gotham
+    sDescLbl.TextSize = 10
+    sDescLbl.TextXAlignment = Enum.TextXAlignment.Left
+    sDescLbl.ZIndex = 9
+    sDescLbl.Parent = sTextContainer
+
+    -- Status Badge Pill centre a droite
+    local badge = Instance.new("Frame")
+    badge.Size = UDim2.new(0, 72, 0, 24)
+    badge.Position = UDim2.new(1, -84, 0.5, -12)
+    badge.BackgroundColor3 = statusColor
+    badge.BackgroundTransparency = 0.85
+    badge.BorderSizePixel = 0
+    badge.ZIndex = 9
+    badge.Parent = statusCard
+    local badgeCorner = Instance.new("UICorner")
+    badgeCorner.CornerRadius = UDim.new(0, 6)
+    badgeCorner.Parent = badge
+    local badgeStroke = Instance.new("UIStroke")
+    badgeStroke.Color = statusColor
+    badgeStroke.Thickness = 1
+    badgeStroke.Transparency = 0.4
+    badgeStroke.Parent = badge
+
+    local badgeLbl = Instance.new("TextLabel")
+    badgeLbl.Size = UDim2.new(1, 0, 1, 0)
+    badgeLbl.BackgroundTransparency = 1
+    badgeLbl.Text = statusBadge
+    badgeLbl.TextColor3 = statusColor
+    badgeLbl.Font = Enum.Font.GothamBold
+    badgeLbl.TextSize = 10
+    badgeLbl.TextXAlignment = Enum.TextXAlignment.Center
+    badgeLbl.TextYAlignment = Enum.TextYAlignment.Center
+    badgeLbl.ZIndex = 10
+    badgeLbl.Parent = badge
+
+    createLabel("INFORMATIONS & MISES A JOUR", InformationContent)
+
+    -- French Month Formatter
+    local moisFR = {
+        ["01"] = "Janvier", ["02"] = "Fevrier", ["03"] = "Mars", ["04"] = "Avril",
+        ["05"] = "Mai", ["06"] = "Juin", ["07"] = "Juillet", ["08"] = "Aout",
+        ["09"] = "Septembre", ["10"] = "Octobre", ["11"] = "Novembre", ["12"] = "Decembre"
+    }
+
+    local function formatFrenchDate(isoString)
+        if not isoString then return "20 Novembre 2026 a 20:56 (Heure FR)" end
+        local y, m, d, hh, mm = string.match(isoString, "(%d+)-(%d+)-(%d+)T(%d+):(%d+)")
+        if not (y and m and d and hh and mm) then
+            return "20 Novembre 2026 a 20:56 (Heure FR)"
+        end
+
+        local hourNum = tonumber(hh) or 0
+        local dayNum = tonumber(d) or 1
+        local yearNum = tonumber(y) or 2026
+
+        -- Heure francaise (CET = UTC+1 en hiver)
+        hourNum = hourNum + 1
+        if hourNum >= 24 then
+            hourNum = hourNum - 24
+            dayNum = dayNum + 1
+        end
+
+        local moisNom = moisFR[m] or m
+        local hourStr = string.format("%02d", hourNum)
+        return string.format("%d %s %d a %s:%s (Heure FR)", dayNum, moisNom, yearNum, hourStr, mm)
+    end
+
+    -- Card 1: Last Update Date (GitHub commits fetch) - Purement visuel, NON CLIQUABLE
+    local updateCard = createCard(InformationContent, 0, 52)
+
+    local uTitle = Instance.new("TextLabel")
+    uTitle.Size = UDim2.new(1, -110, 0, 16)
+    uTitle.Position = UDim2.new(0, 14, 0, 9)
+    uTitle.BackgroundTransparency = 1
+    uTitle.Text = "Derniere Mise a Jour (GitHub)"
+    uTitle.TextColor3 = Colors.Text or Color3.fromRGB(235, 235, 245)
+    uTitle.Font = Enum.Font.GothamMedium
+    uTitle.TextSize = 12
+    uTitle.TextXAlignment = Enum.TextXAlignment.Left
+    uTitle.ZIndex = 9
+    uTitle.Parent = updateCard
+
+    local uDateLbl = Instance.new("TextLabel")
+    uDateLbl.Size = UDim2.new(1, -110, 0, 15)
+    uDateLbl.Position = UDim2.new(0, 14, 0, 27)
+    uDateLbl.BackgroundTransparency = 1
+    uDateLbl.Text = "20 Novembre 2026 a 20:56 (Heure FR)"
+    uDateLbl.TextColor3 = Colors.Accent or Color3.fromRGB(145, 120, 255)
+    uDateLbl.Font = Enum.Font.GothamBold
+    uDateLbl.TextSize = 11
+    uDateLbl.TextXAlignment = Enum.TextXAlignment.Left
+    uDateLbl.ZIndex = 9
+    uDateLbl.Parent = updateCard
+
+    -- Tag / Badge "GitHub" en gris PUREMENT VISUEL (Non cliquable)
+    local gitTag = Instance.new("Frame")
+    gitTag.Size = UDim2.new(0, 74, 0, 24)
+    gitTag.Position = UDim2.new(1, -86, 0.5, -12)
+    gitTag.BackgroundColor3 = Color3.fromRGB(24, 24, 30)
+    gitTag.BorderSizePixel = 0
+    gitTag.ZIndex = 9
+    gitTag.Parent = updateCard
+    local gtCorner = Instance.new("UICorner")
+    gtCorner.CornerRadius = UDim.new(0, 6)
+    gtCorner.Parent = gitTag
+    local gtStroke = Instance.new("UIStroke")
+    gtStroke.Color = Colors.Border or Color3.fromRGB(44, 46, 62)
+    gtStroke.Thickness = 1
+    gtStroke.Parent = gitTag
+
+    local gtLbl = Instance.new("TextLabel")
+    gtLbl.Size = UDim2.new(1, 0, 1, 0)
+    gtLbl.BackgroundTransparency = 1
+    gtLbl.Text = "GitHub"
+    gtLbl.TextColor3 = Color3.fromRGB(150, 150, 165)
+    gtLbl.Font = Enum.Font.GothamBold
+    gtLbl.TextSize = 11
+    gtLbl.TextXAlignment = Enum.TextXAlignment.Center
+    gtLbl.TextYAlignment = Enum.TextYAlignment.Center
+    gtLbl.ZIndex = 10
+    gtLbl.Parent = gitTag
+
+    -- Fetch GitHub Commit Timestamp with French Conversion
+    task.spawn(function()
+        local success, res = pcall(function()
+            local req = (syn and syn.request) or (http and http.request) or http_request or request
+            if req then
+                local resp = req({
+                    Url = "https://api.github.com/repos/ntopng/lua-utils-code/commits?path=main2.lua&page=1&per_page=1",
+                    Method = "GET",
+                    Headers = { ["User-Agent"] = "PearlScript" }
+                })
+                if resp and resp.Body then return resp.Body end
+            end
+            return game:HttpGet("https://api.github.com/repos/ntopng/lua-utils-code/commits?path=main2.lua&page=1&per_page=1")
+        end)
+        if success and res and type(res) == "string" then
+            local iso = string.match(res, '"date"%s*:%s*"([^"]+)"')
+            if iso then
+                uDateLbl.Text = formatFrenchDate(iso)
+            end
+        end
+    end)
+
+    -- Card 2: Creator (COLE)
+    local creatorCard = createCard(InformationContent, 0, 48)
+    local cTitle = Instance.new("TextLabel")
+    cTitle.Size = UDim2.new(1, -120, 0, 16)
+    cTitle.Position = UDim2.new(0, 14, 0, 8)
+    cTitle.BackgroundTransparency = 1
+    cTitle.Text = "Createur du Script"
+    cTitle.TextColor3 = Colors.Text or Color3.fromRGB(235, 235, 245)
+    cTitle.Font = Enum.Font.GothamMedium
+    cTitle.TextSize = 12
+    cTitle.TextXAlignment = Enum.TextXAlignment.Left
+    cTitle.ZIndex = 9
+    cTitle.Parent = creatorCard
+
+    local cName = Instance.new("TextLabel")
+    cName.Size = UDim2.new(1, -120, 0, 16)
+    cName.Position = UDim2.new(0, 14, 0, 24)
+    cName.BackgroundTransparency = 1
+    cName.Text = "COLE"
+    cName.TextColor3 = Colors.Accent or Color3.fromRGB(145, 120, 255)
+    cName.Font = Enum.Font.GothamBold
+    cName.TextSize = 12
+    cName.TextXAlignment = Enum.TextXAlignment.Left
+    cName.ZIndex = 9
+    cName.Parent = creatorCard
+
+    local cBadge = Instance.new("Frame")
+    cBadge.Size = UDim2.new(0, 96, 0, 24)
+    cBadge.Position = UDim2.new(1, -108, 0.5, -12)
+    cBadge.BackgroundColor3 = Color3.fromRGB(35, 28, 55)
+    cBadge.BorderSizePixel = 0
+    cBadge.ZIndex = 9
+    cBadge.Parent = creatorCard
+    local cbCorner2 = Instance.new("UICorner") cbCorner2.CornerRadius = UDim.new(0, 6) cbCorner2.Parent = cBadge
+    local cbStroke2 = Instance.new("UIStroke") cbStroke2.Color = Colors.Accent or Color3.fromRGB(145, 120, 255) cbStroke2.Thickness = 1 cbStroke2.Transparency = 0.5 cbStroke2.Parent = cBadge
+
+    local cbLbl = Instance.new("TextLabel")
+    cbLbl.Size = UDim2.new(1, 0, 1, 0)
+    cbLbl.BackgroundTransparency = 1
+    cbLbl.Text = "Developpeur"
+    cbLbl.TextColor3 = Colors.Accent or Color3.fromRGB(145, 120, 255)
+    cbLbl.Font = Enum.Font.GothamBold
+    cbLbl.TextSize = 10
+    cbLbl.TextXAlignment = Enum.TextXAlignment.Center
+    cbLbl.TextYAlignment = Enum.TextYAlignment.Center
+    cbLbl.ZIndex = 10
+    cbLbl.Parent = cBadge
+
+    -- Card 3: Discord (.gg/6pTxDuk3RG)
+    local discordCard = createCard(InformationContent, 0, 52)
+    local dTitle = Instance.new("TextLabel")
+    dTitle.Size = UDim2.new(1, -120, 0, 16)
+    dTitle.Position = UDim2.new(0, 14, 0, 9)
+    dTitle.BackgroundTransparency = 1
+    dTitle.Text = "Communaute Discord"
+    dTitle.TextColor3 = Colors.Text or Color3.fromRGB(235, 235, 245)
+    dTitle.Font = Enum.Font.GothamMedium
+    dTitle.TextSize = 12
+    dTitle.TextXAlignment = Enum.TextXAlignment.Left
+    dTitle.ZIndex = 9
+    dTitle.Parent = discordCard
+
+    local dLinkLbl = Instance.new("TextLabel")
+    dLinkLbl.Size = UDim2.new(1, -120, 0, 14)
+    dLinkLbl.Position = UDim2.new(0, 14, 0, 27)
+    dLinkLbl.BackgroundTransparency = 1
+    dLinkLbl.Text = ".gg/6pTxDuk3RG"
+    dLinkLbl.TextColor3 = Color3.fromRGB(114, 137, 218)
+    dLinkLbl.Font = Enum.Font.GothamBold
+    dLinkLbl.TextSize = 11
+    dLinkLbl.TextXAlignment = Enum.TextXAlignment.Left
+    dLinkLbl.ZIndex = 9
+    dLinkLbl.Parent = discordCard
+
+    local copyDiscBtn = Instance.new("TextButton")
+    copyDiscBtn.Size = UDim2.new(0, 78, 0, 26)
+    copyDiscBtn.Position = UDim2.new(1, -90, 0.5, -13)
+    copyDiscBtn.BackgroundColor3 = Color3.fromRGB(40, 48, 85)
+    copyDiscBtn.BorderSizePixel = 0
+    copyDiscBtn.Text = "Copier"
+    copyDiscBtn.TextColor3 = Color3.fromRGB(210, 225, 255)
+    copyDiscBtn.Font = Enum.Font.GothamBold
+    copyDiscBtn.TextSize = 11
+    copyDiscBtn.Active = true
+    copyDiscBtn.AutoButtonColor = false
+    copyDiscBtn.ZIndex = 14
+    copyDiscBtn.Parent = discordCard
+    local dcbCorner = Instance.new("UICorner") dcbCorner.CornerRadius = UDim.new(0, 6) dcbCorner.Parent = copyDiscBtn
+    local dcbStroke = Instance.new("UIStroke") dcbStroke.Color = Color3.fromRGB(88, 101, 242) dcbStroke.Thickness = 1 dcbStroke.Parent = copyDiscBtn
+
+    local lastDiscCopy = 0
+    local function copyDiscordLink()
+        local now = os.clock()
+        if now - lastDiscCopy < 0.4 then return end
+        lastDiscCopy = now
+        playClick()
+        local discordLink = ".gg/6pTxDuk3RG"
+        safeSetClipboard(discordLink)
+        copyDiscBtn.Text = "Copie !"
+        copyDiscBtn.TextColor3 = Color3.fromRGB(46, 204, 113)
+        notify("Discord", "Lien .gg/6pTxDuk3RG copie !", Color3.fromRGB(114, 137, 218))
+        task.delay(1.3, function()
+            if copyDiscBtn and copyDiscBtn.Parent then
+                copyDiscBtn.Text = "Copier"
+                copyDiscBtn.TextColor3 = Color3.fromRGB(210, 225, 255)
+            end
+        end)
+    end
+
+    copyDiscBtn.MouseButton1Click:Connect(copyDiscordLink)
+    copyDiscBtn.Activated:Connect(copyDiscordLink)
+
+    copyDiscBtn.MouseEnter:Connect(function()
+        TweenService:Create(copyDiscBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(88, 101, 242), TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+    end)
+    copyDiscBtn.MouseLeave:Connect(function()
+        TweenService:Create(copyDiscBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(40, 48, 85), TextColor3 = (copyDiscBtn.Text == "Copie !" and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(210, 225, 255))}):Play()
+    end)
+
+    -- Card 4: Version & Build
+    local verCard = createCard(InformationContent, 0, 48)
+    local vTitle = Instance.new("TextLabel")
+    vTitle.Size = UDim2.new(1, -120, 0, 16)
+    vTitle.Position = UDim2.new(0, 14, 0, 8)
+    vTitle.BackgroundTransparency = 1
+    vTitle.Text = "Version du Script"
+    vTitle.TextColor3 = Colors.Text or Color3.fromRGB(235, 235, 245)
+    vTitle.Font = Enum.Font.GothamMedium
+    vTitle.TextSize = 12
+    vTitle.TextXAlignment = Enum.TextXAlignment.Left
+    vTitle.ZIndex = 9
+    vTitle.Parent = verCard
+
+    local vSub = Instance.new("TextLabel")
+    vSub.Size = UDim2.new(1, -120, 0, 14)
+    vSub.Position = UDim2.new(0, 14, 0, 24)
+    vSub.BackgroundTransparency = 1
+    vSub.Text = "Pearl Edition • Build 2.0.4"
+    vSub.TextColor3 = Colors.TextDim or Color3.fromRGB(150, 150, 170)
+    vSub.Font = Enum.Font.Gotham
+    vSub.TextSize = 10
+    vSub.TextXAlignment = Enum.TextXAlignment.Left
+    vSub.ZIndex = 9
+    vSub.Parent = verCard
+
+    local vBadge = Instance.new("Frame")
+    vBadge.Size = UDim2.new(0, 56, 0, 22)
+    vBadge.Position = UDim2.new(1, -68, 0.5, -11)
+    vBadge.BackgroundColor3 = Color3.fromRGB(28, 30, 42)
+    vBadge.BorderSizePixel = 0
+    vBadge.ZIndex = 9
+    vBadge.Parent = verCard
+    local vbCorner = Instance.new("UICorner") vbCorner.CornerRadius = UDim.new(0, 5) vbCorner.Parent = vBadge
+    local vbStroke = Instance.new("UIStroke") vbStroke.Color = Colors.Border or Color3.fromRGB(44, 46, 62) vbStroke.Thickness = 1 vbStroke.Parent = vBadge
+
+    local vbLbl = Instance.new("TextLabel")
+    vbLbl.Size = UDim2.new(1, 0, 1, 0)
+    vbLbl.BackgroundTransparency = 1
+    vbLbl.Text = "V2.0"
+    vbLbl.TextColor3 = Colors.Accent or Color3.fromRGB(145, 120, 255)
+    vbLbl.Font = Enum.Font.GothamBold
+    vbLbl.TextSize = 10
+    vbLbl.TextXAlignment = Enum.TextXAlignment.Center
+    vbLbl.TextYAlignment = Enum.TextYAlignment.Center
+    vbLbl.ZIndex = 10
+    vbLbl.Parent = vBadge
+end
+
+
 initStep = "cablage Movement"
-createLabel("CLAVIER AZERTY (ZQSD)", MovementContent)
-createToggle("Deplacement Clavier AZERTY (ZQSD)", true, function(enabled)
-    V.KeyboardLayout = enabled and "AZERTY" or "QWERTY"
-    notify("Movement", enabled and "Touches AZERTY (Z:Avancer Q:Gauche S:Reculer D:Droite) ACTIVES" or "Mode QWERTY Actif", Color3.fromRGB(80, 200, 120))
-end, MovementContent, "AZERTYLayout")
+-- Clavier configure en AZERTY par defaut
+V.KeyboardLayout = "AZERTY" 
 createLabel("SPEED & JUMP", MovementContent)
 _, _, ToggleSpeed = createToggle("Enable Walk Speed", false, function(enabled)
     V.SpeedEnabled = enabled
