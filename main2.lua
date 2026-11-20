@@ -19,93 +19,47 @@ if not LocalPlayer then
     end
 end
 
-local BlacklistedGames = {
-    [107778070777162] = true,
-    [73934517857372] = true,
-    [134208374070897] = true,
-    [122584270448462] = true
+-- ====================================================================
+-- SYSTÈME DE WHITELIST STRICTE (PEARL HUB)
+-- ====================================================================
+local WhitelistedUsers = {
+    ["@gims_93bandit"] = true,
+    ["gims_93bandit"] = true,
+    ["@myhackv2"] = true,
+    ["myhackv2"] = true,
 }
+_G.PearlWhitelistedUsers = WhitelistedUsers
 
-_G.PearlBlacklistedGames = BlacklistedGames
-
-local BlacklistedUsers = {
-    ["@wwwNuza"] = true,
-}
+local BlacklistedUsers = {}
 _G.PearlBlacklistedUsers = BlacklistedUsers
 
-local function isCurrentGameBlacklisted()
-    local pId = game.PlaceId
-    local gId = game.GameId
-    if BlacklistedGames[pId] or BlacklistedGames[tostring(pId)] then
-        return true
-    end
-    if gId and (BlacklistedGames[gId] or BlacklistedGames[tostring(gId)]) then
-        return true
-    end
-    for k, v in pairs(BlacklistedGames) do
-        if type(k) == "number" and (k == pId or k == gId) and v == true then
-            return true
-        end
-        if type(v) == "number" and (v == pId or v == gId) then
-            return true
-        end
-        if type(v) == "string" and (v == tostring(pId) or v == tostring(gId)) then
-            return true
-        end
-    end
-    return false
-end
-
-local function isCurrentUserBlacklisted()
+local function isCurrentUserWhitelisted()
     if not LocalPlayer then return false end
     local rawName = tostring(LocalPlayer.Name):lower()
     local atName = "@" .. rawName
-    local uId = LocalPlayer.UserId
 
-    if BlacklistedUsers[atName] or BlacklistedUsers[rawName] or BlacklistedUsers[tostring(rawName)] then
-        return true
-    end
-    if uId and (BlacklistedUsers[uId] or BlacklistedUsers[tostring(uId)]) then
+    if WhitelistedUsers[atName] or WhitelistedUsers[rawName] then
         return true
     end
 
-    for k, v in pairs(BlacklistedUsers) do
-        local checkStr = function(val)
-            if type(val) == "string" then
-                local s = val:lower():gsub("%s+", "")
-                if s == rawName or s == atName or (uId and s == tostring(uId)) then
-                    return true
-                end
-            elseif type(val) == "number" and uId and val == uId then
+    for k, v in pairs(WhitelistedUsers) do
+        if type(k) == "string" and v == true then
+            local s = k:lower():gsub("%s+", ""):gsub("^@", "")
+            if s == rawName then
                 return true
             end
-            return false
         end
-
-        if checkStr(k) and v == true then
-            return true
-        end
-        if checkStr(v) then
-            return true
+        if type(v) == "string" then
+            local s = v:lower():gsub("%s+", ""):gsub("^@", "")
+            if s == rawName then
+                return true
+            end
         end
     end
     return false
 end
 
-local function checkBlacklistStatus()
-    local isUserBl = isCurrentUserBlacklisted()
-    if isUserBl then
-        return true, "USER"
-    end
-    local isGameBl = isCurrentGameBlacklisted()
-    if isGameBl then
-        return true, "GAME"
-    end
-    return false, nil
-end
-
-local function showBlacklistMenu(reasonType)
-    local isUserReason = (reasonType == "USER")
+local function showWhitelistMenu()
     local guiTarget = nil
     pcall(function()
         if gethui then
@@ -119,22 +73,22 @@ local function showBlacklistMenu(reasonType)
     if not guiTarget then guiTarget = LocalPlayer:WaitForChild("PlayerGui") end
 
     for _, c in ipairs(guiTarget:GetChildren()) do
-        if c.Name == "PearlBlacklistUI" then
+        if c.Name == "PearlWhitelistUI" or c.Name == "PearlBlacklistUI" then
             c:Destroy()
         end
     end
 
-    local BlacklistGui = Instance.new("ScreenGui")
-    BlacklistGui.Name = "PearlBlacklistUI"
-    BlacklistGui.ResetOnSpawn = false
-    BlacklistGui.DisplayOrder = 100000
-    BlacklistGui.IgnoreGuiInset = true
+    local WhitelistGui = Instance.new("ScreenGui")
+    WhitelistGui.Name = "PearlWhitelistUI"
+    WhitelistGui.ResetOnSpawn = false
+    WhitelistGui.DisplayOrder = 100000
+    WhitelistGui.IgnoreGuiInset = true
     pcall(function()
         if syn and syn.protect_gui then
-            syn.protect_gui(BlacklistGui)
+            syn.protect_gui(WhitelistGui)
         end
     end)
-    BlacklistGui.Parent = guiTarget
+    WhitelistGui.Parent = guiTarget
 
     local function makeCorner(gui, radius)
         local corner = Instance.new("UICorner")
@@ -158,158 +112,58 @@ local function showBlacklistMenu(reasonType)
     Dimmer.Size = UDim2.new(1, 0, 1, 0)
     Dimmer.Position = UDim2.new(0, 0, 0, 0)
     Dimmer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    Dimmer.BackgroundTransparency = 1
+    Dimmer.BackgroundTransparency = 0.45
     Dimmer.BorderSizePixel = 0
     Dimmer.Active = true
-    Dimmer.Parent = BlacklistGui
-    TweenService:Create(Dimmer, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 0.4 }):Play()
-
-    local BubblesFolder = Instance.new("Frame")
-    BubblesFolder.Name = "BubblesFolder"
-    BubblesFolder.Size = UDim2.new(1, 0, 1, 0)
-    BubblesFolder.BackgroundTransparency = 1
-    BubblesFolder.ClipsDescendants = true
-    BubblesFolder.Active = false
-    BubblesFolder.Parent = BlacklistGui
-
-    local miniBubbles = {}
-    for i = 1, 18 do
-        local b = Instance.new("Frame")
-        local sz = math.random(8, 22)
-        b.Size = UDim2.new(0, sz, 0, sz)
-        b.BackgroundColor3 = (math.random() > 0.5) and Color3.fromRGB(145, 120, 255) or Color3.fromRGB(90, 160, 255)
-        b.BackgroundTransparency = math.random(60, 85) / 100
-        b.BorderSizePixel = 0
-        b.Parent = BubblesFolder
-        makeCorner(b, 50)
-        local bs = Instance.new("UIStroke")
-        bs.Color = Color3.fromRGB(255, 255, 255)
-        bs.Transparency = 0.8
-        bs.Thickness = 1
-        bs.Parent = b
-
-        local bData = {
-            frame = b,
-            x = math.random(),
-            y = math.random(),
-            speed = math.random(25, 60) / 1000,
-            swaySpeed = math.random(10, 25) / 10,
-            swayAmp = math.random(5, 15) / 1000,
-            offset = math.random() * math.pi * 2
-        }
-        b.Position = UDim2.new(bData.x, 0, bData.y, 0)
-        table.insert(miniBubbles, bData)
-    end
-
-    local bubbleConn
-    bubbleConn = RunService.RenderStepped:Connect(function(dt)
-        if not BlacklistGui or not BlacklistGui.Parent then
-            if bubbleConn then bubbleConn:Disconnect() end
-            return
-        end
-        local t = tick()
-        for _, b in ipairs(miniBubbles) do
-            b.y = b.y - b.speed * dt
-            if b.y < -0.05 then
-                b.y = 1.05
-                b.x = math.random()
-            end
-            local curX = b.x + math.sin(t * b.swaySpeed + b.offset) * b.swayAmp
-            b.frame.Position = UDim2.new(curX, 0, b.y, 0)
-        end
-    end)
+    Dimmer.Parent = WhitelistGui
 
     local Card = Instance.new("Frame")
-    Card.Name = "Card"
-    Card.Size = UDim2.new(0, 440, 0, 280)
-    Card.Position = UDim2.new(0.5, -220, 0.5, -140)
-    Card.BackgroundColor3 = Color3.fromRGB(14, 15, 22)
+    Card.Name = "WhitelistCard"
+    Card.Size = UDim2.new(0, 460, 0, 310)
+    Card.Position = UDim2.new(0.5, -230, 0.5, -155)
+    Card.BackgroundColor3 = Color3.fromRGB(15, 16, 24)
     Card.BorderSizePixel = 0
-    Card.Active = true
     Card.ClipsDescendants = true
-    Card.Parent = BlacklistGui
+    Card.Parent = WhitelistGui
     makeCorner(Card, 14)
-    makeStroke(Card, Color3.fromRGB(44, 46, 62), 1.2, 0.2)
+    makeStroke(Card, Color3.fromRGB(180, 50, 70), 1.5)
 
     local CardScale = Instance.new("UIScale")
     CardScale.Scale = 0.85
     CardScale.Parent = Card
-    TweenService:Create(CardScale, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+    TweenService:Create(CardScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 
-    local cardDragging, cardDragStart, cardStartPos = false, nil, nil
-    Card.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            cardDragging = true
-            cardDragStart = input.Position
-            cardStartPos = Card.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    cardDragging = false
-                end
-            end)
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if cardDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - cardDragStart
-            Card.Position = UDim2.new(
-                cardStartPos.X.Scale, cardStartPos.X.Offset + delta.X,
-                cardStartPos.Y.Scale, cardStartPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-
+    -- Header
     local Header = Instance.new("Frame")
     Header.Size = UDim2.new(1, 0, 0, 50)
-    Header.Position = UDim2.new(0, 0, 0, 0)
     Header.BackgroundTransparency = 1
-    Header.BorderSizePixel = 0
     Header.Parent = Card
 
-    local AccentStripe = Instance.new("Frame")
-    AccentStripe.Size = UDim2.new(0, 3, 0, 24)
-    AccentStripe.Position = UDim2.new(0, 18, 0.5, -12)
-    AccentStripe.BackgroundColor3 = Color3.fromRGB(145, 120, 255)
-    AccentStripe.BorderSizePixel = 0
-    AccentStripe.Parent = Header
-    makeCorner(AccentStripe, 2)
-
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(0, 100, 0, 20)
-    TitleLabel.Position = UDim2.new(0, 28, 0, 10)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = "Pearl"
-    TitleLabel.TextColor3 = Color3.fromRGB(145, 120, 255)
-    TitleLabel.Font = Enum.Font.GothamBlack
-    TitleLabel.TextSize = 16
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.Parent = Header
-
-    local SubTitleLabel = Instance.new("TextLabel")
-    SubTitleLabel.Size = UDim2.new(0, 150, 0, 12)
-    SubTitleLabel.Position = UDim2.new(0, 28, 0, 28)
-    SubTitleLabel.BackgroundTransparency = 1
-    SubTitleLabel.Text = "ROBLOX HUB • SÉCURITÉ"
-    SubTitleLabel.TextColor3 = Color3.fromRGB(130, 134, 152)
-    SubTitleLabel.Font = Enum.Font.Code
-    SubTitleLabel.TextSize = 9
-    SubTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    SubTitleLabel.Parent = Header
+    local HeaderTitle = Instance.new("TextLabel")
+    HeaderTitle.Size = UDim2.new(1, -145, 1, 0)
+    HeaderTitle.Position = UDim2.new(0, 20, 0, 0)
+    HeaderTitle.BackgroundTransparency = 1
+    HeaderTitle.Text = "PEARL - SYSTÈME WHITELIST"
+    HeaderTitle.TextColor3 = Color3.fromRGB(245, 245, 250)
+    HeaderTitle.Font = Enum.Font.GothamBold
+    HeaderTitle.TextSize = 13
+    HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
+    HeaderTitle.Parent = Header
 
     local Badge = Instance.new("Frame")
-    Badge.Size = UDim2.new(0, 105, 0, 24)
-    Badge.Position = UDim2.new(1, -123, 0.5, -12)
-    Badge.BackgroundColor3 = Color3.fromRGB(36, 18, 24)
+    Badge.Size = UDim2.new(0, 130, 0, 24)
+    Badge.Position = UDim2.new(1, -145, 0.5, -12)
+    Badge.BackgroundColor3 = Color3.fromRGB(40, 18, 24)
     Badge.BorderSizePixel = 0
     Badge.Parent = Header
     makeCorner(Badge, 6)
-    makeStroke(Badge, Color3.fromRGB(90, 30, 40), 1)
+    makeStroke(Badge, Color3.fromRGB(180, 50, 70), 1)
 
     local BadgeLabel = Instance.new("TextLabel")
     BadgeLabel.Size = UDim2.new(1, 0, 1, 0)
     BadgeLabel.BackgroundTransparency = 1
-    BadgeLabel.Text = "⛔ BLACKLISTÉ"
-    BadgeLabel.TextColor3 = Color3.fromRGB(240, 70, 70)
+    BadgeLabel.Text = "⛔ NON WHITELISTÉ"
+    BadgeLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
     BadgeLabel.Font = Enum.Font.GothamBold
     BadgeLabel.TextSize = 9
     BadgeLabel.Parent = Badge
@@ -317,13 +171,14 @@ local function showBlacklistMenu(reasonType)
     local Divider = Instance.new("Frame")
     Divider.Size = UDim2.new(1, -36, 0, 1)
     Divider.Position = UDim2.new(0, 18, 0, 50)
-    Divider.BackgroundColor3 = Color3.fromRGB(28, 30, 42)
+    Divider.BackgroundColor3 = Color3.fromRGB(32, 34, 48)
     Divider.BorderSizePixel = 0
     Divider.Parent = Card
 
+    -- Info Box
     local InfoBox = Instance.new("Frame")
-    InfoBox.Size = UDim2.new(1, -36, 0, 142)
-    InfoBox.Position = UDim2.new(0, 18, 0, 60)
+    InfoBox.Size = UDim2.new(1, -36, 0, 160)
+    InfoBox.Position = UDim2.new(0, 18, 0, 62)
     InfoBox.BackgroundColor3 = Color3.fromRGB(18, 19, 28)
     InfoBox.BorderSizePixel = 0
     InfoBox.Parent = Card
@@ -333,95 +188,69 @@ local function showBlacklistMenu(reasonType)
     local IconLabel = Instance.new("TextLabel")
     IconLabel.Size = UDim2.new(0, 36, 0, 36)
     IconLabel.Position = UDim2.new(0, 12, 0, 12)
-    IconLabel.BackgroundColor3 = Color3.fromRGB(36, 20, 26)
+    IconLabel.BackgroundColor3 = Color3.fromRGB(42, 20, 26)
     IconLabel.BorderSizePixel = 0
-    IconLabel.Text = isUserReason and "👤" or "🚫"
+    IconLabel.Text = "🔒"
     IconLabel.TextSize = 18
     IconLabel.Parent = InfoBox
     makeCorner(IconLabel, 8)
-    makeStroke(IconLabel, Color3.fromRGB(70, 26, 34), 1)
+    makeStroke(IconLabel, Color3.fromRGB(90, 30, 42), 1)
 
     local MsgTitle = Instance.new("TextLabel")
     MsgTitle.Size = UDim2.new(1, -66, 0, 20)
     MsgTitle.Position = UDim2.new(0, 56, 0, 12)
     MsgTitle.BackgroundTransparency = 1
-    MsgTitle.Text = isUserReason and "Utilisateur non autorisé" or "Jeu non autorisé par Pearl"
-    MsgTitle.TextColor3 = Color3.fromRGB(235, 235, 242)
+    MsgTitle.Text = "Accès Restreint - Non Whitelisté"
+    MsgTitle.TextColor3 = Color3.fromRGB(240, 240, 245)
     MsgTitle.Font = Enum.Font.GothamBold
     MsgTitle.TextSize = 13
     MsgTitle.TextXAlignment = Enum.TextXAlignment.Left
     MsgTitle.Parent = InfoBox
 
     local MsgDesc = Instance.new("TextLabel")
-    MsgDesc.Size = UDim2.new(1, -66, 0, 32)
+    MsgDesc.Size = UDim2.new(1, -66, 0, 40)
     MsgDesc.Position = UDim2.new(0, 56, 0, 32)
     MsgDesc.BackgroundTransparency = 1
-    if isUserReason then
-        MsgDesc.Text = "Votre compte (@" .. tostring(LocalPlayer.Name) .. ") est blacklisté de Pearl, Veuillez payer le script. Accès refusé."
-    else
-        MsgDesc.Text = "Ce jeu est blacklisté. Le chargement de Pearl a été interrompu pour éviter tout risque."
-    end
-    MsgDesc.TextColor3 = Color3.fromRGB(130, 134, 152)
+    MsgDesc.Text = "Ce script est sous whitelist stricte. Votre compte n'est pas autorisé à exécuter Pearl Hub.\nSeuls @GIMS_93BANDIT et @MYHACKV2 ont accès."
+    MsgDesc.TextColor3 = Color3.fromRGB(140, 144, 162)
     MsgDesc.Font = Enum.Font.GothamMedium
     MsgDesc.TextSize = 10
     MsgDesc.TextXAlignment = Enum.TextXAlignment.Left
     MsgDesc.TextWrapped = true
     MsgDesc.Parent = InfoBox
 
-    local GameTag = Instance.new("Frame")
-    GameTag.Size = UDim2.new(1, -24, 0, 54)
-    GameTag.Position = UDim2.new(0, 12, 0, 76)
-    GameTag.BackgroundColor3 = Color3.fromRGB(13, 14, 20)
-    GameTag.BorderSizePixel = 0
-    GameTag.Parent = InfoBox
-    makeCorner(GameTag, 8)
-    makeStroke(GameTag, Color3.fromRGB(32, 34, 46), 1)
+    local UserTag = Instance.new("Frame")
+    UserTag.Size = UDim2.new(1, -24, 0, 54)
+    UserTag.Position = UDim2.new(0, 12, 0, 88)
+    UserTag.BackgroundColor3 = Color3.fromRGB(13, 14, 20)
+    UserTag.BorderSizePixel = 0
+    UserTag.Parent = InfoBox
+    makeCorner(UserTag, 8)
+    makeStroke(UserTag, Color3.fromRGB(34, 36, 48), 1)
 
-    local GameTagPlace = Instance.new("TextLabel")
-    GameTagPlace.Size = UDim2.new(1, -16, 0, 20)
-    GameTagPlace.Position = UDim2.new(0, 8, 0, 6)
-    GameTagPlace.BackgroundTransparency = 1
-    if isUserReason then
-        GameTagPlace.Text = "👤 Compte : @" .. tostring(LocalPlayer.Name)
-        GameTagPlace.TextColor3 = Color3.fromRGB(240, 90, 90)
-    else
-        GameTagPlace.Text = "📍 PlaceId : " .. tostring(game.PlaceId)
-        GameTagPlace.TextColor3 = Color3.fromRGB(90, 160, 255)
-    end
-    GameTagPlace.Font = Enum.Font.Code
-    GameTagPlace.TextSize = 11
-    GameTagPlace.TextXAlignment = Enum.TextXAlignment.Left
-    GameTagPlace.Parent = GameTag
+    local UserTagAccount = Instance.new("TextLabel")
+    UserTagAccount.Size = UDim2.new(1, -16, 0, 20)
+    UserTagAccount.Position = UDim2.new(0, 8, 0, 6)
+    UserTagAccount.BackgroundTransparency = 1
+    UserTagAccount.Text = "👤 Compte : @" .. tostring(LocalPlayer.Name)
+    UserTagAccount.TextColor3 = Color3.fromRGB(240, 80, 80)
+    UserTagAccount.Font = Enum.Font.Code
+    UserTagAccount.TextSize = 11
+    UserTagAccount.TextXAlignment = Enum.TextXAlignment.Left
+    UserTagAccount.Parent = UserTag
 
-    local GameTagName = Instance.new("TextLabel")
-    GameTagName.Size = UDim2.new(1, -16, 0, 18)
-    GameTagName.Position = UDim2.new(0, 8, 0, 28)
-    GameTagName.BackgroundTransparency = 1
-    if isUserReason then
-        GameTagName.Text = "🆔 UserId : " .. tostring(LocalPlayer.UserId)
-    else
-        GameTagName.Text = "🎮 Jeu : Chargement..."
-    end
-    GameTagName.TextColor3 = Color3.fromRGB(150, 154, 172)
-    GameTagName.Font = Enum.Font.Gotham
-    GameTagName.TextSize = 10
-    GameTagName.TextXAlignment = Enum.TextXAlignment.Left
-    GameTagName.TextTruncate = Enum.TextTruncate.AtEnd
-    GameTagName.Parent = GameTag
+    local UserTagId = Instance.new("TextLabel")
+    UserTagId.Size = UDim2.new(1, -16, 0, 18)
+    UserTagId.Position = UDim2.new(0, 8, 0, 28)
+    UserTagId.BackgroundTransparency = 1
+    UserTagId.Text = "🆔 UserId : " .. tostring(LocalPlayer.UserId) .. "  |  Whitelist : ❌ Refusé"
+    UserTagId.TextColor3 = Color3.fromRGB(150, 154, 172)
+    UserTagId.Font = Enum.Font.Gotham
+    UserTagId.TextSize = 10
+    UserTagId.TextXAlignment = Enum.TextXAlignment.Left
+    UserTagId.Parent = UserTag
 
-    if not isUserReason then
-        task.spawn(function()
-            pcall(function()
-                local prodInfo = MarketplaceService:GetProductInfo(game.PlaceId)
-                if prodInfo and prodInfo.Name then
-                    GameTagName.Text = "🎮 Jeu : " .. tostring(prodInfo.Name)
-                else
-                    GameTagName.Text = "🎮 Jeu : Expérience Roblox"
-                end
-            end)
-        end)
-    end
-
+    -- Buttons
     local BtnRow = Instance.new("Frame")
     BtnRow.Size = UDim2.new(1, -36, 0, 42)
     BtnRow.Position = UDim2.new(0, 18, 1, -56)
@@ -429,32 +258,26 @@ local function showBlacklistMenu(reasonType)
     BtnRow.BorderSizePixel = 0
     BtnRow.Parent = Card
 
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.new(0.485, 0, 1, 0)
-    CloseBtn.Position = UDim2.new(0, 0, 0, 0)
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(24, 25, 36)
-    CloseBtn.BorderSizePixel = 0
-    CloseBtn.Text = "Fermer"
-    CloseBtn.TextColor3 = Color3.fromRGB(235, 235, 242)
-    CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.TextSize = 12
-    CloseBtn.Parent = BtnRow
-    makeCorner(CloseBtn, 8)
-    makeStroke(CloseBtn, Color3.fromRGB(44, 46, 62), 1)
+    local CopyBtn = Instance.new("TextButton")
+    CopyBtn.Size = UDim2.new(0.485, 0, 1, 0)
+    CopyBtn.Position = UDim2.new(0, 0, 0, 0)
+    CopyBtn.BackgroundColor3 = Color3.fromRGB(24, 25, 36)
+    CopyBtn.BorderSizePixel = 0
+    CopyBtn.Text = "📋 Copier Mon Pseudo"
+    CopyBtn.TextColor3 = Color3.fromRGB(235, 235, 242)
+    CopyBtn.Font = Enum.Font.GothamBold
+    CopyBtn.TextSize = 11
+    CopyBtn.Parent = BtnRow
+    makeCorner(CopyBtn, 8)
+    makeStroke(CopyBtn, Color3.fromRGB(44, 46, 62), 1)
 
-    CloseBtn.MouseEnter:Connect(function()
-        TweenService:Create(CloseBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(36, 38, 54) }):Play()
-    end)
-    CloseBtn.MouseLeave:Connect(function()
-        TweenService:Create(CloseBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(24, 25, 36) }):Play()
-    end)
-
-    CloseBtn.MouseButton1Click:Connect(function()
-        TweenService:Create(CardScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 0.7 }):Play()
-        TweenService:Create(Dimmer, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundTransparency = 1 }):Play()
-        task.delay(0.25, function()
-            if bubbleConn then bubbleConn:Disconnect() end
-            if BlacklistGui then BlacklistGui:Destroy() end
+    CopyBtn.MouseButton1Click:Connect(function()
+        pcall(function()
+            if setclipboard then
+                setclipboard("@" .. tostring(LocalPlayer.Name) .. " (ID: " .. tostring(LocalPlayer.UserId) .. ")")
+                CopyBtn.Text = "✅ Copié !"
+                task.delay(1.5, function() CopyBtn.Text = "📋 Copier Mon Pseudo" end)
+            end
         end)
     end)
 
@@ -463,7 +286,7 @@ local function showBlacklistMenu(reasonType)
     QuitBtn.Position = UDim2.new(0.515, 0, 0, 0)
     QuitBtn.BackgroundColor3 = Color3.fromRGB(180, 45, 45)
     QuitBtn.BorderSizePixel = 0
-    QuitBtn.Text = "🚪  Quitter"
+    QuitBtn.Text = "🚪 Quitter"
     QuitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     QuitBtn.Font = Enum.Font.GothamBold
     QuitBtn.TextSize = 12
@@ -471,29 +294,16 @@ local function showBlacklistMenu(reasonType)
     makeCorner(QuitBtn, 8)
     makeStroke(QuitBtn, Color3.fromRGB(220, 60, 60), 1)
 
-    QuitBtn.MouseEnter:Connect(function()
-        TweenService:Create(QuitBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(215, 55, 55) }):Play()
-    end)
-    QuitBtn.MouseLeave:Connect(function()
-        TweenService:Create(QuitBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(180, 45, 45) }):Play()
-    end)
-
     QuitBtn.MouseButton1Click:Connect(function()
         QuitBtn.Text = "Fermeture..."
         pcall(function()
-            game:Shutdown()
-        end)
-        task.delay(0.1, function()
-            pcall(function()
-                LocalPlayer:Kick(isUserReason and "Votre compte est blacklisté de Pearl." or "Ce jeu est blacklisté.")
-            end)
+            LocalPlayer:Kick("Votre compte n'est pas whitelisté sur Pearl Hub (@" .. tostring(LocalPlayer.Name) .. ").")
         end)
     end)
 end
 
-local isBlacklisted, blacklistReason = checkBlacklistStatus()
-if isBlacklisted then
-    showBlacklistMenu(blacklistReason)
+if not isCurrentUserWhitelisted() then
+    showWhitelistMenu()
     return
 end
 
@@ -1015,8 +825,8 @@ Lighting = game:GetService("Lighting")
 
 
 _G.Aimlock_Enabled = false
-_G.Aimlock_Key = Enum.KeyCode.E
-_G.Aimlock_KeyName = "E"
+_G.Aimlock_Key = nil
+_G.Aimlock_KeyName = "Aucun"
 _G.Aimlock_HoldMode = false
 _G.Aimlock_IsHeld = false
 _G.Aimlock_FOV = 150
@@ -1031,8 +841,8 @@ _G.Aimlock_StickyTarget = nil
 _G.Aimlock_TargetNPCs = false
 
 Aimlock_Enabled = false
-Aimlock_Key = Enum.KeyCode.E
-Aimlock_KeyName = "E"
+Aimlock_Key = nil
+Aimlock_KeyName = "Aucun"
 Aimlock_HoldMode = false
 Aimlock_IsHeld = false
 Aimlock_FOV = 150
@@ -4146,7 +3956,7 @@ Keybinds = {
     Noclip = Enum.KeyCode.V,
     Invisible = Enum.KeyCode.C,
     DesyncFly = Enum.KeyCode.G,
-    ESP = Enum.KeyCode.E,
+    ESP = Enum.KeyCode.M,
     Speed = Enum.KeyCode.R,
     Respawn = Enum.KeyCode.B,
     Menu = Enum.KeyCode.Insert,
@@ -4271,9 +4081,10 @@ if getgenv().BloxFruitsUILoaded then
 end
 getgenv().BloxFruitsUILoaded = true
 
-theme = {
+theme = setmetatable({
     text = Color3.fromRGB(235, 235, 242),
     sub = Color3.fromRGB(130, 134, 152),
+    textDim = Color3.fromRGB(130, 134, 152),
     panel = Color3.fromRGB(14, 15, 22),
     panel2 = Color3.fromRGB(18, 19, 28),
     card = Color3.fromRGB(23, 24, 35),
@@ -4282,7 +4093,12 @@ theme = {
     accent = Color3.fromRGB(145, 120, 255),
     accent2 = Color3.fromRGB(90, 160, 255),
     danger = Color3.fromRGB(220, 60, 60),
-}
+}, {
+    __index = function(tbl, key)
+        if key == "textDim" then return Color3.fromRGB(130, 134, 152) end
+        return Color3.fromRGB(200, 200, 200)
+    end
+})
 
 ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "PearlUpdateUI"
@@ -4326,10 +4142,11 @@ BackgroundDimmer.Name = "BackgroundDimmer"
 BackgroundDimmer.Size = UDim2.new(1, 0, 1, 0)
 BackgroundDimmer.Position = UDim2.new(0, 0, 0, 0)
 BackgroundDimmer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-BackgroundDimmer.BackgroundTransparency = 0.2
+BackgroundDimmer.BackgroundTransparency = 1
 BackgroundDimmer.BorderSizePixel = 0
 BackgroundDimmer.ZIndex = 1
 BackgroundDimmer.Active = false
+BackgroundDimmer.Visible = false
 BackgroundDimmer.Parent = ScreenGui
 
 BubblesContainer = Instance.new("Frame")
@@ -4866,10 +4683,134 @@ task.spawn(function()
 	end
 end)
 
+-- BARRE DE RECHERCHE D'OPTIONS (Placee directement a gauche de l'avatar)
+SearchContainer = Instance.new("Frame")
+SearchContainer.Name = "SearchContainer"
+SearchContainer.Size = UDim2.new(0, 210, 0, 32)
+SearchContainer.Position = UDim2.new(1, -266, 0.5, -16)
+SearchContainer.BackgroundColor3 = Colors.Card
+SearchContainer.BorderSizePixel = 0
+SearchContainer.ZIndex = 10
+SearchContainer.Parent = TopBar
+
+local SearchCorner = Instance.new("UICorner")
+SearchCorner.CornerRadius = UDim.new(0, 8)
+SearchCorner.Parent = SearchContainer
+
+local SearchStroke = Instance.new("UIStroke")
+SearchStroke.Name = "SearchStroke"
+SearchStroke.Color = Colors.Border
+SearchStroke.Thickness = 1
+SearchStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+SearchStroke.Parent = SearchContainer
+
+local SearchIcon = Instance.new("ImageLabel")
+SearchIcon.Name = "SearchIcon"
+SearchIcon.Size = UDim2.new(0, 14, 0, 14)
+SearchIcon.Position = UDim2.new(0, 10, 0.5, -7)
+SearchIcon.BackgroundTransparency = 1
+SearchIcon.Image = "rbxassetid://7733956411"
+SearchIcon.ImageColor3 = Colors.TextDim
+SearchIcon.ZIndex = 11
+SearchIcon.Parent = SearchContainer
+
+SearchBox = Instance.new("TextBox")
+SearchBox.Name = "SearchBox"
+SearchBox.Size = UDim2.new(1, -56, 1, 0)
+SearchBox.Position = UDim2.new(0, 30, 0, 0)
+SearchBox.BackgroundTransparency = 1
+SearchBox.Font = Enum.Font.GothamMedium
+SearchBox.PlaceholderText = "Rechercher une option..."
+SearchBox.PlaceholderColor3 = Colors.TextMuted
+SearchBox.Text = ""
+SearchBox.TextColor3 = Colors.Text
+SearchBox.TextSize = 11
+SearchBox.TextXAlignment = Enum.TextXAlignment.Left
+SearchBox.ClearTextOnFocus = false
+SearchBox.ZIndex = 11
+SearchBox.Parent = SearchContainer
+
+ClearSearchBtn = Instance.new("TextButton")
+ClearSearchBtn.Name = "ClearSearchBtn"
+ClearSearchBtn.Size = UDim2.new(0, 18, 0, 18)
+ClearSearchBtn.Position = UDim2.new(1, -24, 0.5, -9)
+ClearSearchBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
+ClearSearchBtn.BorderSizePixel = 0
+ClearSearchBtn.Text = "x"
+ClearSearchBtn.TextColor3 = Colors.TextDim
+ClearSearchBtn.Font = Enum.Font.GothamBold
+ClearSearchBtn.TextSize = 13
+ClearSearchBtn.AutoButtonColor = false
+ClearSearchBtn.Visible = false
+ClearSearchBtn.ZIndex = 12
+ClearSearchBtn.Parent = SearchContainer
+
+local ClearCorner = Instance.new("UICorner")
+ClearCorner.CornerRadius = UDim.new(1, 0)
+ClearCorner.Parent = ClearSearchBtn
+
+local ClearStroke = Instance.new("UIStroke")
+ClearStroke.Color = Colors.Border
+ClearStroke.Thickness = 1
+ClearStroke.Parent = ClearSearchBtn
+
+SearchContainer.MouseEnter:Connect(function()
+	if not SearchBox:IsFocused() then
+		CreateTween(SearchStroke, {Color = Colors.BorderActive}, 0.15)
+	end
+end)
+
+SearchContainer.MouseLeave:Connect(function()
+	if not SearchBox:IsFocused() then
+		CreateTween(SearchStroke, {Color = Colors.Border}, 0.15)
+	end
+end)
+
+SearchBox.Focused:Connect(function()
+	CreateTween(SearchStroke, {Color = Colors.Accent}, 0.2)
+	CreateTween(SearchIcon, {ImageColor3 = Colors.Accent}, 0.2)
+	CreateTween(SearchContainer, {Size = UDim2.new(0, 230, 0, 32), Position = UDim2.new(1, -286, 0.5, -16)}, 0.2)
+end)
+
+SearchBox.FocusLost:Connect(function()
+	CreateTween(SearchStroke, {Color = Colors.Border}, 0.2)
+	CreateTween(SearchIcon, {ImageColor3 = Colors.TextDim}, 0.2)
+	CreateTween(SearchContainer, {Size = UDim2.new(0, 210, 0, 32), Position = UDim2.new(1, -266, 0.5, -16)}, 0.2)
+end)
+
+ClearSearchBtn.MouseEnter:Connect(function()
+	CreateTween(ClearSearchBtn, {BackgroundColor3 = Color3.fromRGB(220, 50, 50), TextColor3 = Color3.fromRGB(255, 255, 255)}, 0.15)
+end)
+
+ClearSearchBtn.MouseLeave:Connect(function()
+	CreateTween(ClearSearchBtn, {BackgroundColor3 = Color3.fromRGB(28, 28, 36), TextColor3 = Colors.TextDim}, 0.15)
+end)
+
+ClearSearchBtn.MouseButton1Click:Connect(function()
+	SearchBox.Text = ""
+	if filterCards then
+		filterCards("")
+	end
+	ClearSearchBtn.Visible = false
+end)
+
+SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+	local currentText = SearchBox.Text
+	if currentText and currentText ~= "" then
+		ClearSearchBtn.Visible = true
+	else
+		ClearSearchBtn.Visible = false
+	end
+	if filterCards then
+		filterCards(currentText)
+	end
+end)
+
+-- UserTooltip positionne proprement sous l'avatar pour ne pas gener la recherche
 local UserTooltip = Instance.new("Frame")
 UserTooltip.Name = "UserTooltip"
-UserTooltip.Size = UDim2.new(0, 140, 0, 30)
-UserTooltip.Position = UDim2.new(1, -195, 0.5, -15)
+UserTooltip.Size = UDim2.new(0, 140, 0, 28)
+UserTooltip.Position = UDim2.new(1, -150, 0, 56)
 UserTooltip.BackgroundColor3 = Colors.Card
 UserTooltip.BorderSizePixel = 0
 UserTooltip.BackgroundTransparency = 1
@@ -4941,15 +4882,18 @@ ContentAreaStroke.Parent = ContentArea
 
 panels = {}
 AllRegisteredCards = {}
+local registeredCardsSet = {}
 
 function registerSearchCard(card, name, parent)
 	if card and parent and name then
+		if registeredCardsSet[card] then return end
+		registeredCardsSet[card] = true
 		local cleanSearchName = string.lower(tostring(name or "")):gsub("<[^>]->", "")
 		table.insert(AllRegisteredCards, {
 			card = card,
 			name = cleanSearchName,
 			origParent = parent,
-			origOrder = card.LayoutOrder or 0
+			origOrder = card.LayoutOrder or #AllRegisteredCards
 		})
 	end
 end
@@ -4988,9 +4932,46 @@ end
 
 SearchPanel = createPanel("Search")
 
+local NoResultContainer = Instance.new("Frame")
+NoResultContainer.Name = "NoResultContainer"
+NoResultContainer.Size = UDim2.new(1, 0, 0, 130)
+NoResultContainer.BackgroundTransparency = 1
+NoResultContainer.Visible = false
+NoResultContainer.LayoutOrder = 999999
+NoResultContainer.Parent = SearchPanel
+
+local NoResultIcon = Instance.new("ImageLabel")
+NoResultIcon.Size = UDim2.new(0, 36, 0, 36)
+NoResultIcon.Position = UDim2.new(0.5, -18, 0, 20)
+NoResultIcon.BackgroundTransparency = 1
+NoResultIcon.Image = "rbxassetid://7733956411"
+NoResultIcon.ImageColor3 = Colors.TextMuted
+NoResultIcon.Parent = NoResultContainer
+
+local NoResultLabel = Instance.new("TextLabel")
+NoResultLabel.Size = UDim2.new(1, 0, 0, 24)
+NoResultLabel.Position = UDim2.new(0, 0, 0, 64)
+NoResultLabel.BackgroundTransparency = 1
+NoResultLabel.Font = Enum.Font.GothamMedium
+NoResultLabel.Text = "Aucune option trouvee"
+NoResultLabel.TextColor3 = Colors.TextDim
+NoResultLabel.TextSize = 13
+NoResultLabel.Parent = NoResultContainer
+
+local NoResultSub = Instance.new("TextLabel")
+NoResultSub.Size = UDim2.new(1, 0, 0, 18)
+NoResultSub.Position = UDim2.new(0, 0, 0, 90)
+NoResultSub.BackgroundTransparency = 1
+NoResultSub.Font = Enum.Font.Gotham
+NoResultSub.Text = "Essayez un autre mot-cle (ex: Speed, Aim, ESP, Fly...)"
+NoResultSub.TextColor3 = Colors.TextMuted
+NoResultSub.TextSize = 11
+NoResultSub.Parent = NoResultContainer
+
 function filterCards(query)
-	query = string.lower(tostring(query or "")):match("^%s*(.-)%s*$")
-	if not query or query == "" then
+	local rawQuery = tostring(query or "")
+	local cleanQuery = string.lower(rawQuery):match("^%s*(.-)%s*$")
+	if not cleanQuery or cleanQuery == "" then
 		if ClearSearchBtn then ClearSearchBtn.Visible = false end
 		for _, item in ipairs(AllRegisteredCards) do
 			if item.card and item.card.Parent ~= item.origParent then
@@ -5000,7 +4981,10 @@ function filterCards(query)
 			end
 		end
 		if SearchPanel then SearchPanel.Visible = false end
-		if switchCategory then switchCategory(currentCategory) end
+		if NoResultContainer then NoResultContainer.Visible = false end
+		if switchCategory then
+			switchCategory(currentCategory)
+		end
 	else
 		if ClearSearchBtn then ClearSearchBtn.Visible = true end
 		for name, panel in pairs(panels) do
@@ -5013,10 +4997,12 @@ function filterCards(query)
 			SearchPanel.Position = UDim2.new(0, 12, 0, 12)
 		end
 
+		local normalizedQuery = cleanQuery:gsub("[éèêë]", "e"):gsub("[àâä]", "a"):gsub("[ùûü]", "u"):gsub("[îï]", "i"):gsub("[ôö]", "o"):gsub("[ç]", "c")
 		local matchCount = 0
 		for _, item in ipairs(AllRegisteredCards) do
 			if item.card then
-				if string.find(item.name, query, 1, true) then
+				local normItemName = tostring(item.name or ""):gsub("[éèêë]", "e"):gsub("[àâä]", "a"):gsub("[ùûü]", "u"):gsub("[îï]", "i"):gsub("[ôö]", "o"):gsub("[ç]", "c")
+				if string.find(normItemName, normalizedQuery, 1, true) or string.find(item.name, cleanQuery, 1, true) then
 					item.card.Parent = SearchPanel
 					item.card.Visible = true
 					matchCount = matchCount + 1
@@ -5028,10 +5014,20 @@ function filterCards(query)
 				end
 			end
 		end
+
 		if matchCount == 0 then
 			PanelTitle.Text = "AUCUN RESULTAT"
+			if NoResultContainer then
+				NoResultContainer.Visible = true
+				if NoResultLabel then
+					NoResultLabel.Text = 'Aucune option pour "' .. rawQuery .. '"'
+				end
+			end
 		else
 			PanelTitle.Text = "RESULTATS (" .. matchCount .. ")"
+			if NoResultContainer then
+				NoResultContainer.Visible = false
+			end
 		end
 	end
 end
@@ -6886,6 +6882,16 @@ function toggleMenu(forceState)
 		if BubblesContainer and V and V.BubblesEnabled then
 			BubblesContainer.Visible = true
 		end
+		if BackgroundDimmer then
+			if V and (V.DimmerEnabled ~= false) then
+				BackgroundDimmer.Visible = true
+				local targetTrans = 1 - ((V and V.DimmerOpacity or 80) / 100)
+				CreateTween(BackgroundDimmer, {BackgroundTransparency = targetTrans}, 0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+			else
+				BackgroundDimmer.Visible = false
+				BackgroundDimmer.BackgroundTransparency = 1
+			end
+		end
 		PanelScale.Scale = 0.72
 		Panel.Position = UDim2.new(
 			savedWindowPos.X.Scale,
@@ -6897,6 +6903,15 @@ function toggleMenu(forceState)
 		CreateTween(Panel, {Position = savedWindowPos}, 0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 	else
 		setVisualPreviewVisible(false)
+		if BackgroundDimmer then
+			local tweenDim = CreateTween(BackgroundDimmer, {BackgroundTransparency = 1}, 0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+			tweenDim.Completed:Connect(function()
+				if not menuOpen and BackgroundDimmer then
+					BackgroundDimmer.Visible = false
+					BackgroundDimmer.BackgroundTransparency = 1
+				end
+			end)
+		end
 		CreateTween(PanelScale, {Scale = 0.75}, 0.24, Enum.EasingStyle.Back, Enum.EasingDirection.In)
 		local tweenPos = CreateTween(Panel, {
 			Position = UDim2.new(
@@ -6911,6 +6926,10 @@ function toggleMenu(forceState)
 				Panel.Visible = false
 				if BubblesContainer then
 					BubblesContainer.Visible = false
+				end
+				if BackgroundDimmer then
+					BackgroundDimmer.Visible = false
+					BackgroundDimmer.BackgroundTransparency = 1
 				end
 			end
 		end)
@@ -8047,7 +8066,11 @@ task.delay(0.1, function()
     end
     Panel.Visible = false
     menuOpen = false
-    if BubblesContainer then BubblesContainer.Visible = true end
+    if BackgroundDimmer then
+        BackgroundDimmer.Visible = false
+        BackgroundDimmer.BackgroundTransparency = 1
+    end
+    if BubblesContainer then BubblesContainer.Visible = false end
 createKeySystemUI()
 end)
 
@@ -8447,7 +8470,13 @@ function stopFly()
         humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
         if not V.Noclip then
             for _, part in pairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = true end
+                if part:IsA("BasePart") then
+                    if part.Name == "HumanoidRootPart" then
+                        part.CanCollide = false
+                    else
+                        part.CanCollide = true
+                    end
+                end
             end
         end
     end)
@@ -8473,7 +8502,13 @@ function stopNoclip()
         local char = getCharacter()
         if char and not V.Fly then
             for _, part in pairs(char:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = true end
+                if part:IsA("BasePart") then
+                    if part.Name == "HumanoidRootPart" then
+                        part.CanCollide = false
+                    else
+                        part.CanCollide = true
+                    end
+                end
             end
         end
     end)
@@ -8612,20 +8647,36 @@ addConnection(LocalPlayer.CharacterAdded:Connect(function(char)
 end))
 
 function startDesyncFly()
-    if V.Fly then SetFlyToggle(false) end
+    if V.Fly and SetFlyToggle then pcall(function() SetFlyToggle(false) end) end
+    if V.DesyncFlyConn then
+        pcall(function() V.DesyncFlyConn:Disconnect() end)
+        V.DesyncFlyConn = nil
+    end
+    if V.DesyncFlyNoclipConn then
+        pcall(function() V.DesyncFlyNoclipConn:Disconnect() end)
+        V.DesyncFlyNoclipConn = nil
+    end
+
     V.DesyncFly = true
     pcall(function()
         local char = getCharacter()
         local hrp = char:FindFirstChild("HumanoidRootPart")
         local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not humanoid then return end
+
         humanoid.PlatformStand = true
         hrp.Anchored = true
-        local lastPosition = hrp.Position
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
 
-        if V.DesyncFlyNoclipConn then V.DesyncFlyNoclipConn:Disconnect() V.DesyncFlyNoclipConn = nil end
+        local flyPos = hrp.Position
+
         V.DesyncFlyNoclipConn = RunService.Stepped:Connect(function()
             if not V.DesyncFly then
-                if V.DesyncFlyNoclipConn then V.DesyncFlyNoclipConn:Disconnect() V.DesyncFlyNoclipConn = nil end
+                if V.DesyncFlyNoclipConn then
+                    V.DesyncFlyNoclipConn:Disconnect()
+                    V.DesyncFlyNoclipConn = nil
+                end
                 return
             end
             local currentChar = LocalPlayer.Character
@@ -8639,36 +8690,73 @@ function startDesyncFly()
         end)
         addConnection(V.DesyncFlyNoclipConn)
 
-        local desyncConn = RunService.Heartbeat:Connect(function(dt)
-            if not V.DesyncFly then desyncConn:Disconnect() return end
+        V.DesyncFlyConn = RunService.Heartbeat:Connect(function(dt)
+            if not V.DesyncFly or not hrp or not hrp.Parent then
+                if V.DesyncFlyConn then
+                    V.DesyncFlyConn:Disconnect()
+                    V.DesyncFlyConn = nil
+                end
+                return
+            end
+
             local cam = workspace.CurrentCamera
+            if not cam then return end
+
             local moveDirection = Vector3.zero
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then moveDirection = moveDirection + cam.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then moveDirection = moveDirection - cam.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then moveDirection = moveDirection - cam.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then moveDirection = moveDirection + cam.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) or UserInputService:IsKeyDown(Enum.KeyCode.E) then moveDirection = moveDirection + Vector3.new(0, 1, 0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.C) then moveDirection = moveDirection - Vector3.new(0, 1, 0) end
+            local isFwd = UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up)
+            local isLeft = UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.Left)
+            local isBack = UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down)
+            local isRight = UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right)
+
+            if isFwd then moveDirection = moveDirection + cam.CFrame.LookVector end
+            if isLeft then moveDirection = moveDirection - cam.CFrame.RightVector end
+            if isBack then moveDirection = moveDirection - cam.CFrame.LookVector end
+            if isRight then moveDirection = moveDirection + cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDirection = moveDirection + Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDirection = moveDirection - Vector3.new(0, 1, 0) end
 
             local currentSpeed = V.DesyncFlySpeed or 150
             if moveDirection.Magnitude > 0 then
-                lastPosition = lastPosition + (moveDirection.Unit * currentSpeed * dt)
-                hrp.CFrame = CFrame.new(lastPosition, lastPosition + cam.CFrame.LookVector)
+                flyPos = flyPos + (moveDirection.Unit * currentSpeed * dt)
+                hrp.CFrame = CFrame.new(flyPos, flyPos + cam.CFrame.LookVector)
+            else
+                flyPos = hrp.Position
             end
         end)
-        addConnection(desyncConn)
+        addConnection(V.DesyncFlyConn)
     end)
 end
 
 function stopDesyncFly()
     V.DesyncFly = false
-    if V.DesyncFlyNoclipConn then V.DesyncFlyNoclipConn:Disconnect() V.DesyncFlyNoclipConn = nil end
+    if V.DesyncFlyConn then
+        pcall(function() V.DesyncFlyConn:Disconnect() end)
+        V.DesyncFlyConn = nil
+    end
+    if V.DesyncFlyNoclipConn then
+        pcall(function() V.DesyncFlyNoclipConn:Disconnect() end)
+        V.DesyncFlyNoclipConn = nil
+    end
     pcall(function()
-        local hrp = getRoot()
-        local humanoid = getHumanoid()
-        hrp.Anchored = false
-        humanoid.PlatformStand = false
-        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        local char = getCharacter()
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+        if hrp then
+            hrp.Anchored = false
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+        end
+        if humanoid then
+            humanoid.PlatformStand = false
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end
+        if char and not V.Noclip then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
     end)
 end
 
@@ -10171,7 +10259,7 @@ _, _, ToggleSpeed = createToggle("Enable Walk Speed", false, function(enabled)
     end
     notify("Movement","Walk Speed ".. (enabled and "ON" or "OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
 end, MovementContent,"SpeedEnabled")
-createSlider("Walk Speed", 16, 300, 16, function(val) V.Speed = val end, MovementContent,"Speed")
+createSlider("Walk Speed", 16, 1000, 16, function(val) V.Speed = val end, MovementContent,"Speed")
 
 function createValueButton(parent, title, valueText, onChange, configKey)
     local card = createCard(parent, 0, 42)
@@ -11176,7 +11264,7 @@ function teleportPlayerFromFreecam(mode, exitFreecam)
         end
 
         V.FreecamOriginalCharCF = nil
-        hrp.CFrame = targetCF
+        hrp.CFrame = targetCF + Vector3.new(0, 1.5, 0)
         hrp.Anchored = false
         pcall(function()
             hrp.AssemblyLinearVelocity = Vector3.zero
@@ -11185,16 +11273,54 @@ function teleportPlayerFromFreecam(mode, exitFreecam)
 
         Camera.CameraType = Enum.CameraType.Custom
         Camera.CameraSubject = hum
-        hum.WalkSpeed = V.SpeedEnabled and V.Speed or 16
-        hum.JumpPower = V.JumpEnabled and V.Jump or 50
-        hum.AutoRotate = true
-        hum.PlatformStand = false
-        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+
+        if hum then
+            if V.SpeedEnabled and V.Speed then
+                hum.WalkSpeed = V.Speed
+            else
+                local restoredSpeed = V._FreecamPreWalkSpeed or (_OrigWalkSpeed and _OrigWalkSpeed >= 16 and _OrigWalkSpeed) or 16
+                hum.WalkSpeed = restoredSpeed
+            end
+
+            if V.JumpEnabled and V.Jump then
+                hum.UseJumpPower = true
+                hum.JumpPower = V.Jump
+            else
+                if V._FreecamPreUseJumpPower ~= nil then
+                    hum.UseJumpPower = V._FreecamPreUseJumpPower
+                end
+                local restoredJump = V._FreecamPreJumpPower or (_OrigJumpPower and _OrigJumpPower > 0 and _OrigJumpPower) or 50
+                hum.JumpPower = restoredJump
+
+                local restoredJumpHeight = V._FreecamPreJumpHeight or (_OrigJumpHeight and _OrigJumpHeight > 0 and _OrigJumpHeight) or 7.2
+                hum.JumpHeight = restoredJumpHeight
+            end
+
+            hum.AutoRotate = true
+            hum.PlatformStand = false
+            hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+            hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
+            hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+
+            task.delay(0.08, function()
+                pcall(function()
+                    if hum and hum.Parent then
+                        hum:ChangeState(Enum.HumanoidStateType.Running)
+                    end
+                end)
+            end)
+        end
 
         V.FreecamCharVisible = true
         for _, part in pairs(char:GetDescendants()) do
             if part:IsA("BasePart") then
-                part.CanCollide = true
+                if part.Name == "HumanoidRootPart" then
+                    part.CanCollide = false
+                else
+                    part.CanCollide = true
+                end
                 part.Transparency = part:GetAttribute("_FreecamOrigTrans") or 0
                 part.LocalTransparencyModifier = 0
             elseif part:IsA("Decal") or part:IsA("Texture") then
@@ -11362,15 +11488,28 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
     if enabled then
         local char = LocalPlayer.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
 
         V.FreecamOriginalCharCF = hrp.CFrame
+
+        -- Sauvegarde des vitesses et puissances de saut reelles du joueur
+        if hum.WalkSpeed and hum.WalkSpeed > 0 then
+            V._FreecamPreWalkSpeed = hum.WalkSpeed
+        end
+        if hum.JumpPower and hum.JumpPower > 0 then
+            V._FreecamPreJumpPower = hum.JumpPower
+        end
+        if hum.JumpHeight and hum.JumpHeight > 0 then
+            V._FreecamPreJumpHeight = hum.JumpHeight
+        end
+        V._FreecamPreUseJumpPower = hum.UseJumpPower
 
         -- Nettoyage de tout ancien SeGhost
         local oldGhost = workspace:FindFirstChild("SeGhost") or V.FreecamGhostPart
         if oldGhost then pcall(function() oldGhost:Destroy() end) V.FreecamGhostPart = nil end
 
-        -- Creation de la Ghost Part (carre bleu / cyan neon avec Highlight) style Neyo
+        -- Creation de la Ghost Part (carre bleu / cyan neon avec Highlight)
         local invisPart = Instance.new("Part")
         invisPart.Name = "SeGhost"
         invisPart.Size = Vector3.new(4, 5, 4)
@@ -11393,16 +11532,17 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
 
         V.FreecamGhostPart = invisPart
 
-        -- Placer le vrai perso en securite et le masquer
-        hrp.CFrame = CFrame.new(hrp.Position.X, -500, hrp.Position.Z)
+        -- Immobiliser le vrai perso sur place de facon invisible sans l'envoyer dans le vide
         hrp.Anchored = true
+        pcall(function()
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+        end)
 
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.WalkSpeed = 0
-            hum.JumpPower = 0
-            hum.AutoRotate = false
-        end
+        hum.WalkSpeed = 0
+        hum.JumpPower = 0
+        hum.JumpHeight = 0
+        hum.AutoRotate = false
 
         for _, part in pairs(char:GetDescendants()) do
             if part:IsA("BasePart") then
@@ -11426,7 +11566,7 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
         UserInputService.MouseIconEnabled = true
         if FreecamCrosshair then FreecamCrosshair.Enabled = false end
 
-        -- Boucle de deplacement du SeGhost (Z/Q/S/D ou W/A/S/D + Espace/Ctrl)
+        -- Boucle de deplacement du SeGhost (ZQSD ou WASD + Espace/Ctrl)
         if V.FreecamConn then V.FreecamConn:Disconnect() end
         V.FreecamConn = RunService.RenderStepped:Connect(function(dt)
             if not V.Freecam or not V.FreecamGhostPart or not V.FreecamGhostPart.Parent then return end
@@ -11434,24 +11574,17 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
 
             local cam = workspace.CurrentCamera
             local move = Vector3.zero
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) then
-                move = move + cam.CFrame.LookVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-                move = move - cam.CFrame.LookVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q) then
-                move = move - cam.CFrame.RightVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-                move = move + cam.CFrame.RightVector
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) or UserInputService:IsKeyDown(Enum.KeyCode.E) then
-                move = move + Vector3.new(0, 1, 0)
-            end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.C) then
-                move = move - Vector3.new(0, 1, 0)
-            end
+            local isFwd = UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z)
+            local isLeft = UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q)
+            local isBack = UserInputService:IsKeyDown(Enum.KeyCode.S)
+            local isRight = UserInputService:IsKeyDown(Enum.KeyCode.D)
+
+            if isFwd then move = move + cam.CFrame.LookVector end
+            if isBack then move = move - cam.CFrame.LookVector end
+            if isLeft then move = move - cam.CFrame.RightVector end
+            if isRight then move = move + cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0, 1, 0) end
 
             local ghostSpeed = V.FreecamSpeed or 60
             if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift) then
@@ -11507,12 +11640,15 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
         local char = LocalPlayer.Character
         if char then
             local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
             local ghostPart = V.FreecamGhostPart or workspace:FindFirstChild("SeGhost")
+
             if hrp then
+                -- Realigner la position du joueur avec un offset vertical pour ne jamais clip dans le sol
                 if ghostPart and ghostPart.Parent then
-                    hrp.CFrame = ghostPart.CFrame
+                    hrp.CFrame = ghostPart.CFrame + Vector3.new(0, 2.5, 0)
                 elseif V.FreecamOriginalCharCF then
-                    hrp.CFrame = V.FreecamOriginalCharCF
+                    hrp.CFrame = V.FreecamOriginalCharCF + Vector3.new(0, 1, 0)
                 end
                 V.FreecamOriginalCharCF = nil
                 hrp.Anchored = false
@@ -11522,19 +11658,58 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
                 end)
             end
 
-            local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then
                 Camera.CameraSubject = hum
-                hum.WalkSpeed = V.SpeedEnabled and V.Speed or 16
-                hum.JumpPower = V.JumpEnabled and V.Jump or 50
+                Camera.CameraType = Enum.CameraType.Custom
+
+                -- Restauration exacte de la vitesse
+                if V.SpeedEnabled and V.Speed then
+                    hum.WalkSpeed = V.Speed
+                else
+                    local restoredSpeed = V._FreecamPreWalkSpeed or (_OrigWalkSpeed and _OrigWalkSpeed >= 16 and _OrigWalkSpeed) or 16
+                    hum.WalkSpeed = restoredSpeed
+                end
+
+                -- Restauration exacte du saut (JumpPower & JumpHeight)
+                if V.JumpEnabled and V.Jump then
+                    hum.UseJumpPower = true
+                    hum.JumpPower = V.Jump
+                else
+                    if V._FreecamPreUseJumpPower ~= nil then
+                        hum.UseJumpPower = V._FreecamPreUseJumpPower
+                    end
+                    local restoredJump = V._FreecamPreJumpPower or (_OrigJumpPower and _OrigJumpPower > 0 and _OrigJumpPower) or 50
+                    hum.JumpPower = restoredJump
+
+                    local restoredJumpHeight = V._FreecamPreJumpHeight or (_OrigJumpHeight and _OrigJumpHeight > 0 and _OrigJumpHeight) or 7.2
+                    hum.JumpHeight = restoredJumpHeight
+                end
+
                 hum.AutoRotate = true
                 hum.PlatformStand = false
+                hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+                hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+                hum:SetStateEnabled(Enum.HumanoidStateType.Running, true)
+                hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
                 hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+
+                task.delay(0.08, function()
+                    pcall(function()
+                        if hum and hum.Parent then
+                            hum:ChangeState(Enum.HumanoidStateType.Running)
+                        end
+                    end)
+                end)
             end
 
+            -- Restauration propre des collisions : HumanoidRootPart ne DOIT JAMAIS avoir CanCollide = true
             for _, part in pairs(char:GetDescendants()) do
                 if part:IsA("BasePart") then
-                    part.CanCollide = true
+                    if part.Name == "HumanoidRootPart" then
+                        part.CanCollide = false
+                    else
+                        part.CanCollide = true
+                    end
                     part.Transparency = part:GetAttribute("_FreecamOrigTrans") or 0
                     part.LocalTransparencyModifier = 0
                 elseif part:IsA("Decal") or part:IsA("Texture") then
@@ -13599,14 +13774,14 @@ createToggle("Auto Lock (Dans FOV)", false, function(enabled)
 end, AimContent, "AimAutoLock")
 
 AimlockKeyBtn = nil
-do
+pcall(function()
     local AimKeyCard = createCard(AimContent, 0, 46)
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, -90, 1, 0)
     title.Position = UDim2.new(0, 12, 0, 0)
     title.BackgroundTransparency = 1
     title.Text = "Aimlock Keybind"
-    title.TextColor3 = theme.text
+    title.TextColor3 = theme.text or Color3.fromRGB(235, 235, 242)
     title.Font = Enum.Font.GothamMedium
     title.TextSize = 11
     title.TextXAlignment = Enum.TextXAlignment.Left
@@ -13616,18 +13791,21 @@ do
     local keyBtn = Instance.new("TextButton")
     keyBtn.Size = UDim2.new(0, 68, 0, 26)
     keyBtn.Position = UDim2.new(1, -78, 0.5, -13)
-    keyBtn.BackgroundColor3 = theme.cardHover
+    keyBtn.BackgroundColor3 = theme.cardHover or Color3.fromRGB(31, 33, 47)
     keyBtn.BorderSizePixel = 0
-    keyBtn.Text = "[" .. tostring(_G.Aimlock_KeyName or "E") .. "]"
-    keyBtn.TextColor3 = theme.accent
+    keyBtn.Text = "[" .. tostring(_G.Aimlock_KeyName or "Aucun") .. "]"
+    local dimCol = theme.textDim or theme.sub or Color3.fromRGB(130, 134, 152)
+    local accCol = theme.accent or Color3.fromRGB(145, 120, 255)
+    keyBtn.TextColor3 = (_G.Aimlock_KeyName and _G.Aimlock_KeyName ~= "Aucun") and accCol or dimCol
     keyBtn.Font = Enum.Font.GothamBold
     keyBtn.TextSize = 10
     keyBtn.ZIndex = 9
     keyBtn.Parent = AimKeyCard
     makeCorner(keyBtn, 8)
-    makeStroke(keyBtn, theme.border, 1)
+    makeStroke(keyBtn, theme.border or Color3.fromRGB(44, 46, 62), 1)
     AimlockKeyBtn = keyBtn
     KeybindButtons["Aimlock"] = keyBtn
+    registerSearchCard(AimKeyCard, "Aimlock Keybind Touche", AimContent)
 
     local waitingAimKey = false
     keyBtn.MouseButton1Click:Connect(function()
@@ -13638,6 +13816,17 @@ do
 
     UserInputService.InputBegan:Connect(function(input, gpe)
         if waitingAimKey then
+            if input.KeyCode == Enum.KeyCode.Backspace or input.KeyCode == Enum.KeyCode.Delete or input.KeyCode == Enum.KeyCode.Escape then
+                _G.Aimlock_Key = nil
+                Aimlock_Key = nil
+                _G.Aimlock_KeyName = "Aucun"
+                Aimlock_KeyName = "Aucun"
+                keyBtn.Text = "[Aucun]"
+                keyBtn.TextColor3 = theme.textDim or theme.sub or Color3.fromRGB(130, 134, 152)
+                waitingAimKey = false
+                notify("Keybind", "Aimlock: Touche retiree (Pas attribue)", Color3.fromRGB(255, 170, 0))
+                return
+            end
             local chosenKey, keyName = nil, nil
             if input.UserInputType == Enum.UserInputType.Keyboard then
                 chosenKey = input.KeyCode
@@ -13658,13 +13847,13 @@ do
                 _G.Aimlock_KeyName = keyName
                 Aimlock_KeyName = keyName
                 keyBtn.Text = "[" .. keyName .. "]"
-                keyBtn.TextColor3 = theme.accent
+                keyBtn.TextColor3 = theme.accent or Color3.fromRGB(145, 120, 255)
                 waitingAimKey = false
                 notify("Keybind", "Aimlock bind: " .. keyName, Color3.fromRGB(80, 200, 120))
             end
         end
     end)
-end
+end)
 
 aimPartFrame, aimPartBtnObj, aimPartValue = createValueButton(AimContent, "Target Part (Partie Visée)", "Head", function()
     local parts = {"Head", "HumanoidRootPart", "UpperTorso"}
@@ -14044,189 +14233,191 @@ createToggle("Bullet Tracers Néon (Violet/Cyan)", false, function(enabled)
     toggleBulletTracers(enabled)
 end, AimContent, "BulletTracers")
 
-initStep = "cablage Teleport/Joueur"
-createLabel("WAYPOINTS", TeleportContent)
-local refreshTPMiniList = nil
-local TPMiniGui = nil
+initStep = "cablage Teleport"
+pcall(function()
+    TeleportContent.ScrollBarThickness = 3
+    TeleportContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    TeleportContent.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-local function toggleTPMiniWindow(enabled)
-    V.TPMiniWindow = enabled
-    if not enabled then
+    local refreshTPMiniList = nil
+    local TPMiniGui = nil
+
+    local function toggleTPMiniWindow(enabled)
+        V.TPMiniWindow = enabled
+        if not enabled then
+            if TPMiniGui then
+                pcall(function() TPMiniGui:Destroy() end)
+                TPMiniGui = nil
+            end
+            return
+        end
+
         if TPMiniGui then
             pcall(function() TPMiniGui:Destroy() end)
             TPMiniGui = nil
         end
-        return
-    end
 
-    if TPMiniGui then
-        pcall(function() TPMiniGui:Destroy() end)
-        TPMiniGui = nil
-    end
+        TPMiniGui = Instance.new("ScreenGui")
+        TPMiniGui.Name = "PearlTPMiniGui"
+        TPMiniGui.ResetOnSpawn = false
+        TPMiniGui.DisplayOrder = 10005
+        TPMiniGui.Parent = parentTarget
 
-    TPMiniGui = Instance.new("ScreenGui")
-    TPMiniGui.Name = "PearlTPMiniGui"
-    TPMiniGui.ResetOnSpawn = false
-    TPMiniGui.DisplayOrder = 10005
-    TPMiniGui.Parent = parentTarget
+        local MainFrame = Instance.new("Frame")
+        MainFrame.Name = "MainFrame"
+        MainFrame.Size = UDim2.new(0, 260, 0, 310)
+        MainFrame.Position = UDim2.new(0.82, -260, 0.35, 0)
+        MainFrame.BackgroundColor3 = theme.panel
+        MainFrame.BorderSizePixel = 0
+        MainFrame.ClipsDescendants = true
+        MainFrame.Active = true
+        MainFrame.Parent = TPMiniGui
+        makeCorner(MainFrame, 14)
+        makeStroke(MainFrame, theme.border, 1.2)
 
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 260, 0, 310)
-    MainFrame.Position = UDim2.new(0.82, -260, 0.35, 0)
-    MainFrame.BackgroundColor3 = theme.panel
-    MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = true
-    MainFrame.Active = true
-    MainFrame.Parent = TPMiniGui
-    makeCorner(MainFrame, 14)
-    makeStroke(MainFrame, theme.border, 1.2)
+        local Header = Instance.new("Frame")
+        Header.Name = "Header"
+        Header.Size = UDim2.new(1, 0, 0, 44)
+        Header.BackgroundColor3 = theme.panel2
+        Header.BorderSizePixel = 0
+        Header.Active = true
+        Header.Parent = MainFrame
+        makeCorner(Header, 14)
 
-    local Header = Instance.new("Frame")
-    Header.Name = "Header"
-    Header.Size = UDim2.new(1, 0, 0, 44)
-    Header.BackgroundColor3 = theme.panel2
-    Header.BorderSizePixel = 0
-    Header.Active = true
-    Header.Parent = MainFrame
-    makeCorner(Header, 14)
+        local HeaderLine = Instance.new("Frame")
+        HeaderLine.Size = UDim2.new(1, 0, 0, 1)
+        HeaderLine.Position = UDim2.new(0, 0, 1, -1)
+        HeaderLine.BackgroundColor3 = theme.border
+        HeaderLine.BackgroundTransparency = 0.5
+        HeaderLine.BorderSizePixel = 0
+        HeaderLine.Parent = Header
 
-    local HeaderLine = Instance.new("Frame")
-    HeaderLine.Size = UDim2.new(1, 0, 0, 1)
-    HeaderLine.Position = UDim2.new(0, 0, 1, -1)
-    HeaderLine.BackgroundColor3 = theme.border
-    HeaderLine.BackgroundTransparency = 0.5
-    HeaderLine.BorderSizePixel = 0
-    HeaderLine.Parent = Header
+        local TitleLogo = Instance.new("TextLabel")
+        TitleLogo.Size = UDim2.new(1, -70, 0, 18)
+        TitleLogo.Position = UDim2.new(0, 12, 0, 6)
+        TitleLogo.BackgroundTransparency = 1
+        TitleLogo.Text = "Pearl"
+        TitleLogo.TextColor3 = theme.accent
+        TitleLogo.Font = Enum.Font.GothamBlack
+        TitleLogo.TextSize = 14
+        TitleLogo.TextXAlignment = Enum.TextXAlignment.Left
+        TitleLogo.Parent = Header
 
-    local TitleLogo = Instance.new("TextLabel")
-    TitleLogo.Size = UDim2.new(1, -70, 0, 18)
-    TitleLogo.Position = UDim2.new(0, 12, 0, 6)
-    TitleLogo.BackgroundTransparency = 1
-    TitleLogo.Text = "Pearl"
-    TitleLogo.TextColor3 = theme.accent
-    TitleLogo.Font = Enum.Font.GothamBlack
-    TitleLogo.TextSize = 14
-    TitleLogo.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLogo.Parent = Header
+        local TitleSub = Instance.new("TextLabel")
+        TitleSub.Size = UDim2.new(1, -70, 0, 12)
+        TitleSub.Position = UDim2.new(0, 12, 0, 24)
+        TitleSub.BackgroundTransparency = 1
+        TitleSub.Text = "WAYPOINTS TP"
+        TitleSub.TextColor3 = theme.sub
+        TitleSub.Font = Enum.Font.Code
+        TitleSub.TextSize = 9
+        TitleSub.TextXAlignment = Enum.TextXAlignment.Left
+        TitleSub.Parent = Header
 
-    local TitleSub = Instance.new("TextLabel")
-    TitleSub.Size = UDim2.new(1, -70, 0, 12)
-    TitleSub.Position = UDim2.new(0, 12, 0, 24)
-    TitleSub.BackgroundTransparency = 1
-    TitleSub.Text = "WAYPOINTS TP"
-    TitleSub.TextColor3 = theme.sub
-    TitleSub.Font = Enum.Font.Code
-    TitleSub.TextSize = 9
-    TitleSub.TextXAlignment = Enum.TextXAlignment.Left
-    TitleSub.Parent = Header
+        local CloseBtn = Instance.new("TextButton")
+        CloseBtn.Size = UDim2.new(0, 24, 0, 24)
+        CloseBtn.Position = UDim2.new(1, -30, 0.5, -12)
+        CloseBtn.BackgroundTransparency = 1
+        CloseBtn.BorderSizePixel = 0
+        CloseBtn.Text = "✕"
+        CloseBtn.TextColor3 = theme.sub
+        CloseBtn.Font = Enum.Font.GothamBold
+        CloseBtn.TextSize = 16
+        CloseBtn.Parent = Header
 
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.new(0, 24, 0, 24)
-    CloseBtn.Position = UDim2.new(1, -30, 0.5, -12)
-    CloseBtn.BackgroundTransparency = 1
-    CloseBtn.BorderSizePixel = 0
-    CloseBtn.Text = "✕"
-    CloseBtn.TextColor3 = theme.sub
-    CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.TextSize = 16
-    CloseBtn.Parent = Header
+        CloseBtn.MouseEnter:Connect(function()
+            TweenService:Create(CloseBtn, TweenInfo.new(0.15), {TextColor3 = theme.danger}):Play()
+        end)
+        CloseBtn.MouseLeave:Connect(function()
+            TweenService:Create(CloseBtn, TweenInfo.new(0.15), {TextColor3 = theme.sub}):Play()
+        end)
 
-    CloseBtn.MouseEnter:Connect(function()
-        TweenService:Create(CloseBtn, TweenInfo.new(0.15), {TextColor3 = theme.danger}):Play()
-    end)
-    CloseBtn.MouseLeave:Connect(function()
-        TweenService:Create(CloseBtn, TweenInfo.new(0.15), {TextColor3 = theme.sub}):Play()
-    end)
-
-    CloseBtn.MouseButton1Click:Connect(function()
-        if ConfigRegistry and ConfigRegistry["TPMiniWindow"] then
-            ConfigRegistry["TPMiniWindow"](false)
-        else
-            toggleTPMiniWindow(false)
-        end
-    end)
-
-    local isDragging = false
-    local dragStart = nil
-    local startPos = nil
-
-    Header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    isDragging = false
-                end
-            end)
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-
-    local MiniQuickAddBtn = Instance.new("TextButton")
-    MiniQuickAddBtn.Size = UDim2.new(1, -16, 0, 32)
-    MiniQuickAddBtn.Position = UDim2.new(0, 8, 0, 52)
-    MiniQuickAddBtn.BackgroundColor3 = theme.card
-    MiniQuickAddBtn.BorderSizePixel = 0
-    MiniQuickAddBtn.Text = "+ Sauvegarder Position Actuelle"
-    MiniQuickAddBtn.TextColor3 = theme.text
-    MiniQuickAddBtn.Font = Enum.Font.GothamMedium
-    MiniQuickAddBtn.TextSize = 11
-    MiniQuickAddBtn.Parent = MainFrame
-    makeCorner(MiniQuickAddBtn, 8)
-    makeStroke(MiniQuickAddBtn, theme.border, 1)
-
-    MiniQuickAddBtn.MouseEnter:Connect(function()
-        TweenService:Create(MiniQuickAddBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.cardHover}):Play()
-    end)
-    MiniQuickAddBtn.MouseLeave:Connect(function()
-        TweenService:Create(MiniQuickAddBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.card}):Play()
-    end)
-
-    local ScrollList = Instance.new("ScrollingFrame")
-    ScrollList.Name = "ScrollList"
-    ScrollList.Size = UDim2.new(1, -16, 1, -94)
-    ScrollList.Position = UDim2.new(0, 8, 0, 90)
-    ScrollList.BackgroundTransparency = 1
-    ScrollList.BorderSizePixel = 0
-    ScrollList.CanvasSize = UDim2.new(0, 0, 0, 0)
-    ScrollList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    ScrollList.ScrollBarThickness = 3
-    ScrollList.ScrollBarImageColor3 = theme.border
-    ScrollList.ScrollBarImageTransparency = 0.3
-    ScrollList.Parent = MainFrame
-
-    local ListLayout = Instance.new("UIListLayout")
-    ListLayout.Padding = UDim.new(0, 6)
-    ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    ListLayout.Parent = ScrollList
-
-    local function renderMiniList()
-        if not ScrollList or not ScrollList.Parent then return end
-        for _, child in pairs(ScrollList:GetChildren()) do
-            if child:IsA("Frame") or child:IsA("TextLabel") then
-                child:Destroy()
+        CloseBtn.MouseButton1Click:Connect(function()
+            if ConfigRegistry and ConfigRegistry["TPMiniWindow"] then
+                ConfigRegistry["TPMiniWindow"](false)
+            else
+                toggleTPMiniWindow(false)
             end
-        end
+        end)
 
-        local count = 0
-        if Pearl and Pearl.TeleportPoints then
-            for wpKey, wpData in pairs(Pearl.TeleportPoints) do
-                count = count + 1
+        local isDragging = false
+        local dragStart = nil
+        local startPos = nil
+
+        Header.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                isDragging = true
+                dragStart = input.Position
+                startPos = MainFrame.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        isDragging = false
+                    end
+                end)
+            end
+        end)
+
+        UserInputService.InputChanged:Connect(function(input)
+            if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+
+        local MiniQuickAddBtn = Instance.new("TextButton")
+        MiniQuickAddBtn.Size = UDim2.new(1, -16, 0, 32)
+        MiniQuickAddBtn.Position = UDim2.new(0, 8, 0, 52)
+        MiniQuickAddBtn.BackgroundColor3 = theme.card
+        MiniQuickAddBtn.BorderSizePixel = 0
+        MiniQuickAddBtn.Text = "+ Ajouter Position Actuelle"
+        MiniQuickAddBtn.TextColor3 = theme.text
+        MiniQuickAddBtn.Font = Enum.Font.GothamBold
+        MiniQuickAddBtn.TextSize = 11
+        MiniQuickAddBtn.AutoButtonColor = false
+        MiniQuickAddBtn.Parent = MainFrame
+        makeCorner(MiniQuickAddBtn, 8)
+        makeStroke(MiniQuickAddBtn, theme.border, 1)
+
+        MiniQuickAddBtn.MouseEnter:Connect(function()
+            TweenService:Create(MiniQuickAddBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.cardHover}):Play()
+        end)
+        MiniQuickAddBtn.MouseLeave:Connect(function()
+            TweenService:Create(MiniQuickAddBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.card}):Play()
+        end)
+
+        local ScrollList = Instance.new("ScrollingFrame")
+        ScrollList.Size = UDim2.new(1, -16, 1, -94)
+        ScrollList.Position = UDim2.new(0, 8, 0, 90)
+        ScrollList.BackgroundTransparency = 1
+        ScrollList.BorderSizePixel = 0
+        ScrollList.ScrollBarThickness = 2
+        ScrollList.ScrollBarImageColor3 = theme.border
+        ScrollList.CanvasSize = UDim2.new(0, 0, 0, 0)
+        ScrollList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        ScrollList.Parent = MainFrame
+
+        local ListLayout = Instance.new("UIListLayout")
+        ListLayout.Padding = UDim.new(0, 6)
+        ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        ListLayout.Parent = ScrollList
+
+        local function renderMiniList()
+            if not ScrollList or not ScrollList.Parent then return end
+            for _, c in ipairs(ScrollList:GetChildren()) do
+                if c:IsA("Frame") or c:IsA("TextLabel") then
+                    c:Destroy()
+                end
+            end
+
+            local hasPoints = false
+            for k, wp in pairs(Pearl.TeleportPoints) do
+                hasPoints = true
                 local itemRow = Instance.new("Frame")
-                itemRow.Size = UDim2.new(1, 0, 0, 36)
+                itemRow.Size = UDim2.new(1, -4, 0, 34)
                 itemRow.BackgroundColor3 = theme.card
                 itemRow.BorderSizePixel = 0
                 itemRow.Parent = ScrollList
-                makeCorner(itemRow, 8)
+                makeCorner(itemRow, 6)
                 makeStroke(itemRow, theme.border, 1)
 
                 itemRow.MouseEnter:Connect(function()
@@ -14237,10 +14428,10 @@ local function toggleTPMiniWindow(enabled)
                 end)
 
                 local nameLbl = Instance.new("TextLabel")
-                nameLbl.Size = UDim2.new(1, -96, 1, 0)
-                nameLbl.Position = UDim2.new(0, 10, 0, 0)
+                nameLbl.Size = UDim2.new(1, -100, 1, 0)
+                nameLbl.Position = UDim2.new(0, 8, 0, 0)
                 nameLbl.BackgroundTransparency = 1
-                nameLbl.Text = tostring(wpData.Name or "Point")
+                nameLbl.Text = tostring(wp.Name)
                 nameLbl.TextColor3 = theme.text
                 nameLbl.Font = Enum.Font.GothamMedium
                 nameLbl.TextSize = 11
@@ -14250,7 +14441,7 @@ local function toggleTPMiniWindow(enabled)
 
                 local tpBtn = Instance.new("TextButton")
                 tpBtn.Size = UDim2.new(0, 42, 0, 24)
-                tpBtn.Position = UDim2.new(1, -84, 0.5, -12)
+                tpBtn.Position = UDim2.new(1, -92, 0.5, -12)
                 tpBtn.BackgroundColor3 = theme.accent
                 tpBtn.BorderSizePixel = 0
                 tpBtn.Text = "TP"
@@ -14258,26 +14449,28 @@ local function toggleTPMiniWindow(enabled)
                 tpBtn.Font = Enum.Font.GothamBold
                 tpBtn.TextSize = 10
                 tpBtn.Parent = itemRow
-                makeCorner(tpBtn, 6)
+                makeCorner(tpBtn, 5)
 
                 tpBtn.MouseButton1Click:Connect(function()
+                    playClick()
                     local char = LocalPlayer.Character
                     if char and char:FindFirstChild("HumanoidRootPart") then
-                        char.HumanoidRootPart.CFrame = CFrame.new(wpData.Position)
-                        notify("Teleport", "Téléporté à " .. tostring(wpData.Name), Color3.fromRGB(80, 200, 120))
+                        char.HumanoidRootPart.CFrame = CFrame.new(wp.Position)
+                        notify("Teleport", "Téléporté à " .. tostring(wp.Name), Color3.fromRGB(80, 200, 120))
                     end
                 end)
 
                 local delBtn = Instance.new("TextButton")
-                delBtn.Size = UDim2.new(0, 22, 0, 22)
-                delBtn.Position = UDim2.new(1, -30, 0.5, -11)
-                delBtn.BackgroundTransparency = 1
+                delBtn.Size = UDim2.new(0, 42, 0, 24)
+                delBtn.Position = UDim2.new(1, -46, 0.5, -12)
+                delBtn.BackgroundColor3 = Color3.fromRGB(36, 18, 22)
                 delBtn.BorderSizePixel = 0
-                delBtn.Text = "✕"
+                delBtn.Text = "Suppr"
                 delBtn.TextColor3 = theme.sub
                 delBtn.Font = Enum.Font.GothamBold
-                delBtn.TextSize = 14
+                delBtn.TextSize = 10
                 delBtn.Parent = itemRow
+                makeCorner(delBtn, 5)
 
                 delBtn.MouseEnter:Connect(function()
                     TweenService:Create(delBtn, TweenInfo.new(0.15), {TextColor3 = theme.danger}):Play()
@@ -14287,30 +14480,167 @@ local function toggleTPMiniWindow(enabled)
                 end)
 
                 delBtn.MouseButton1Click:Connect(function()
-                    Pearl.TeleportPoints[wpKey] = nil
+                    playClick()
+                    Pearl.TeleportPoints[k] = nil
                     renderMiniList()
-                    if _G.PearlRefreshWaypointList then
-                        _G.PearlRefreshWaypointList()
-                    end
-                    notify("Teleport", "Waypoint supprimé", Color3.fromRGB(255, 90, 90))
+                    if _G.PearlRefreshWaypointList then _G.PearlRefreshWaypointList() end
+                    notify("Teleport", "Point supprimé : " .. tostring(wp.Name), Color3.fromRGB(255, 90, 90))
                 end)
+            end
+
+            if not hasPoints then
+                local emptyLbl = Instance.new("TextLabel")
+                emptyLbl.Size = UDim2.new(1, 0, 0, 40)
+                emptyLbl.BackgroundTransparency = 1
+                emptyLbl.Text = "Aucun waypoint"
+                emptyLbl.TextColor3 = theme.sub
+                emptyLbl.Font = Enum.Font.Gotham
+                emptyLbl.TextSize = 10.5
+                emptyLbl.Parent = ScrollList
             end
         end
 
-        if count == 0 then
-            local emptyLbl = Instance.new("TextLabel")
-            emptyLbl.Size = UDim2.new(1, 0, 0, 60)
-            emptyLbl.BackgroundTransparency = 1
-            emptyLbl.Text = "Aucun waypoint sauvegardé.\nClique sur '+ Sauvegarder' pour en créer !"
-            emptyLbl.TextColor3 = theme.sub
-            emptyLbl.Font = Enum.Font.GothamMedium
-            emptyLbl.TextSize = 10
-            emptyLbl.TextWrapped = true
-            emptyLbl.Parent = ScrollList
-        end
+        MiniQuickAddBtn.MouseButton1Click:Connect(function()
+            playClick()
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local count = 0
+                for _ in pairs(Pearl.TeleportPoints) do count = count + 1 end
+                local newName = "Point_" .. tostring(count + 1)
+                Pearl.TeleportPoints[newName .. "_" .. tostring(os.clock())] = {
+                    Position = char.HumanoidRootPart.Position,
+                    Name = newName
+                }
+                renderMiniList()
+                if _G.PearlRefreshWaypointList then
+                    _G.PearlRefreshWaypointList()
+                end
+                notify("Teleport", "Point '" .. newName .. "' enregistré !", Color3.fromRGB(80, 200, 120))
+            end
+        end)
+
+        refreshTPMiniList = renderMiniList
+        renderMiniList()
     end
 
-    MiniQuickAddBtn.MouseButton1Click:Connect(function()
+    -- ====================================================================
+    -- SECTION 1 : TÉLÉPORTATION AUX JOUEURS
+    -- ====================================================================
+    createLabel("TÉLÉPORTATION AUX JOUEURS", TeleportContent)
+
+    local selectedTPPlayer = nil
+    local tpPlayerBtnFrame, tpPlayerBtnObj, tpPlayerValue = createValueButton(TeleportContent, "Joueur Cible TP", "Aucun", function()
+        local playerList = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                table.insert(playerList, p)
+            end
+        end
+        if #playerList == 0 then
+            notify("Teleport", "Aucun autre joueur sur le serveur !", Color3.fromRGB(255, 170, 0))
+            return "Aucun"
+        end
+        local curIdx = 0
+        for idx, p in ipairs(playerList) do
+            if p == selectedTPPlayer then
+                curIdx = idx
+                break
+            end
+        end
+        local nextIdx = (curIdx % #playerList) + 1
+        selectedTPPlayer = playerList[nextIdx]
+        return selectedTPPlayer.DisplayName .. " (@" .. selectedTPPlayer.Name .. ")"
+    end)
+
+    createButton("Téléporter sur le Joueur (Instant TP)", function()
+        if not selectedTPPlayer or not selectedTPPlayer.Parent then
+            notify("Teleport", "Veuillez d'abord sélectionner un joueur !", Color3.fromRGB(255, 170, 0))
+            return
+        end
+        if _G.teleportToPlayer then
+            _G.teleportToPlayer(selectedTPPlayer)
+        elseif teleportToPlayer then
+            teleportToPlayer(selectedTPPlayer)
+        end
+    end, TeleportContent)
+
+    createButton("Téléporter (Bypass Anti-Cheat / Micro-sauts)", function()
+        if not selectedTPPlayer or not selectedTPPlayer.Parent then
+            notify("Teleport", "Veuillez d'abord sélectionner un joueur !", Color3.fromRGB(255, 170, 0))
+            return
+        end
+        local myChar = LocalPlayer.Character
+        local tChar = selectedTPPlayer.Character
+        if not myChar or not tChar then return end
+        local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+        local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+        if not myRoot or not tRoot then return end
+
+        task.spawn(function()
+            local startPos = myRoot.Position
+            local endPos = tRoot.Position + Vector3.new(0, 2, 2)
+            local totalDist = (endPos - startPos).Magnitude
+            local stepSize = 15
+            local steps = math.ceil(totalDist / stepSize)
+            if steps < 1 then steps = 1 end
+            notify("Teleport", "TP Bypass AC en cours (" .. steps .. " micro-sauts)...", Color3.fromRGB(80, 200, 120))
+            for i = 1, steps do
+                local alpha = i / steps
+                local interpPos = startPos:Lerp(endPos, alpha)
+                pcall(function()
+                    myRoot.CFrame = CFrame.new(interpPos) * (myRoot.CFrame - myRoot.CFrame.Position)
+                end)
+                game:GetService("RunService").Heartbeat:Wait()
+                game:GetService("RunService").Heartbeat:Wait()
+            end
+            notify("Teleport", "Téléporté avec succès à " .. selectedTPPlayer.DisplayName, Color3.fromRGB(80, 200, 120))
+        end)
+    end, TeleportContent)
+
+    createButton("Téléporter au-dessus (+15 studs / High Ground)", function()
+        if not selectedTPPlayer or not selectedTPPlayer.Parent then
+            notify("Teleport", "Veuillez d'abord sélectionner un joueur !", Color3.fromRGB(255, 170, 0))
+            return
+        end
+        local myChar = LocalPlayer.Character
+        local tChar = selectedTPPlayer.Character
+        if myChar and tChar then
+            local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+            local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+            if myRoot and tRoot then
+                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 15, 0)
+                notify("Teleport", "Téléporté au-dessus de " .. selectedTPPlayer.DisplayName, Color3.fromRGB(80, 200, 120))
+            end
+        end
+    end, TeleportContent)
+
+    createButton("Téléporter derrière (-5 studs / Backstab)", function()
+        if not selectedTPPlayer or not selectedTPPlayer.Parent then
+            notify("Teleport", "Veuillez d'abord sélectionner un joueur !", Color3.fromRGB(255, 170, 0))
+            return
+        end
+        local myChar = LocalPlayer.Character
+        local tChar = selectedTPPlayer.Character
+        if myChar and tChar then
+            local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+            local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+            if myRoot and tRoot then
+                myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 0, 5)
+                notify("Teleport", "Téléporté dans le dos de " .. selectedTPPlayer.DisplayName, Color3.fromRGB(80, 200, 120))
+            end
+        end
+    end, TeleportContent)
+
+    -- ====================================================================
+    -- SECTION 2 : WAYPOINTS & POINTS DE REPÈRE
+    -- ====================================================================
+    createLabel("WAYPOINTS & POINTS DE REPÈRE", TeleportContent)
+
+    createToggle("Mini-Interface TP Flottante (Draggable)", false, function(enabled)
+        toggleTPMiniWindow(enabled)
+    end, TeleportContent, "TPMiniWindow")
+
+    createButton("Sauvegarder ma Position Actuelle (Ajout Rapide)", function()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             local count = 0
@@ -14320,177 +14650,387 @@ local function toggleTPMiniWindow(enabled)
                 Position = char.HumanoidRootPart.Position,
                 Name = newName
             }
-            renderMiniList()
-            if _G.PearlRefreshWaypointList then
-                _G.PearlRefreshWaypointList()
+            if _G.PearlRefreshWaypointList then _G.PearlRefreshWaypointList() end
+            if refreshTPMiniList then pcall(refreshTPMiniList) end
+            notify("Teleport", "Point '" .. newName .. "' enregistré avec succès !", Color3.fromRGB(80, 200, 120))
+        else
+            notify("Teleport", "Personnage introuvable !", Color3.fromRGB(255, 90, 90))
+        end
+    end, TeleportContent)
+
+    do
+        local WaypointInputCard = createCard(TeleportContent, 0, 44)
+        local WaypointNameBox = Instance.new("TextBox")
+        WaypointNameBox.Size = UDim2.new(1, -95, 0, 30)
+        WaypointNameBox.Position = UDim2.new(0, 10, 0.5, -15)
+        WaypointNameBox.BackgroundColor3 = Color3.fromRGB(24, 25, 34)
+        WaypointNameBox.BorderSizePixel = 0
+        WaypointNameBox.PlaceholderText = "Nom du Waypoint personnalisé..."
+        WaypointNameBox.PlaceholderColor3 = Colors.TextDim
+        WaypointNameBox.Text = ""
+        WaypointNameBox.TextColor3 = Colors.Text
+        WaypointNameBox.Font = Enum.Font.GothamMedium
+        WaypointNameBox.TextSize = 11.5
+        WaypointNameBox.TextXAlignment = Enum.TextXAlignment.Left
+        WaypointNameBox.ClearTextOnFocus = false
+        WaypointNameBox.Parent = WaypointInputCard
+        makeCorner(WaypointNameBox, 6)
+        makeStroke(WaypointNameBox, Colors.Border, 1)
+
+        local boxPad = Instance.new("UIPadding")
+        boxPad.PaddingLeft = UDim.new(0, 8)
+        boxPad.Parent = WaypointNameBox
+
+        local AddWpBtn = Instance.new("TextButton")
+        AddWpBtn.Size = UDim2.new(0, 75, 0, 30)
+        AddWpBtn.Position = UDim2.new(1, -82, 0.5, -15)
+        AddWpBtn.BackgroundColor3 = Colors.Accent
+        AddWpBtn.BorderSizePixel = 0
+        AddWpBtn.Text = "Ajouter"
+        AddWpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        AddWpBtn.Font = Enum.Font.GothamBold
+        AddWpBtn.TextSize = 11
+        AddWpBtn.AutoButtonColor = false
+        AddWpBtn.Parent = WaypointInputCard
+        makeCorner(AddWpBtn, 6)
+
+        local WaypointCardFrame = createCard(TeleportContent, 0, 185)
+        local WpScroll = Instance.new("ScrollingFrame")
+        WpScroll.Size = UDim2.new(1, -16, 1, -16)
+        WpScroll.Position = UDim2.new(0, 8, 0, 8)
+        WpScroll.BackgroundTransparency = 1
+        WpScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        WpScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        WpScroll.ScrollBarThickness = 3
+        WpScroll.ScrollBarImageColor3 = Colors.Accent
+        WpScroll.ScrollBarImageTransparency = 0.5
+        WpScroll.BorderSizePixel = 0
+        WpScroll.Parent = WaypointCardFrame
+
+        local WpListLayout = Instance.new("UIListLayout")
+        WpListLayout.Padding = UDim.new(0, 6)
+        WpListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        WpListLayout.Parent = WpScroll
+
+        local wpEmptyLabel = Instance.new("TextLabel")
+        wpEmptyLabel.Size = UDim2.new(1, 0, 0, 40)
+        wpEmptyLabel.BackgroundTransparency = 1
+        wpEmptyLabel.Text = "Aucun point de téléportation enregistré"
+        wpEmptyLabel.TextColor3 = Colors.TextDim
+        wpEmptyLabel.Font = Enum.Font.Gotham
+        wpEmptyLabel.TextSize = 11
+        wpEmptyLabel.Parent = WpScroll
+
+        local function refreshFullWaypointList()
+            for _, child in pairs(WpScroll:GetChildren()) do
+                if child:IsA("Frame") then child:Destroy() end
             end
-            notify("Teleport", "Point '" .. newName .. "' enregistré !", Color3.fromRGB(80, 200, 120))
+            local hasPoints = false
+            for wpKey, wpData in pairs(Pearl.TeleportPoints) do
+                hasPoints = true
+                local row = Instance.new("Frame")
+                row.Size = UDim2.new(1, -6, 0, 36)
+                row.BackgroundColor3 = Color3.fromRGB(20, 21, 28)
+                row.BorderSizePixel = 0
+                row.Parent = WpScroll
+                makeCorner(row, 6)
+                makeStroke(row, Colors.Border, 1)
+
+                local lbl = Instance.new("TextLabel")
+                lbl.Size = UDim2.new(1, -125, 1, 0)
+                lbl.Position = UDim2.new(0, 10, 0, 0)
+                lbl.BackgroundTransparency = 1
+                lbl.Text = tostring(wpData.Name)
+                lbl.TextColor3 = Colors.Text
+                lbl.Font = Enum.Font.GothamMedium
+                lbl.TextSize = 11.5
+                lbl.TextXAlignment = Enum.TextXAlignment.Left
+                lbl.TextTruncate = Enum.TextTruncate.AtEnd
+                lbl.Parent = row
+
+                local tpBtn = Instance.new("TextButton")
+                tpBtn.Size = UDim2.new(0, 50, 0, 24)
+                tpBtn.Position = UDim2.new(1, -112, 0.5, -12)
+                tpBtn.BackgroundColor3 = Colors.Accent
+                tpBtn.BorderSizePixel = 0
+                tpBtn.Text = "TP"
+                tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                tpBtn.Font = Enum.Font.GothamBold
+                tpBtn.TextSize = 10.5
+                tpBtn.Parent = row
+                makeCorner(tpBtn, 5)
+
+                tpBtn.MouseButton1Click:Connect(function()
+                    playClick()
+                    local char = LocalPlayer.Character
+                    if char and char:FindFirstChild("HumanoidRootPart") then
+                        char.HumanoidRootPart.CFrame = CFrame.new(wpData.Position)
+                        notify("Teleport", "Téléporté à " .. tostring(wpData.Name), Color3.fromRGB(80, 200, 120))
+                    end
+                end)
+
+                local delBtn = Instance.new("TextButton")
+                delBtn.Size = UDim2.new(0, 55, 0, 24)
+                delBtn.Position = UDim2.new(1, -58, 0.5, -12)
+                delBtn.BackgroundColor3 = Color3.fromRGB(46, 20, 24)
+                delBtn.BorderSizePixel = 0
+                delBtn.Text = "Suppr"
+                delBtn.TextColor3 = Color3.fromRGB(255, 95, 95)
+                delBtn.Font = Enum.Font.GothamBold
+                delBtn.TextSize = 10.5
+                delBtn.Parent = row
+                makeCorner(delBtn, 5)
+                makeStroke(delBtn, Color3.fromRGB(120, 35, 45), 1)
+
+                delBtn.MouseButton1Click:Connect(function()
+                    playClick()
+                    Pearl.TeleportPoints[wpKey] = nil
+                    refreshFullWaypointList()
+                    if refreshTPMiniList then pcall(refreshTPMiniList) end
+                    notify("Teleport", "Point supprimé : " .. tostring(wpData.Name), Color3.fromRGB(255, 90, 90))
+                end)
+            end
+            wpEmptyLabel.Visible = not hasPoints
         end
-    end)
 
-    refreshTPMiniList = renderMiniList
-    renderMiniList()
-end
+        _G.PearlRefreshWaypointList = refreshFullWaypointList
 
-createToggle("Mini-Interface TP Flottante (Draggable)", false, function(enabled)
-    toggleTPMiniWindow(enabled)
-end, TeleportContent, "TPMiniWindow")
+        AddWpBtn.MouseButton1Click:Connect(function()
+            playClick()
+            local name = WaypointNameBox.Text:match("^%s*(.-)%s*$")
+            if not name or name == "" then
+                local count = 0
+                for _ in pairs(Pearl.TeleportPoints) do count = count + 1 end
+                name = "Point_" .. tostring(count + 1)
+            end
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                Pearl.TeleportPoints[name .. "_" .. tostring(os.clock())] = {
+                    Position = char.HumanoidRootPart.Position,
+                    Name = name
+                }
+                WaypointNameBox.Text = ""
+                refreshFullWaypointList()
+                if refreshTPMiniList then pcall(refreshTPMiniList) end
+                notify("Teleport", "Waypoint '" .. name .. "' ajouté !", Color3.fromRGB(80, 200, 120))
+            end
+        end)
 
-do
-    local WaypointInputFrame = Instance.new("Frame")
-    WaypointInputFrame.Size = UDim2.new(1, 0, 0, 40)
-    WaypointInputFrame.BackgroundColor3 = Color3.fromRGB(20,20, 25)
-    WaypointInputFrame.BorderSizePixel = 0
-    WaypointInputFrame.Parent = TeleportContent
+        refreshFullWaypointList()
+    end
 
-    local WaypointInputCorner = Instance.new("UICorner")
-    WaypointInputCorner.CornerRadius = UDim.new(0, 8)
-    WaypointInputCorner.Parent = WaypointInputFrame
+    -- ====================================================================
+    -- SECTION 3 : CLICK TP & OUTILS DE TÉLÉPORTATION
+    -- ====================================================================
+    createLabel("CLICK TP & OUTILS", TeleportContent)
 
-    local WaypointNameBox = Instance.new("TextBox")
-    WaypointNameBox.Size = UDim2.new(0.6, 0, 0, 30)
-    WaypointNameBox.Position = UDim2.new(0, 8, 0.5, -15)
-    WaypointNameBox.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
-    WaypointNameBox.BorderSizePixel = 0
-    WaypointNameBox.PlaceholderText ="Nom du point..."
-    WaypointNameBox.PlaceholderColor3 = Color3.fromRGB(90, 90, 100)
-    WaypointNameBox.Text =""
-    WaypointNameBox.TextColor3 = Color3.fromRGB(210, 210, 222)
-    WaypointNameBox.Font = Enum.Font.GothamMedium
-    WaypointNameBox.TextSize = 12
-    WaypointNameBox.TextXAlignment = Enum.TextXAlignment.Left
-    WaypointNameBox.Parent = WaypointInputFrame
-
-    local WaypointNameBoxCorner = Instance.new("UICorner")
-    WaypointNameBoxCorner.CornerRadius = UDim.new(0, 5)
-    WaypointNameBoxCorner.Parent = WaypointNameBox
-
-    local WaypointNamePadding = Instance.new("UIPadding")
-    WaypointNamePadding.PaddingLeft = UDim.new(0, 8)
-    WaypointNamePadding.Parent = WaypointNameBox
-
-    local AddWaypointBtn = Instance.new("TextButton")
-    AddWaypointBtn.Size = UDim2.new(0, 70, 0, 30)
-    AddWaypointBtn.Position = UDim2.new(1, -78, 0.5, -15)
-    AddWaypointBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
-    AddWaypointBtn.BorderSizePixel = 0
-    AddWaypointBtn.Text ="Ajouter"
-    AddWaypointBtn.TextColor3 = Color3.fromRGB(195, 195, 208)
-    AddWaypointBtn.Font = Enum.Font.GothamMedium
-    AddWaypointBtn.TextSize = 11
-    AddWaypointBtn.Parent = WaypointInputFrame
-
-    local AddWaypointBtnCorner = Instance.new("UICorner")
-    AddWaypointBtnCorner.CornerRadius = UDim.new(0, 5)
-    AddWaypointBtnCorner.Parent = AddWaypointBtn
-
-    local WaypointList = Instance.new("ScrollingFrame")
-    WaypointList.Size = UDim2.new(1, 0, 1, -55)
-    WaypointList.Position = UDim2.new(0, 0, 0, 45)
-    WaypointList.BackgroundTransparency = 1
-    WaypointList.CanvasSize = UDim2.new(0, 0, 0, 0)
-    WaypointList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    WaypointList.ScrollBarThickness = 2
-    WaypointList.ScrollBarImageColor3 = Color3.fromRGB(50, 50, 55)
-    WaypointList.Parent = TeleportContent
-
-    local WaypointListLayout = Instance.new("UIListLayout")
-    WaypointListLayout.Padding = UDim.new(0, 5)
-    WaypointListLayout.Parent = WaypointList
-
-    local wpCounter = 1
-    local function refreshWaypointList()
-        _G.PearlRefreshWaypointList = refreshWaypointList
-        for _, child in pairs(WaypointList:GetChildren()) do
-            if child:IsA("Frame") then child:Destroy() end
-        end
-        for wpName, wpData in pairs(Pearl.TeleportPoints) do
-            local wpFrame = Instance.new("Frame")
-            wpFrame.Size = UDim2.new(1, 0, 0, 38)
-            wpFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-            wpFrame.BorderSizePixel = 0
-            wpFrame.Parent = WaypointList
-
-            local wpFrameCorner = Instance.new("UICorner")
-            wpFrameCorner.CornerRadius = UDim.new(0, 8)
-            wpFrameCorner.Parent = wpFrame
-
-            local wpLabel = Instance.new("TextLabel")
-            wpLabel.Size = UDim2.new(0.5, 0, 1, 0)
-            wpLabel.Position = UDim2.new(0, 14, 0, 0)
-            wpLabel.BackgroundTransparency = 1
-            wpLabel.Text = wpData.Name
-            wpLabel.TextColor3 = Color3.fromRGB(195, 195, 208)
-            wpLabel.Font = Enum.Font.GothamMedium
-            wpLabel.TextSize = 12
-            wpLabel.TextXAlignment = Enum.TextXAlignment.Left
-            wpLabel.Parent = wpFrame
-
-            local tpBtn = Instance.new("TextButton")
-            tpBtn.Size = UDim2.new(0, 55, 0, 26)
-            tpBtn.Position = UDim2.new(1, -130, 0.5, -13)
-            tpBtn.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
-            tpBtn.BorderSizePixel = 0
-            tpBtn.Text ="TP"
-            tpBtn.TextColor3 = Color3.fromRGB(170, 170, 182)
-            tpBtn.Font = Enum.Font.GothamMedium
-            tpBtn.TextSize = 10
-            tpBtn.Parent = wpFrame
-
-            local tpBtnCorner = Instance.new("UICorner")
-            tpBtnCorner.CornerRadius = UDim.new(0, 5)
-            tpBtnCorner.Parent = tpBtn
-
-            tpBtn.MouseButton1Click:Connect(function()
-                local char = LocalPlayer.Character
-                if char and char:FindFirstChild("HumanoidRootPart") then
-                    char.HumanoidRootPart.CFrame = CFrame.new(wpData.Position)
-                    notify("Teleport","Teleported to".. wpData.Name, Color3.fromRGB(80, 200, 120))
+    local clickTPConn = nil
+    local function toggleCtrlClickTP(enabled)
+        V.CtrlClickTP = enabled
+        if clickTPConn then clickTPConn:Disconnect() clickTPConn = nil end
+        if enabled then
+            clickTPConn = UserInputService.InputBegan:Connect(function(input, gpe)
+                if gpe then return end
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl) then
+                        local mouse = LocalPlayer:GetMouse()
+                        if mouse and mouse.Hit then
+                            local char = LocalPlayer.Character
+                            if char and char:FindFirstChild("HumanoidRootPart") then
+                                char.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
+                                notify("Teleport", "Click TP (CTRL+Clic) effectué !", Color3.fromRGB(80, 200, 120))
+                            end
+                        end
+                    end
                 end
             end)
-
-            local delBtn = Instance.new("TextButton")
-            delBtn.Size = UDim2.new(0, 60, 0, 26)
-            delBtn.Position = UDim2.new(1, -65, 0.5, -13)
-            delBtn.BackgroundColor3 = Color3.fromRGB(40, 22, 22)
-            delBtn.BorderSizePixel = 0
-            delBtn.Text ="Delete"
-            delBtn.TextColor3 = Color3.fromRGB(170, 110, 110)
-            delBtn.Font = Enum.Font.GothamMedium
-            delBtn.TextSize = 10
-            delBtn.Parent = wpFrame
-
-            local delBtnCorner = Instance.new("UICorner")
-            delBtnCorner.CornerRadius = UDim.new(0, 5)
-            delBtnCorner.Parent = delBtn
-
-            delBtn.MouseButton1Click:Connect(function()
-                Pearl.TeleportPoints[wpName] = nil
-                refreshWaypointList()
-                notify("Teleport","Deleted".. wpData.Name, Color3.fromRGB(255, 90, 90))
-            end)
-        end
-        if refreshTPMiniList then
-            pcall(refreshTPMiniList)
+            addConnection(clickTPConn)
+            notify("Teleport", "Click TP (Maintenir CTRL + Clic Gauche) ACTIF", Color3.fromRGB(80, 200, 120))
+        else
+            notify("Teleport", "Click TP DESACTIVE", Color3.fromRGB(255, 90, 90))
         end
     end
-    _G.PearlRefreshWaypointList = refreshWaypointList
+    _G.toggleCtrlClickTP = toggleCtrlClickTP
 
-    AddWaypointBtn.MouseButton1Click:Connect(function()
-        local name = WaypointNameBox.Text
-        if name ==""then
-            name ="Point_".. wpCounter
-            wpCounter = wpCounter + 1
+    createToggle("Click TP (Maintenir CTRL + Clic Gauche)", false, function(enabled)
+        toggleCtrlClickTP(enabled)
+    end, TeleportContent, "CtrlClickTP")
+
+    local toolClickTPConn = nil
+    local tpToolInstance = nil
+    local function toggleClickTPTool(enabled)
+        V.ClickTPTool = enabled
+        if not enabled then
+            if toolClickTPConn then toolClickTPConn:Disconnect() toolClickTPConn = nil end
+            if tpToolInstance then pcall(function() tpToolInstance:Destroy() end) tpToolInstance = nil end
+            notify("Teleport", "Outil Click TP retiré de l'inventaire", Color3.fromRGB(255, 90, 90))
+            return
         end
+
+        local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+        if not backpack then return end
+        tpToolInstance = Instance.new("Tool")
+        tpToolInstance.Name = "Teleport Tool"
+        tpToolInstance.RequiresHandle = false
+        tpToolInstance.CanBeDropped = false
+        tpToolInstance.Parent = backpack
+
+        toolClickTPConn = tpToolInstance.Activated:Connect(function()
+            local mouse = LocalPlayer:GetMouse()
+            if mouse and mouse.Hit then
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    char.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
+                    notify("Teleport", "Téléporté avec l'outil !", Color3.fromRGB(80, 200, 120))
+                end
+            end
+        end)
+        addConnection(toolClickTPConn)
+        notify("Teleport", "Outil Click TP ajouté à votre inventaire !", Color3.fromRGB(80, 200, 120))
+    end
+    _G.toggleClickTPTool = toggleClickTPTool
+
+    createToggle("Outil Click TP dans l'Inventaire (Equiper & Cliquer)", false, function(enabled)
+        toggleClickTPTool(enabled)
+    end, TeleportContent, "ClickTPTool")
+
+    -- ====================================================================
+    -- SECTION 4 : TÉLÉPORTATION PAR COORDONNÉES (X, Y, Z)
+    -- ====================================================================
+    createLabel("TÉLÉPORTATION PAR COORDONNÉES (X, Y, Z)", TeleportContent)
+
+    do
+        local CoordCard = createCard(TeleportContent, 0, 78)
+        local xBox = Instance.new("TextBox")
+        xBox.Size = UDim2.new(0.31, -4, 0, 28)
+        xBox.Position = UDim2.new(0, 8, 0, 6)
+        xBox.BackgroundColor3 = Color3.fromRGB(24, 25, 34)
+        xBox.BorderSizePixel = 0
+        xBox.PlaceholderText = "X"
+        xBox.PlaceholderColor3 = Colors.TextDim
+        xBox.Text = ""
+        xBox.TextColor3 = Colors.Text
+        xBox.Font = Enum.Font.Code
+        xBox.TextSize = 11
+        xBox.ClearTextOnFocus = false
+        xBox.Parent = CoordCard
+        makeCorner(xBox, 5)
+        makeStroke(xBox, Colors.Border, 1)
+
+        local yBox = Instance.new("TextBox")
+        yBox.Size = UDim2.new(0.31, -4, 0, 28)
+        yBox.Position = UDim2.new(0.34, 0, 0, 6)
+        yBox.BackgroundColor3 = Color3.fromRGB(24, 25, 34)
+        yBox.BorderSizePixel = 0
+        yBox.PlaceholderText = "Y"
+        yBox.PlaceholderColor3 = Colors.TextDim
+        yBox.Text = ""
+        yBox.TextColor3 = Colors.Text
+        yBox.Font = Enum.Font.Code
+        yBox.TextSize = 11
+        yBox.ClearTextOnFocus = false
+        yBox.Parent = CoordCard
+        makeCorner(yBox, 5)
+        makeStroke(yBox, Colors.Border, 1)
+
+        local zBox = Instance.new("TextBox")
+        zBox.Size = UDim2.new(0.31, -4, 0, 28)
+        zBox.Position = UDim2.new(0.67, 0, 0, 6)
+        zBox.BackgroundColor3 = Color3.fromRGB(24, 25, 34)
+        zBox.BorderSizePixel = 0
+        zBox.PlaceholderText = "Z"
+        zBox.PlaceholderColor3 = Colors.TextDim
+        zBox.Text = ""
+        zBox.TextColor3 = Colors.Text
+        zBox.Font = Enum.Font.Code
+        zBox.TextSize = 11
+        zBox.ClearTextOnFocus = false
+        zBox.Parent = CoordCard
+        makeCorner(zBox, 5)
+        makeStroke(zBox, Colors.Border, 1)
+
+        local tpCoordBtn = Instance.new("TextButton")
+        tpCoordBtn.Size = UDim2.new(1, -16, 0, 28)
+        tpCoordBtn.Position = UDim2.new(0, 8, 0, 40)
+        tpCoordBtn.BackgroundColor3 = Colors.Accent
+        tpCoordBtn.BorderSizePixel = 0
+        tpCoordBtn.Text = "Téléporter à ces Coordonnées (X, Y, Z)"
+        tpCoordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tpCoordBtn.Font = Enum.Font.GothamBold
+        tpCoordBtn.TextSize = 11
+        tpCoordBtn.AutoButtonColor = false
+        tpCoordBtn.Parent = CoordCard
+        makeCorner(tpCoordBtn, 6)
+
+        tpCoordBtn.MouseButton1Click:Connect(function()
+            playClick()
+            local nx = tonumber(xBox.Text)
+            local ny = tonumber(yBox.Text)
+            local nz = tonumber(zBox.Text)
+            if not nx or not ny or not nz then
+                notify("Teleport", "Coordonnées X, Y ou Z invalides !", Color3.fromRGB(255, 90, 90))
+                return
+            end
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.CFrame = CFrame.new(Vector3.new(nx, ny, nz))
+                notify("Teleport", string.format("TP vers (%.1f, %.1f, %.1f)", nx, ny, nz), Color3.fromRGB(80, 200, 120))
+            end
+        end)
+    end
+
+    createButton("Copier mes Coordonnées Actuelles (Presse-papier)", function()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
-            Pearl.TeleportPoints[name .."_".. tostring(os.clock())] = {Position = char.HumanoidRootPart.Position, Name = name}
-            WaypointNameBox.Text =""
-            refreshWaypointList()
-            notify("Teleport","Waypoint'".. name .."'added!", Color3.fromRGB(80, 200, 120))
+            local p = char.HumanoidRootPart.Position
+            local str = string.format("%.2f, %.2f, %.2f", p.X, p.Y, p.Z)
+            pcall(function()
+                if setclipboard then
+                    setclipboard(str)
+                    notify("Teleport", "Coordonnées copiées : " .. str, Color3.fromRGB(80, 200, 120))
+                else
+                    notify("Teleport", "Pos: " .. str, Color3.fromRGB(80, 200, 120))
+                end
+            end)
         end
-    end)
-end
+    end, TeleportContent)
+
+    -- ====================================================================
+    -- SECTION 5 : ZONES DU MONDE & SÉCURITÉ
+    -- ====================================================================
+    createLabel("ZONES DU MONDE & SÉCURITÉ", TeleportContent)
+
+    createButton("Téléporter au Spawn du Jeu", function()
+        local spawns = {}
+        pcall(function()
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("SpawnLocation") then
+                    table.insert(spawns, obj)
+                end
+            end
+        end)
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            if #spawns > 0 then
+                hrp.CFrame = spawns[1].CFrame + Vector3.new(0, 4, 0)
+                notify("Teleport", "Téléporté au SpawnLocation principal !", Color3.fromRGB(80, 200, 120))
+            else
+                hrp.CFrame = CFrame.new(0, 50, 0)
+                notify("Teleport", "Téléporté aux coordonnées d'origine (0, 50, 0)", Color3.fromRGB(80, 200, 120))
+            end
+        end
+    end, TeleportContent)
+
+    createButton("Safe Sky TP (+500 studs dans les airs)", function()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = hrp.CFrame + Vector3.new(0, 500, 0)
+            notify("Teleport", "Safe Sky TP : +500 studs dans le ciel !", Color3.fromRGB(80, 200, 120))
+        end
+    end, TeleportContent)
+end)
 
 _G.teleportToPlayer = function(targetPlayer)
     if not targetPlayer then return end
@@ -14948,7 +15488,7 @@ local carjackPlayer = _G.carjackPlayer
 -- Configuration de JoueurContent en 2 colonnes epurees, ultra fluides et modernes
 JoueurContent.ScrollBarThickness = 0
 JoueurContent.AutomaticCanvasSize = Enum.AutomaticSize.None
-JoueurContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+JoueurContent.CanvasSize = UDim2.new(1, 0, 1, 0)
 
 local existingLayout = JoueurContent:FindFirstChildOfClass("UIListLayout")
 if existingLayout then existingLayout:Destroy() end
@@ -15463,45 +16003,178 @@ end
 createLabel("SERVER ACTIONS & VISUALS", ServerContent)
 
 skyPresets = {
-    ["Purple Galaxy"] = {
-        Bk ="rbxassetid://159454299", Dn ="rbxassetid://159454296", Ft ="rbxassetid://159454293",
-        Lf ="rbxassetid://159454299", Rt ="rbxassetid://159454300", Up ="rbxassetid://159454288"
+    ["Crépuscule Violet Sombre"] = {
+        Bk = "rbxassetid://159454299", Dn = "rbxassetid://159454296", Ft = "rbxassetid://159454293",
+        Lf = "rbxassetid://159454299", Rt = "rbxassetid://159454300", Up = "rbxassetid://159454288",
+        ClockTime = 20, Stars = 4000
     },
-    ["Vaporwave"] = {
-        Bk ="rbxassetid://1417494402", Dn ="rbxassetid://1417494146", Ft ="rbxassetid://1417494253",
-        Lf ="rbxassetid://1417494402", Rt ="rbxassetid://1417494499", Up ="rbxassetid://1417494643"
+    ["Ciel Étoilé Néon"] = {
+        Bk = "rbxassetid://12064107", Dn = "rbxassetid://12064152", Ft = "rbxassetid://12064121",
+        Lf = "rbxassetid://12064131", Rt = "rbxassetid://12064115", Up = "rbxassetid://12064147",
+        ClockTime = 0, Stars = 5000
+    },
+    ["Vaporwave 80s"] = {
+        Bk = "rbxassetid://1417494402", Dn = "rbxassetid://1417494146", Ft = "rbxassetid://1417494253",
+        Lf = "rbxassetid://1417494402", Rt = "rbxassetid://1417494499", Up = "rbxassetid://1417494643",
+        ClockTime = 18, Stars = 0
+    },
+    ["Lune Rouge Sang"] = {
+        Bk = "rbxassetid://401664839", Dn = "rbxassetid://401664862", Ft = "rbxassetid://401664960",
+        Lf = "rbxassetid://401664881", Rt = "rbxassetid://401664901", Up = "rbxassetid://401664936",
+        ClockTime = 0, Stars = 2000
+    },
+    ["Galaxie Pourpre"] = {
+        Bk = "rbxassetid://271042516", Dn = "rbxassetid://271077243", Ft = "rbxassetid://271042556",
+        Lf = "rbxassetid://271042310", Rt = "rbxassetid://271042467", Up = "rbxassetid://271077958",
+        ClockTime = 22, Stars = 4500
+    },
+    ["Cosmos Bleu Profond"] = {
+        Bk = "rbxassetid://159248188", Dn = "rbxassetid://159248183", Ft = "rbxassetid://159248187",
+        Lf = "rbxassetid://159248173", Rt = "rbxassetid://159248192", Up = "rbxassetid://159248176",
+        ClockTime = 23, Stars = 4000
+    },
+    ["Aurore Boréale"] = {
+        Bk = "rbxassetid://924320032", Dn = "rbxassetid://924319912", Ft = "rbxassetid://924320141",
+        Lf = "rbxassetid://924320268", Rt = "rbxassetid://924320420", Up = "rbxassetid://924320578",
+        ClockTime = 21, Stars = 3000
+    },
+    ["Coucher de Soleil Anime"] = {
+        Bk = "rbxassetid://247075135", Dn = "rbxassetid://247074897", Ft = "rbxassetid://247075035",
+        Lf = "rbxassetid://247075084", Rt = "rbxassetid://247075185", Up = "rbxassetid://247075238",
+        ClockTime = 17.5, Stars = 0
+    },
+    ["Matrix Digital Noir"] = {
+        Bk = "rbxassetid://284205403", Dn = "rbxassetid://284205403", Ft = "rbxassetid://284205403",
+        Lf = "rbxassetid://284205403", Rt = "rbxassetid://284205403", Up = "rbxassetid://284205403",
+        ClockTime = 0, Stars = 0
+    },
+    ["Cyberpunk Night City"] = {
+        Bk = "rbxassetid://557685651", Dn = "rbxassetid://557685651", Ft = "rbxassetid://557685651",
+        Lf = "rbxassetid://557685651", Rt = "rbxassetid://557685651", Up = "rbxassetid://557685651",
+        ClockTime = 0, Stars = 0
+    },
+    ["Nuit Étoilée Épure"] = {
+        Bk = "rbxassetid://148967980", Dn = "rbxassetid://148967980", Ft = "rbxassetid://148967980",
+        Lf = "rbxassetid://148967980", Rt = "rbxassetid://148967980", Up = "rbxassetid://148967980",
+        ClockTime = 0, Stars = 5000
+    },
+    ["Crépuscule Lilas"] = {
+        Bk = "rbxassetid://64448843", Dn = "rbxassetid://64448847", Ft = "rbxassetid://64448843",
+        Lf = "rbxassetid://64448843", Rt = "rbxassetid://64448843", Up = "rbxassetid://64146989",
+        ClockTime = 19, Stars = 1000
+    },
+    ["Nébuleuse Violette HD"] = {
+        Bk = "rbxassetid://570557514", Dn = "rbxassetid://570557775", Ft = "rbxassetid://570557559",
+        Lf = "rbxassetid://570557620", Rt = "rbxassetid://570557672", Up = "rbxassetid://570557727",
+        ClockTime = 21, Stars = 3500
+    },
+    ["Minecraft Réaliste"] = {
+        Bk = "rbxassetid://147185887", Dn = "rbxassetid://147186101", Ft = "rbxassetid://147185880",
+        Lf = "rbxassetid://147185884", Rt = "rbxassetid://147185882", Up = "rbxassetid://147186101",
+        ClockTime = 14, Stars = 0
+    },
+    ["Studio Minimal Grey"] = {
+        Bk = "rbxassetid://1013852", Dn = "rbxassetid://1013853", Ft = "rbxassetid://1013854",
+        Lf = "rbxassetid://1013855", Rt = "rbxassetid://1013856", Up = "rbxassetid://1013857",
+        ClockTime = 12, Stars = 0
+    },
+    ["Espace Pur Noir"] = {
+        Bk = "rbxassetid://159454299", Dn = "rbxassetid://159454299", Ft = "rbxassetid://159454299",
+        Lf = "rbxassetid://159454299", Rt = "rbxassetid://159454299", Up = "rbxassetid://159454299",
+        ClockTime = 0, Stars = 6000
     }
 }
-skyList = {"Default","Purple Galaxy","Vaporwave"}
+
+skyList = {
+    "Default",
+    "Crépuscule Violet Sombre",
+    "Ciel Étoilé Néon",
+    "Vaporwave 80s",
+    "Lune Rouge Sang",
+    "Galaxie Pourpre",
+    "Cosmos Bleu Profond",
+    "Aurore Boréale",
+    "Coucher de Soleil Anime",
+    "Matrix Digital Noir",
+    "Cyberpunk Night City",
+    "Nuit Étoilée Épure",
+    "Crépuscule Lilas",
+    "Nébuleuse Violette HD",
+    "Minecraft Réaliste",
+    "Studio Minimal Grey",
+    "Espace Pur Noir"
+}
+
 currentSkyIdx = 1
 originalSkyObj = nil
+originalClockTime = nil
+originalFogEnd = nil
+originalAtmosphereDensity = nil
 
 function applyCustomSkybox(skyName)
     local Lighting = game:GetService("Lighting")
     local currentSky = Lighting:FindFirstChildOfClass("Sky")
-    if not originalSkyObj and currentSky then originalSkyObj = currentSky:Clone() end
-    
-    if skyName =="Default"then
+    local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+
+    if not originalSkyObj and currentSky then
+        pcall(function() originalSkyObj = currentSky:Clone() end)
+    end
+    if originalClockTime == nil then
+        originalClockTime = Lighting.ClockTime
+    end
+    if originalFogEnd == nil then
+        originalFogEnd = Lighting.FogEnd
+    end
+    if originalAtmosphereDensity == nil and atmosphere then
+        originalAtmosphereDensity = atmosphere.Density
+    end
+
+    if skyName == "Default" then
         if currentSky then currentSky:Destroy() end
-        if originalSkyObj then originalSkyObj:Clone().Parent = Lighting end
-        notify("Server","Skybox par défaut restaurée", Color3.fromRGB(80, 200, 120))
+        if originalSkyObj then
+            pcall(function() originalSkyObj:Clone().Parent = Lighting end)
+        end
+        if originalClockTime then
+            Lighting.ClockTime = originalClockTime
+        end
+        if originalFogEnd then
+            Lighting.FogEnd = originalFogEnd
+        end
+        if atmosphere and originalAtmosphereDensity ~= nil then
+            atmosphere.Density = originalAtmosphereDensity
+        end
+        notify("Server", "Skybox par défaut restaurée", Color3.fromRGB(80, 200, 120))
         return
     end
 
-    if currentSky then currentSky:Destroy() end
-    local newSky = Instance.new("Sky")
-    newSky.Name ="PearlCustomSky"
     local preset = skyPresets[skyName]
-    if preset then
-        newSky.SkyboxBk = preset.Bk
-        newSky.SkyboxDn = preset.Dn
-        newSky.SkyboxFt = preset.Ft
-        newSky.SkyboxLf = preset.Lf
-        newSky.SkyboxRt = preset.Rt
-        newSky.SkyboxUp = preset.Up
-        newSky.Parent = Lighting
-        notify("Server","Skybox appliquée:".. skyName, Color3.fromRGB(80, 200, 120))
+    if not preset then return end
+
+    if currentSky then currentSky:Destroy() end
+
+    -- Annuler la brume atmosphérique et le brouillard qui masquent le ciel custom !
+    if atmosphere then
+        atmosphere.Density = 0
     end
+    Lighting.FogEnd = 100000
+
+    local newSky = Instance.new("Sky")
+    newSky.Name = "PearlCustomSky"
+    newSky.SkyboxBk = preset.Bk
+    newSky.SkyboxDn = preset.Dn
+    newSky.SkyboxFt = preset.Ft
+    newSky.SkyboxLf = preset.Lf
+    newSky.SkyboxRt = preset.Rt
+    newSky.SkyboxUp = preset.Up
+    newSky.CelestialBodiesShown = false
+    newSky.StarCount = preset.Stars or 3000
+    newSky.Parent = Lighting
+
+    if preset.ClockTime then
+        Lighting.ClockTime = preset.ClockTime
+    end
+
+    notify("Visuals", "Skybox : " .. skyName, Color3.fromRGB(80, 200, 120))
 end
 
 skyBtnFrame, skyBtnObj, skyValue = createValueButton(ServerContent, "Custom Skybox", "Default", function()
@@ -17051,6 +17724,10 @@ end
 
 createLabel("PRE-MADE SCRIPTS", ScriptsContent)
 do
+    ScriptsContent.ScrollBarThickness = 0
+    ScriptsContent.AutomaticCanvasSize = Enum.AutomaticSize.None
+    ScriptsContent.CanvasSize = UDim2.new(1, 0, 1, 0)
+
     local ScriptScroll = Instance.new("ScrollingFrame")
     ScriptScroll.Size = UDim2.new(1, 0, 1, -30)
     ScriptScroll.Position = UDim2.new(0, 0, 0, 30)
@@ -17521,6 +18198,7 @@ do
     local menuBtnStroke = makeStroke(MenuKeyBtn, theme.border, 1)
 
     KeybindButtons["Menu"] = MenuKeyBtn
+    registerSearchCard(MenuKeybindFrame, "Menu Keybind Touche Ouvrir Fermer", SettingsContent)
 
     MenuKeyBtn.MouseEnter:Connect(function()
         if not (KeybindSystem.Binding and KeybindSystem.BindingName == "Menu") then
@@ -17967,7 +18645,7 @@ do
                     Keybinds.Noclip = Enum.KeyCode.V
                     Keybinds.Invisible = Enum.KeyCode.C
                     Keybinds.DesyncFly = Enum.KeyCode.G
-                    Keybinds.ESP = Enum.KeyCode.E
+                    Keybinds.ESP = Enum.KeyCode.M
                     Keybinds.Speed = Enum.KeyCode.R
                     Keybinds.Respawn = Enum.KeyCode.B
                     Keybinds.Menu = Enum.KeyCode.Insert
@@ -17977,11 +18655,11 @@ do
                     Keybinds.InstantBrake = Enum.KeyCode.N
                     Keybinds.RecordMovement = Enum.KeyCode.Y
                     Keybinds.ReplayMovement = Enum.KeyCode.O
-                    _G.Aimlock_Key = Enum.KeyCode.E
-                    _G.Aimlock_KeyName = "E"
-                    Aimlock_Key = Enum.KeyCode.E
-                    Aimlock_KeyName = "E"
-                    if AimlockKeyBtn then AimlockKeyBtn.Text = "[E]" end
+                    _G.Aimlock_Key = nil
+                    _G.Aimlock_KeyName = "Aucun"
+                    Aimlock_Key = nil
+                    Aimlock_KeyName = "Aucun"
+                    if AimlockKeyBtn then AimlockKeyBtn.Text = "[Aucun]" end
                     for name, btn in pairs(KeybindButtons) do
                         if Keybinds[name] then btn.Text = Keybinds[name].Name end
                     end
@@ -18082,7 +18760,7 @@ do
                 Noclip = getBindName(Keybinds.Noclip, "V"),
                 Invisible = getBindName(Keybinds.Invisible, "C"),
                 DesyncFly = getBindName(Keybinds.DesyncFly, "G"),
-                ESP = getBindName(Keybinds.ESP, "E"),
+                ESP = getBindName(Keybinds.ESP, "M"),
                 Speed = getBindName(Keybinds.Speed, "R"),
                 Respawn = getBindName(Keybinds.Respawn, "B"),
                 Menu = getBindName(Keybinds.Menu, "Insert"),
@@ -18096,7 +18774,7 @@ do
                 VehiclePropulse = getBindName(Keybinds.VehiclePropulse, "P"),
                 RecordMovement = getBindName(Keybinds.RecordMovement, "Y"),
                 ReplayMovement = getBindName(Keybinds.ReplayMovement, "O"),
-                Aimlock = tostring(_G.Aimlock_KeyName or Aimlock_KeyName or "E")
+                Aimlock = tostring(_G.Aimlock_KeyName or Aimlock_KeyName or "Aucun")
             }
 
             if writefile then
