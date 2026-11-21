@@ -3980,24 +3980,27 @@ Cache = { Distances = {}, FPSBoost = {}, Lighting = nil, PostEffects = {} }
 ConfigRegistry = {}
 
 Keybinds = {
-    Fly = Enum.KeyCode.F,
-    Noclip = Enum.KeyCode.V,
-    Invisible = Enum.KeyCode.C,
-    DesyncFly = Enum.KeyCode.G,
-    ESP = Enum.KeyCode.M,
-    Speed = Enum.KeyCode.R,
-    Respawn = Enum.KeyCode.B,
+    Fly = Enum.KeyCode.Unknown,
+    Noclip = Enum.KeyCode.Unknown,
+    Invisible = Enum.KeyCode.Unknown,
+    DesyncFly = Enum.KeyCode.Unknown,
+    ESP = Enum.KeyCode.Unknown,
+    Speed = Enum.KeyCode.Unknown,
+    Respawn = Enum.KeyCode.Unknown,
     Menu = Enum.KeyCode.Insert,
-    Freecam = Enum.KeyCode.X,
-    VehicleFly = Enum.KeyCode.H,
-    VehicleBoost = Enum.KeyCode.T,
-    InstantBrake = Enum.KeyCode.N,
-    VehicleSeatTP = Enum.KeyCode.J,
-    VehicleAutoFlip = Enum.KeyCode.K,
-    VehicleExplode = Enum.KeyCode.L,
-    VehiclePropulse = Enum.KeyCode.P,
-    RecordMovement = Enum.KeyCode.Y,
-    ReplayMovement = Enum.KeyCode.O
+    Freecam = Enum.KeyCode.Unknown,
+    VehicleFly = Enum.KeyCode.Unknown,
+    VehicleBoost = Enum.KeyCode.Unknown,
+    InstantBrake = Enum.KeyCode.Unknown,
+    VehicleSeatTP = Enum.KeyCode.Unknown,
+    VehicleAutoFlip = Enum.KeyCode.Unknown,
+    VehicleExplode = Enum.KeyCode.Unknown,
+    VehiclePropulse = Enum.KeyCode.Unknown,
+    RecordMovement = Enum.KeyCode.Unknown,
+    ReplayMovement = Enum.KeyCode.Unknown,
+    VehicleFreeze = Enum.KeyCode.Unknown,
+    VehicleDelete = Enum.KeyCode.Unknown,
+    VehicleInvisible = Enum.KeyCode.Unknown
 }
 
 KeybindCallbacks = {}
@@ -4348,10 +4351,95 @@ WmPadding.PaddingLeft = UDim.new(0, 6)
 WmPadding.PaddingRight = UDim.new(0, 12)
 WmPadding.Parent = Watermark
 
+-- Petit menu d'affichage des joueurs connectes dans le serveur
+local WatermarkPlayerCard = Instance.new("Frame")
+WatermarkPlayerCard.Name = "WatermarkPlayerCard"
+WatermarkPlayerCard.Size = UDim2.new(0, 0, 0, 24)
+WatermarkPlayerCard.Position = UDim2.new(0, 0, 1, 6)
+WatermarkPlayerCard.BackgroundColor3 = Colors.Background
+WatermarkPlayerCard.BorderSizePixel = 0
+WatermarkPlayerCard.AutomaticSize = Enum.AutomaticSize.X
+WatermarkPlayerCard.ZIndex = 100
+WatermarkPlayerCard.Parent = Watermark
+
+local WmPlayerCorner = Instance.new("UICorner")
+WmPlayerCorner.CornerRadius = UDim.new(0, 6)
+WmPlayerCorner.Parent = WatermarkPlayerCard
+
+local WmPlayerStroke = Instance.new("UIStroke")
+WmPlayerStroke.Color = Colors.Border
+WmPlayerStroke.Thickness = 1
+WmPlayerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+WmPlayerStroke.Parent = WatermarkPlayerCard
+
+local WmPlayerBar = Instance.new("Frame")
+WmPlayerBar.Name = "AccentBar"
+WmPlayerBar.Size = UDim2.new(0, 3, 0, 14)
+WmPlayerBar.Position = UDim2.new(0, 4, 0.5, -7)
+WmPlayerBar.BackgroundColor3 = Colors.Accent
+WmPlayerBar.BorderSizePixel = 0
+WmPlayerBar.ZIndex = 101
+WmPlayerBar.Parent = WatermarkPlayerCard
+
+local WmPlayerBarCorner = Instance.new("UICorner")
+WmPlayerBarCorner.CornerRadius = UDim.new(0, 2)
+WmPlayerBarCorner.Parent = WmPlayerBar
+
+local PlayerIcon = Instance.new("ImageLabel")
+PlayerIcon.Name = "PlayerIcon"
+PlayerIcon.Size = UDim2.new(0, 13, 0, 13)
+PlayerIcon.Position = UDim2.new(0, 12, 0.5, -6.5)
+PlayerIcon.BackgroundTransparency = 1
+PlayerIcon.Image = "rbxassetid://7743876054"
+PlayerIcon.ImageColor3 = Colors.Accent
+PlayerIcon.ZIndex = 101
+PlayerIcon.Parent = WatermarkPlayerCard
+
+local PlayerCountText = Instance.new("TextLabel")
+PlayerCountText.Name = "PlayerCountText"
+PlayerCountText.Size = UDim2.new(0, 0, 1, 0)
+PlayerCountText.Position = UDim2.new(0, 29, 0, 0)
+PlayerCountText.BackgroundTransparency = 1
+PlayerCountText.AutomaticSize = Enum.AutomaticSize.X
+PlayerCountText.Text = "0 / 0 joueurs"
+PlayerCountText.TextColor3 = Colors.Text
+PlayerCountText.TextSize = 11.5
+PlayerCountText.Font = Enum.Font.GothamMedium
+PlayerCountText.TextXAlignment = Enum.TextXAlignment.Left
+PlayerCountText.ZIndex = 101
+PlayerCountText.Parent = WatermarkPlayerCard
+
+local WmPlayerPadding = Instance.new("UIPadding")
+WmPlayerPadding.PaddingTop = UDim.new(0, 0)
+WmPlayerPadding.PaddingBottom = UDim.new(0, 0)
+WmPlayerPadding.PaddingLeft = UDim.new(0, 6)
+WmPlayerPadding.PaddingRight = UDim.new(0, 12)
+WmPlayerPadding.Parent = WatermarkPlayerCard
+
+local function updateWatermarkPlayerCount()
+	pcall(function()
+		local count = #Players:GetPlayers()
+		local maxP = Players.MaxPlayers
+		if maxP and maxP > 0 then
+			PlayerCountText.Text = tostring(count) .. " / " .. tostring(maxP) .. " joueurs"
+		else
+			PlayerCountText.Text = tostring(count) .. " joueurs"
+		end
+	end)
+end
+updateWatermarkPlayerCount()
+Players.PlayerAdded:Connect(function()
+	task.wait(0.2)
+	updateWatermarkPlayerCount()
+end)
+Players.PlayerRemoving:Connect(function()
+	task.defer(updateWatermarkPlayerCount)
+end)
+
 local wmDragging = false
 local wmDragStart, wmStartPos
 
-Watermark.InputBegan:Connect(function(input)
+local function startWmDrag(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		wmDragging = true
 		wmDragStart = input.Position
@@ -4363,7 +4451,13 @@ Watermark.InputBegan:Connect(function(input)
 			end
 		end)
 	end
-end)
+end
+
+Watermark.InputBegan:Connect(startWmDrag)
+if WatermarkPlayerCard then
+	WatermarkPlayerCard.Active = true
+	WatermarkPlayerCard.InputBegan:Connect(startWmDrag)
+end
 
 UserInputService.InputChanged:Connect(function(input)
 	if wmDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
@@ -4385,6 +4479,7 @@ RunService.RenderStepped:Connect(function()
 	if now - lastFpsTime >= 0.25 then
 		local curFps = math.floor(fpsFrames / (now - lastFpsTime))
 		WatermarkText.Text = "Pearl HUB | " .. (LocalPlayer and LocalPlayer.Name or "user") .. " | " .. curFps .. " FPS"
+		if updateWatermarkPlayerCount then updateWatermarkPlayerCount() end
 		fpsFrames = 0
 		lastFpsTime = now
 	end
@@ -5196,6 +5291,13 @@ ContentAreaStroke.Thickness = 1
 ContentAreaStroke.Parent = ContentArea
 
 panels = {}
+local panelItemCounters = {}
+local function getNextLayoutOrder(parent)
+	if not parent then return 1 end
+	panelItemCounters[parent] = (panelItemCounters[parent] or 0) + 1
+	return panelItemCounters[parent]
+end
+
 AllRegisteredCards = {}
 local registeredCardsSet = {}
 
@@ -5204,11 +5306,17 @@ function registerSearchCard(card, name, parent)
 		if registeredCardsSet[card] then return end
 		registeredCardsSet[card] = true
 		local cleanSearchName = string.lower(tostring(name or "")):gsub("<[^>]->", "")
+		local assignedOrder = card.LayoutOrder
+		if not assignedOrder or assignedOrder <= 0 then
+			assignedOrder = getNextLayoutOrder(parent)
+			card.LayoutOrder = assignedOrder
+		end
+		pcall(function() card:SetAttribute("NebulaOrigOrder", assignedOrder) end)
 		table.insert(AllRegisteredCards, {
 			card = card,
 			name = cleanSearchName,
 			origParent = parent,
-			origOrder = card.LayoutOrder or #AllRegisteredCards
+			origOrder = assignedOrder
 		})
 	end
 end
@@ -5235,9 +5343,9 @@ function createPanel(name)
 	layout.Parent = panel
 
 	local pad = Instance.new("UIPadding")
-	pad.PaddingTop = UDim.new(0, 4)
-	pad.PaddingLeft = UDim.new(0, 4)
-	pad.PaddingRight = UDim.new(0, 4)
+	pad.PaddingTop = UDim.new(0, 6)
+	pad.PaddingLeft = UDim.new(0, 6)
+	pad.PaddingRight = UDim.new(0, 8)
 	pad.PaddingBottom = UDim.new(0, 24)
 	pad.Parent = panel
 
@@ -5289,9 +5397,15 @@ function filterCards(query)
 	if not cleanQuery or cleanQuery == "" then
 		if ClearSearchBtn then ClearSearchBtn.Visible = false end
 		for _, item in ipairs(AllRegisteredCards) do
-			if item.card and item.card.Parent ~= item.origParent then
-				item.card.Parent = item.origParent
-				item.card.LayoutOrder = item.origOrder
+			if item.card and item.origParent then
+				if item.card.Parent ~= item.origParent then
+					item.card.Parent = item.origParent
+				end
+				local restoredOrder = item.origOrder
+				if not restoredOrder or restoredOrder <= 0 then
+					pcall(function() restoredOrder = item.card:GetAttribute("NebulaOrigOrder") end)
+				end
+				item.card.LayoutOrder = restoredOrder or 1
 				item.card.Visible = true
 			end
 		end
@@ -5315,16 +5429,21 @@ function filterCards(query)
 		local normalizedQuery = cleanQuery:gsub("[éèêë]", "e"):gsub("[àâä]", "a"):gsub("[ùûü]", "u"):gsub("[îï]", "i"):gsub("[ôö]", "o"):gsub("[ç]", "c")
 		local matchCount = 0
 		for _, item in ipairs(AllRegisteredCards) do
-			if item.card then
+			if item.card and item.origParent then
 				local normItemName = tostring(item.name or ""):gsub("[éèêë]", "e"):gsub("[àâä]", "a"):gsub("[ùûü]", "u"):gsub("[îï]", "i"):gsub("[ôö]", "o"):gsub("[ç]", "c")
 				if string.find(normItemName, normalizedQuery, 1, true) or string.find(item.name, cleanQuery, 1, true) then
-					item.card.Parent = SearchPanel
-					item.card.Visible = true
 					matchCount = matchCount + 1
+					item.card.Parent = SearchPanel
+					item.card.LayoutOrder = matchCount
+					item.card.Visible = true
 				else
 					if item.card.Parent == SearchPanel then
 						item.card.Parent = item.origParent
-						item.card.LayoutOrder = item.origOrder
+						local restoredOrder = item.origOrder
+						if not restoredOrder or restoredOrder <= 0 then
+							pcall(function() restoredOrder = item.card:GetAttribute("NebulaOrigOrder") end)
+						end
+						item.card.LayoutOrder = restoredOrder or 1
 					end
 				end
 			end
@@ -5352,7 +5471,9 @@ function createCard(parent, order, height)
 	card.Size = UDim2.new(1, 0, 0, height or 46)
 	card.BackgroundColor3 = Colors.Card
 	card.BorderSizePixel = 0
-	card.LayoutOrder = order or 0
+	local assignedOrder = (order and order > 0) and order or getNextLayoutOrder(parent)
+	card.LayoutOrder = assignedOrder
+	pcall(function() card:SetAttribute("NebulaOrigOrder", assignedOrder) end)
 	card.ZIndex = 8
 	card.Parent = parent
 
@@ -5381,7 +5502,9 @@ function createSectionHeader(parent, title, order)
 	local header = Instance.new("Frame")
 	header.Size = UDim2.new(1, 0, 0, 26)
 	header.BackgroundTransparency = 1
-	header.LayoutOrder = order or 0
+	local assignedOrder = (order and order > 0) and order or getNextLayoutOrder(parent)
+	header.LayoutOrder = assignedOrder
+	pcall(function() header:SetAttribute("NebulaOrigOrder", assignedOrder) end)
 	header.ZIndex = 8
 	header.Parent = parent
 
@@ -6351,6 +6474,7 @@ local function initVisualPreview()
 				VP.HeadDot.Size = UDim2.new(0, diam, 0, diam)
 				VP.HeadDot.Position = UDim2.fromScale(uvHead.X, uvHead.Y)
 				VP.HeadDotStroke.Color = curColor
+				VP.HeadDotStroke.Thickness = V.ESPSkeletonThickness or 1.5
 				VP.HeadDot.Visible = true
 			else
 				VP.HeadDot.Visible = false
@@ -6436,7 +6560,7 @@ local function initVisualPreview()
 				local uv1, ok1 = projectToPreview(pair[1])
 				local uv2, ok2 = projectToPreview(pair[2])
 				if ok1 and ok2 then
-					update2DLineUV(VP.SkeletonLines[lineIdx], uv1, uv2, 1.5, curColor, ovW, ovH)
+					update2DLineUV(VP.SkeletonLines[lineIdx], uv1, uv2, V.ESPSkeletonThickness or 1.5, curColor, ovW, ovH)
 					lineIdx = lineIdx + 1
 				end
 			end
@@ -6737,9 +6861,15 @@ function switchCategory(key)
 		SearchBox.Text = ""
 		if ClearSearchBtn then ClearSearchBtn.Visible = false end
 		for _, item in ipairs(AllRegisteredCards) do
-			if item.card and item.card.Parent ~= item.origParent then
-				item.card.Parent = item.origParent
-				item.card.LayoutOrder = item.origOrder
+			if item.card and item.origParent then
+				if item.card.Parent ~= item.origParent then
+					item.card.Parent = item.origParent
+				end
+				local restoredOrder = item.origOrder
+				if not restoredOrder or restoredOrder <= 0 then
+					pcall(function() restoredOrder = item.card:GetAttribute("NebulaOrigOrder") end)
+				end
+				item.card.LayoutOrder = restoredOrder or 1
 				item.card.Visible = true
 			end
 		end
@@ -7170,6 +7300,9 @@ function createLabel(text, parent)
 	Label.Font = Enum.Font.GothamBold
 	Label.TextSize = 10
 	Label.TextXAlignment = Enum.TextXAlignment.Left
+	local assignedOrder = getNextLayoutOrder(parent)
+	Label.LayoutOrder = assignedOrder
+	pcall(function() Label:SetAttribute("NebulaOrigOrder", assignedOrder) end)
 	Label.ZIndex = 8
 	Label.Parent = parent
 	return Label
@@ -7352,7 +7485,10 @@ function performFullUnload()
             if V.Invis and toggleInvisibility then pcall(function() toggleInvisibility(false) end) end
             if V.NoAnim and disableNoAnim then pcall(disableNoAnim) end
             if V.Flinging and stopFling then pcall(stopFling) end
-            if V.Spectate and stopSpectate then pcall(stopSpectate) end
+            if stopSpectate then pcall(stopSpectate) end
+            if _G.stopSpectate then pcall(_G.stopSpectate) end
+            if _G.destroySpectatorWindow then pcall(_G.destroySpectatorWindow) end
+            if V then V.SpectatorList = false end
             if V.InfRange and toggleInfiniteRange then pcall(function() toggleInfiniteRange(false) end) end
             if V.FPSBoost and toggleFPSBooster then pcall(function() toggleFPSBooster(false) end) end
             if V.Fullbright and toggleFullbright then pcall(function() toggleFullbright(false) end) end
@@ -7480,6 +7616,7 @@ V.KillAll = false
         if clearESP then clearESP() end
         if ClearESP then ClearESP() end
         if ESPGui then ESPGui:Destroy() end
+        if VehicleESPGui then pcall(function() VehicleESPGui:Destroy() end) end
     end)
 
     pcall(function()
@@ -7548,11 +7685,12 @@ V.KillAll = false
 
     pcall(function()
         workspace.Gravity = 196.2
-        if Camera then
-            Camera.FieldOfView = 70
-            Camera.CameraType = Enum.CameraType.Custom
+        local cam = workspace.CurrentCamera or Camera
+        if cam then
+            cam.FieldOfView = 70
+            cam.CameraType = Enum.CameraType.Custom
             local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if hum then Camera.CameraSubject = hum end
+            if hum then cam.CameraSubject = hum end
         end
         LocalPlayer.CameraMode = Enum.CameraMode.Classic
         LocalPlayer.CameraMaxZoomDistance = 128
@@ -7579,9 +7717,31 @@ V.KillAll = false
         if ScreenGui then ScreenGui:Destroy() end
     end)
     pcall(function()
-        for _, child in pairs(parentTarget:GetChildren()) do
-            if child:IsA("ScreenGui") and (child.Name == "PearlUpdateUI" or child.Name == "PearlKeySystemUI" or child.Name == "EternalFlick_GUI" or child.Name == "PearlFreecamMenu" or child.Name == "PearlFreecamCrosshair" or child.Name == "PearlPlayerInspector" or child.Name == "PearlESP" or child.Name == "PearlTPMiniGui") then
-                child:Destroy()
+        local searchRoots = {
+            parentTarget,
+            CoreGui,
+            LocalPlayer and (LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:FindFirstChild("PlayerGui"))
+        }
+        for _, root in ipairs(searchRoots) do
+            if root then
+                pcall(function()
+                    for _, child in ipairs(root:GetChildren()) do
+                        if child:IsA("ScreenGui") and (
+                            child.Name == "PearlSpectatorListGui" or
+                            child.Name:find("Spectator") or
+                            child.Name == "PearlUpdateUI" or
+                            child.Name == "PearlKeySystemUI" or
+                            child.Name == "EternalFlick_GUI" or
+                            child.Name == "PearlFreecamMenu" or
+                            child.Name == "PearlFreecamCrosshair" or
+                            child.Name == "PearlPlayerInspector" or
+                            child.Name == "PearlESP" or
+                            child.Name == "PearlTPMiniGui"
+                        ) then
+                            child:Destroy()
+                        end
+                    end
+                end)
             end
         end
     end)
@@ -8471,12 +8631,18 @@ V.InfAmmo = false
 V.FastReload = false
 V.HitboxExtender = false
 V.HitboxSize = 25
-V.BodyHeightScale = 10
-V.BodyWidthScale = 10
 V.RightClickInspect = false
 V.ESPTracer = false
 V.ESPSkeleton = false
+V.ESPSkeletonThickness = 2
 V.ESPHealth = false
+V.VehicleESP = false
+V.VehicleESPBox3D = true
+V.VehicleESPName = true
+V.VehicleESPDist = true
+V.VehicleESPDriver = true
+V.VehicleESPColor = Color3.fromRGB(145, 120, 255)
+V.VehicleESPObjects = {}
 V.ESPPV = false
 V.ESPWeapon = false
 V.ESPDropped = false
@@ -8568,11 +8734,7 @@ V.FPSConn = RunService.RenderStepped:Connect(function()
         lastTime = currentTime
     end
     if V and V.CustomFOV and V.FOV and V.FOV ~= 70 then
-        local isAiming = false
-        pcall(function()
-            isAiming = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-        end)
-        if not isAiming and Camera.FieldOfView ~= V.FOV then
+        if Camera.FieldOfView ~= V.FOV then
             Camera.FieldOfView = V.FOV
         end
     end
@@ -9079,13 +9241,18 @@ function stopSpectate()
     if V.SpecConn then V.SpecConn:Disconnect() V.SpecConn = nil end
     pcall(function()
         local char = LocalPlayer.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then Camera.CameraSubject = hum end
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local cam = workspace.CurrentCamera or Camera
+        if cam then
+            cam.CameraType = Enum.CameraType.Custom
+            if hum then
+                cam.CameraSubject = hum
+            end
         end
     end)
     notify("Spectate","Spectate OFF", Color3.fromRGB(255, 90, 90))
 end
+_G.stopSpectate = stopSpectate
 
 function startFling(player)
     if V.Flinging then return end
@@ -9712,6 +9879,15 @@ ESPGui.IgnoreGuiInset = true
 ESPGui.Enabled = false
 ESPGui.Parent = parentTarget
 
+if VehicleESPGui then pcall(function() VehicleESPGui:Destroy() end) end
+VehicleESPGui = Instance.new("ScreenGui")
+VehicleESPGui.Name = "PearlVehicleESP"
+VehicleESPGui.ResetOnSpawn = false
+VehicleESPGui.DisplayOrder = 99
+VehicleESPGui.IgnoreGuiInset = true
+VehicleESPGui.Enabled = false
+VehicleESPGui.Parent = parentTarget
+
 function clearESP()
     for player, obj in pairs(V.ESPObjects) do
         if obj.conn then obj.conn:Disconnect() end
@@ -9723,6 +9899,7 @@ function clearESP()
         if obj.healthPvText then obj.healthPvText:Destroy() end
         if obj.weaponLabel then obj.weaponLabel:Destroy() end
         if obj.skeletonFolder then obj.skeletonFolder:Destroy() end
+        if obj.skeletonHead then obj.skeletonHead:Destroy() end
         if obj.tracerLine then obj.tracerLine:Destroy() end
     end
     V.ESPObjects = {}
@@ -9811,6 +9988,21 @@ function createESPForCharacter(charInstance, customName)
     skeletonFolder.Name = "SkeletonLines_" .. (customName or charInstance.Name)
     skeletonFolder.Parent = ESPGui
 
+    local skeletonHead = Instance.new("Frame")
+    skeletonHead.Name = "SkeletonHead"
+    skeletonHead.AnchorPoint = Vector2.new(0.5, 0.5)
+    skeletonHead.BackgroundTransparency = 1
+    skeletonHead.BorderSizePixel = 0
+    skeletonHead.Visible = false
+    skeletonHead.Parent = ESPGui
+    local skeletonHeadStroke = Instance.new("UIStroke")
+    skeletonHeadStroke.Color = V.ESPColor
+    skeletonHeadStroke.Thickness = V.ESPSkeletonThickness or 1.5
+    skeletonHeadStroke.Parent = skeletonHead
+    local skeletonHeadCorner = Instance.new("UICorner")
+    skeletonHeadCorner.CornerRadius = UDim.new(1, 0)
+    skeletonHeadCorner.Parent = skeletonHead
+
     local tracerLine = Instance.new("Frame")
     tracerLine.Visible = false
     tracerLine.BorderSizePixel = 0
@@ -9820,7 +10012,8 @@ function createESPForCharacter(charInstance, customName)
 
     V.ESPObjects[charInstance] = {
         box = box, boxStroke = boxStroke, nameLabel = nameLabel, distLabel = distLabel, highlight = highlight,
-        healthBg = healthBg, healthBar = healthBar, healthPvText = healthPvText, weaponLabel = weaponLabel, skeletonFolder = skeletonFolder, tracerLine = tracerLine
+        healthBg = healthBg, healthBar = healthBar, healthPvText = healthPvText, weaponLabel = weaponLabel,
+        skeletonFolder = skeletonFolder, skeletonHead = skeletonHead, skeletonHeadStroke = skeletonHeadStroke, tracerLine = tracerLine
     }
 
     local conn = RunService.RenderStepped:Connect(function()
@@ -9834,6 +10027,7 @@ function createESPForCharacter(charInstance, customName)
             healthPvText.Visible = false
             weaponLabel.Visible = false
             skeletonFolder:ClearAllChildren()
+            skeletonHead.Visible = false
             tracerLine.Visible = false
             return
         end
@@ -9841,7 +10035,9 @@ function createESPForCharacter(charInstance, customName)
         local head = char:FindFirstChild("Head") or hrp
         local hum = char:FindFirstChildOfClass("Humanoid")
         local localChar = LocalPlayer.Character
-        if not hrp or not localChar or not localChar:FindFirstChild("HumanoidRootPart") then
+        local localRoot = localChar and (localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChildWhichIsA("BasePart"))
+        local targetRoot = hrp or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Head") or char:FindFirstChildWhichIsA("BasePart")
+        if not targetRoot or not localRoot then
             box.Visible = false
             nameLabel.Visible = false
             distLabel.Visible = false
@@ -9850,34 +10046,52 @@ function createESPForCharacter(charInstance, customName)
             healthPvText.Visible = false
             weaponLabel.Visible = false
             skeletonFolder:ClearAllChildren()
+            skeletonHead.Visible = false
             tracerLine.Visible = false
             return
         end
 
-        local resolvedPos = hrp.Position
-        local resolvedHeadPos = head.Position
+        local rootPart = hrp or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Head") or char:FindFirstChildWhichIsA("BasePart")
+        local resolvedPos = (hrp and hrp.Position) or (rootPart and rootPart.Position) or Vector3.zero
+        local resolvedHeadPos = (head and head.Position) or (resolvedPos + Vector3.new(0, 1.5, 0))
 
         if V.ESPDesyncResolver then
             local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("LowerTorso")
-            if torso and (torso.Position - hrp.Position).Magnitude > 2.2 and (torso.Position - hrp.Position).Magnitude < 120 then
+            -- 1. Detached / Ghost Torso Desync & Freecam body
+            if torso and hrp and (torso.Position - hrp.Position).Magnitude > 2.0 then
+                resolvedPos = torso.Position
+                resolvedHeadPos = (head and (head.Position - torso.Position).Magnitude < 15) and head.Position or (torso.Position + Vector3.new(0, 1.5, 0))
+            -- 2. Detached Head Freecam / Camera Desync
+            elseif head and hrp and (head.Position - hrp.Position).Magnitude > 3.0 then
+                resolvedHeadPos = head.Position
+                resolvedPos = head.Position - Vector3.new(0, 1.5, 0)
+            -- 3. RootPart in void or extreme coordinates while torso is active
+            elseif hrp and (hrp.Position.Y < -400 or hrp.Position.Magnitude > 50000) and torso then
                 resolvedPos = torso.Position
                 resolvedHeadPos = torso.Position + Vector3.new(0, 1.5, 0)
+            -- 4. Seated / Vehicle desync
+            elseif hum and hum.SeatPart then
+                resolvedPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
+                resolvedHeadPos = resolvedPos + Vector3.new(0, 1.5, 0)
+            -- 5. Assembly velocity replication & prediction
             else
                 local vel = Vector3.zero
-                pcall(function() vel = hrp.AssemblyLinearVelocity end)
-                if vel.Magnitude > 1.2 and vel.Magnitude < 1800 then
-                    local ping = 0.05
-                    pcall(function()
-                        local stats = game:GetService("Stats")
-                        local netStats = stats and stats:FindFirstChild("Network")
-                        local sServerStats = netStats and netStats:FindFirstChild("ServerStatsItem")
-                        local dataPing = sServerStats and sServerStats:FindFirstChild("Data Ping")
-                        if dataPing and dataPing:GetValue() > 0 then
-                            ping = math.clamp(dataPing:GetValue() / 1000, 0.02, 0.35)
-                        end
-                    end)
-                    resolvedPos = resolvedPos + (vel * ping)
-                    resolvedHeadPos = resolvedHeadPos + (vel * ping)
+                pcall(function() vel = (hrp or rootPart).AssemblyLinearVelocity end)
+                if vel.Magnitude > 1.5 then
+                    if vel.Magnitude < 2000 then
+                        local ping = 0.05
+                        pcall(function()
+                            local stats = game:GetService("Stats")
+                            local netStats = stats and stats:FindFirstChild("Network")
+                            local sServerStats = netStats and netStats:FindFirstChild("ServerStatsItem")
+                            local dataPing = sServerStats and sServerStats:FindFirstChild("Data Ping")
+                            if dataPing and dataPing:GetValue() > 0 then
+                                ping = math.clamp(dataPing:GetValue() / 1000, 0.02, 0.35)
+                            end
+                        end)
+                        resolvedPos = resolvedPos + (vel * ping)
+                        resolvedHeadPos = resolvedHeadPos + (vel * ping)
+                    end
                 end
             end
         end
@@ -10092,7 +10306,7 @@ function createESPForCharacter(charInstance, customName)
                             local distance = (Vector2.new(p2Pos.X, p2Pos.Y) - Vector2.new(p1Pos.X, p1Pos.Y)).Magnitude
                             local angle = math.atan2(p2Pos.Y - p1Pos.Y, p2Pos.X - p1Pos.X)
                             line.BackgroundColor3 = V.ESPColor
-                            line.Size = UDim2.new(0, distance, 0, 1.5)
+                            line.Size = UDim2.new(0, distance, 0, V.ESPSkeletonThickness or 1.5)
                             line.Position = UDim2.new(0, (p1Pos.X + p2Pos.X) / 2, 0, (p1Pos.Y + p2Pos.Y) / 2)
                             line.Rotation = math.deg(angle)
                             line.Visible = true
@@ -10104,10 +10318,29 @@ function createESPForCharacter(charInstance, customName)
             for i = lineIdx + 1, #existingLines do
                 existingLines[i].Visible = false
             end
+            local headPart = char:FindFirstChild("Head")
+            if headPart then
+                local headPos, hOnScreen = Camera:WorldToViewportPoint(headPart.Position)
+                if hOnScreen and headPos.Z > 0 and headPos.X >= 0 and headPos.X <= vp.X and headPos.Y >= 0 and headPos.Y <= vp.Y then
+                    local topPos = Camera:WorldToViewportPoint(headPart.Position + Vector3.new(0, headPart.Size.Y * 0.5, 0))
+                    local botPos = Camera:WorldToViewportPoint(headPart.Position - Vector3.new(0, headPart.Size.Y * 0.5, 0))
+                    local diam = math.clamp(math.abs(botPos.Y - topPos.Y) * 1.15, 6, 60)
+                    skeletonHead.Size = UDim2.new(0, diam, 0, diam)
+                    skeletonHead.Position = UDim2.new(0, headPos.X, 0, headPos.Y)
+                    skeletonHeadStroke.Color = V.ESPColor
+                    skeletonHeadStroke.Thickness = V.ESPSkeletonThickness or 1.5
+                    skeletonHead.Visible = true
+                else
+                    skeletonHead.Visible = false
+                end
+            else
+                skeletonHead.Visible = false
+            end
         else
             for _, child in ipairs(skeletonFolder:GetChildren()) do
                 child.Visible = false
             end
+            skeletonHead.Visible = false
         end
 
         if V.ESPTracer and onScreen and screenPos.Z > 0 then
@@ -10220,6 +10453,21 @@ function createESPForPlayer(player)
     skeletonFolder.Name ="SkeletonLines_".. player.Name
     skeletonFolder.Parent = ESPGui
 
+    local skeletonHead = Instance.new("Frame")
+    skeletonHead.Name = "SkeletonHead"
+    skeletonHead.AnchorPoint = Vector2.new(0.5, 0.5)
+    skeletonHead.BackgroundTransparency = 1
+    skeletonHead.BorderSizePixel = 0
+    skeletonHead.Visible = false
+    skeletonHead.Parent = ESPGui
+    local skeletonHeadStroke = Instance.new("UIStroke")
+    skeletonHeadStroke.Color = V.ESPColor
+    skeletonHeadStroke.Thickness = V.ESPSkeletonThickness or 1.5
+    skeletonHeadStroke.Parent = skeletonHead
+    local skeletonHeadCorner = Instance.new("UICorner")
+    skeletonHeadCorner.CornerRadius = UDim.new(1, 0)
+    skeletonHeadCorner.Parent = skeletonHead
+
     local tracerLine = Instance.new("Frame")
     tracerLine.Visible = false
     tracerLine.BorderSizePixel = 0
@@ -10229,7 +10477,8 @@ function createESPForPlayer(player)
 
     V.ESPObjects[player] = {
         box = box, boxStroke = boxStroke, nameLabel = nameLabel, distLabel = distLabel, highlight = highlight,
-        healthBg = healthBg, healthBar = healthBar, healthPvText = healthPvText, weaponLabel = weaponLabel, skeletonFolder = skeletonFolder, tracerLine = tracerLine
+        healthBg = healthBg, healthBar = healthBar, healthPvText = healthPvText, weaponLabel = weaponLabel,
+        skeletonFolder = skeletonFolder, skeletonHead = skeletonHead, skeletonHeadStroke = skeletonHeadStroke, tracerLine = tracerLine
     }
 
     local conn = RunService.RenderStepped:Connect(function()
@@ -10255,6 +10504,7 @@ function createESPForPlayer(player)
                     child.Visible = false
                 end
             end
+            if skeletonHead then skeletonHead.Visible = false end
             if tracerLine then tracerLine.Visible = false end
             return
         end
@@ -10262,7 +10512,9 @@ function createESPForPlayer(player)
         local head = char:FindFirstChild("Head")
         local hum = char:FindFirstChildOfClass("Humanoid")
         local localChar = LocalPlayer.Character
-        if not hrp or not head or not hum or not localChar or not localChar:FindFirstChild("HumanoidRootPart") then
+        local localRoot = localChar and (localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChildWhichIsA("BasePart"))
+        local targetRoot = hrp or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Head") or char:FindFirstChildWhichIsA("BasePart")
+        if not targetRoot or not localRoot then
             box.Visible = false
             nameLabel.Visible = false
             distLabel.Visible = false
@@ -10275,34 +10527,52 @@ function createESPForPlayer(player)
                     child.Visible = false
                 end
             end
+            if skeletonHead then skeletonHead.Visible = false end
             if tracerLine then tracerLine.Visible = false end
             return
         end
 
-        local resolvedPos = hrp.Position
-        local resolvedHeadPos = head.Position
+        local rootPart = hrp or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Head") or char:FindFirstChildWhichIsA("BasePart")
+        local resolvedPos = (hrp and hrp.Position) or (rootPart and rootPart.Position) or Vector3.zero
+        local resolvedHeadPos = (head and head.Position) or (resolvedPos + Vector3.new(0, 1.5, 0))
 
         if V.ESPDesyncResolver then
             local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("LowerTorso")
-            if torso and (torso.Position - hrp.Position).Magnitude > 2.2 and (torso.Position - hrp.Position).Magnitude < 120 then
+            -- 1. Detached / Ghost Torso Desync & Freecam body
+            if torso and hrp and (torso.Position - hrp.Position).Magnitude > 2.0 then
+                resolvedPos = torso.Position
+                resolvedHeadPos = (head and (head.Position - torso.Position).Magnitude < 15) and head.Position or (torso.Position + Vector3.new(0, 1.5, 0))
+            -- 2. Detached Head Freecam / Camera Desync
+            elseif head and hrp and (head.Position - hrp.Position).Magnitude > 3.0 then
+                resolvedHeadPos = head.Position
+                resolvedPos = head.Position - Vector3.new(0, 1.5, 0)
+            -- 3. RootPart in void or extreme coordinates while torso is active
+            elseif hrp and (hrp.Position.Y < -400 or hrp.Position.Magnitude > 50000) and torso then
                 resolvedPos = torso.Position
                 resolvedHeadPos = torso.Position + Vector3.new(0, 1.5, 0)
+            -- 4. Seated / Vehicle desync
+            elseif hum and hum.SeatPart then
+                resolvedPos = hum.SeatPart.Position + Vector3.new(0, 2, 0)
+                resolvedHeadPos = resolvedPos + Vector3.new(0, 1.5, 0)
+            -- 5. Assembly velocity replication & prediction
             else
                 local vel = Vector3.zero
-                pcall(function() vel = hrp.AssemblyLinearVelocity end)
-                if vel.Magnitude > 1.2 and vel.Magnitude < 1800 then
-                    local ping = 0.05
-                    pcall(function()
-                        local stats = game:GetService("Stats")
-                        local netStats = stats and stats:FindFirstChild("Network")
-                        local sServerStats = netStats and netStats:FindFirstChild("ServerStatsItem")
-                        local dataPing = sServerStats and sServerStats:FindFirstChild("Data Ping")
-                        if dataPing and dataPing:GetValue() > 0 then
-                            ping = math.clamp(dataPing:GetValue() / 1000, 0.02, 0.35)
-                        end
-                    end)
-                    resolvedPos = resolvedPos + (vel * ping)
-                    resolvedHeadPos = resolvedHeadPos + (vel * ping)
+                pcall(function() vel = (hrp or rootPart).AssemblyLinearVelocity end)
+                if vel.Magnitude > 1.5 then
+                    if vel.Magnitude < 2000 then
+                        local ping = 0.05
+                        pcall(function()
+                            local stats = game:GetService("Stats")
+                            local netStats = stats and stats:FindFirstChild("Network")
+                            local sServerStats = netStats and netStats:FindFirstChild("ServerStatsItem")
+                            local dataPing = sServerStats and sServerStats:FindFirstChild("Data Ping")
+                            if dataPing and dataPing:GetValue() > 0 then
+                                ping = math.clamp(dataPing:GetValue() / 1000, 0.02, 0.35)
+                            end
+                        end)
+                        resolvedPos = resolvedPos + (vel * ping)
+                        resolvedHeadPos = resolvedHeadPos + (vel * ping)
+                    end
                 end
             end
         end
@@ -10507,7 +10777,7 @@ function createESPForPlayer(player)
                             local distance = (Vector2.new(p2Pos.X, p2Pos.Y) - Vector2.new(p1Pos.X, p1Pos.Y)).Magnitude
                             local angle = math.atan2(p2Pos.Y - p1Pos.Y, p2Pos.X - p1Pos.X)
                             line.BackgroundColor3 = V.ESPColor
-                            line.Size = UDim2.new(0, distance, 0, 1.5)
+                            line.Size = UDim2.new(0, distance, 0, V.ESPSkeletonThickness or 1.5)
                             line.Position = UDim2.new(0, (p1Pos.X + p2Pos.X) / 2, 0, (p1Pos.Y + p2Pos.Y) / 2)
                             line.Rotation = math.deg(angle)
                             line.Visible = true
@@ -10519,10 +10789,29 @@ function createESPForPlayer(player)
             for i = lineIdx + 1, #existingLines do
                 existingLines[i].Visible = false
             end
+            local headPart = char:FindFirstChild("Head")
+            if headPart then
+                local headPos, hOnScreen = Camera:WorldToViewportPoint(headPart.Position)
+                if hOnScreen and headPos.Z > 0 and headPos.X >= 0 and headPos.X <= vp.X and headPos.Y >= 0 and headPos.Y <= vp.Y then
+                    local topPos = Camera:WorldToViewportPoint(headPart.Position + Vector3.new(0, headPart.Size.Y * 0.5, 0))
+                    local botPos = Camera:WorldToViewportPoint(headPart.Position - Vector3.new(0, headPart.Size.Y * 0.5, 0))
+                    local diam = math.clamp(math.abs(botPos.Y - topPos.Y) * 1.15, 6, 60)
+                    skeletonHead.Size = UDim2.new(0, diam, 0, diam)
+                    skeletonHead.Position = UDim2.new(0, headPos.X, 0, headPos.Y)
+                    skeletonHeadStroke.Color = V.ESPColor
+                    skeletonHeadStroke.Thickness = V.ESPSkeletonThickness or 1.5
+                    skeletonHead.Visible = true
+                else
+                    skeletonHead.Visible = false
+                end
+            else
+                skeletonHead.Visible = false
+            end
         else
             for _, child in ipairs(skeletonFolder:GetChildren()) do
                 child.Visible = false
             end
+            skeletonHead.Visible = false
         end
 
         if V.ESPTracer and onScreen and screenPos.Z > 0 then
@@ -10573,9 +10862,250 @@ function refreshESP()
     end
 end
 
+-- ==============================================================
+-- [VEHICLE ESP : 3D BOX, NAME, DISTANCE, DRIVER & COLORS]
+-- ==============================================================
+V.VehicleESPObjects = V.VehicleESPObjects or {}
+
+local VEHICLE_EDGE_PAIRS = {
+    {1, 2}, {2, 3}, {3, 4}, {4, 1},
+    {5, 6}, {6, 7}, {7, 8}, {8, 5},
+    {1, 5}, {2, 6}, {3, 7}, {4, 8}
+}
+
+local function clearVehicleESP()
+    if V.VehicleESPObjects then
+        for veh, obj in pairs(V.VehicleESPObjects) do
+            if obj.conn then pcall(function() obj.conn:Disconnect() end) end
+            if obj.linesFolder then pcall(function() obj.linesFolder:Destroy() end) end
+            if obj.topContainer then pcall(function() obj.topContainer:Destroy() end) end
+        end
+    end
+    V.VehicleESPObjects = {}
+    if VehicleESPGui then
+        VehicleESPGui:ClearAllChildren()
+    end
+end
+_G.clearVehicleESP = clearVehicleESP
+
+local function createESPForVehicle(veh, seat)
+    if not veh or not seat or (V.VehicleESPObjects and V.VehicleESPObjects[veh]) then return end
+    V.VehicleESPObjects = V.VehicleESPObjects or {}
+
+    local targetParent = VehicleESPGui or parentTarget
+    local linesFolder = Instance.new("Folder")
+    linesFolder.Name = "Veh3DBox_" .. tostring(veh.Name)
+    linesFolder.Parent = targetParent
+
+    local lines = {}
+    for i = 1, 12 do
+        local line = Instance.new("Frame")
+        line.Name = "Edge_" .. i
+        line.BorderSizePixel = 0
+        line.AnchorPoint = Vector2.new(0.5, 0.5)
+        line.BackgroundColor3 = V.VehicleESPColor or Color3.fromRGB(145, 120, 255)
+        line.Visible = false
+        line.ZIndex = 8
+        line.Parent = linesFolder
+        table.insert(lines, line)
+    end
+
+    local topContainer = Instance.new("Frame")
+    topContainer.Name = "VehTopInfo_" .. tostring(veh.Name)
+    topContainer.AnchorPoint = Vector2.new(0.5, 1)
+    topContainer.Size = UDim2.new(0, 160, 0, 48)
+    topContainer.BackgroundTransparency = 1
+    topContainer.BorderSizePixel = 0
+    topContainer.Visible = false
+    topContainer.ZIndex = 9
+    topContainer.Parent = targetParent
+
+    local topLayout = Instance.new("UIListLayout")
+    topLayout.FillDirection = Enum.FillDirection.Vertical
+    topLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    topLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+    topLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    topLayout.Padding = UDim.new(0, 1)
+    topLayout.Parent = topContainer
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "NameLabel"
+    nameLabel.Size = UDim2.new(1, 0, 0, 14)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Text = tostring(veh.Name)
+    nameLabel.TextColor3 = V.VehicleESPColor or Color3.fromRGB(145, 120, 255)
+    nameLabel.TextStrokeTransparency = 0.4
+    nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    nameLabel.TextSize = 11.5
+    nameLabel.LayoutOrder = 1
+    nameLabel.Parent = topContainer
+
+    local driverLabel = Instance.new("TextLabel")
+    driverLabel.Name = "DriverLabel"
+    driverLabel.Size = UDim2.new(1, 0, 0, 13)
+    driverLabel.BackgroundTransparency = 1
+    driverLabel.Font = Enum.Font.GothamMedium
+    driverLabel.Text = "[Vide]"
+    driverLabel.TextColor3 = Color3.fromRGB(160, 165, 180)
+    driverLabel.TextStrokeTransparency = 0.4
+    driverLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    driverLabel.TextSize = 10.5
+    driverLabel.LayoutOrder = 2
+    driverLabel.Parent = topContainer
+
+    local distLabel = Instance.new("TextLabel")
+    distLabel.Name = "DistLabel"
+    distLabel.Size = UDim2.new(1, 0, 0, 12)
+    distLabel.BackgroundTransparency = 1
+    distLabel.Font = Enum.Font.Gotham
+    distLabel.Text = "[0m]"
+    distLabel.TextColor3 = Color3.fromRGB(220, 220, 230)
+    distLabel.TextStrokeTransparency = 0.4
+    distLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    distLabel.TextSize = 10
+    distLabel.LayoutOrder = 3
+    distLabel.Parent = topContainer
+
+    local conn
+    conn = RunService.RenderStepped:Connect(function()
+        if not V.VehicleESP or not veh or not veh.Parent or not seat or not seat.Parent then
+            if conn then conn:Disconnect() end
+            if linesFolder then linesFolder:Destroy() end
+            if topContainer then topContainer:Destroy() end
+            if V.VehicleESPObjects then V.VehicleESPObjects[veh] = nil end
+            return
+        end
+
+        local cf, size
+        pcall(function()
+            if veh:IsA("Model") then
+                cf, size = veh:GetBoundingBox()
+            else
+                cf, size = seat.CFrame, seat.Size
+            end
+        end)
+        if not cf or not size then return end
+
+        local sx = math.max(size.X / 2, 2.5)
+        local sy = math.max(size.Y / 2, 1.5)
+        local sz = math.max(size.Z / 2, 3.5)
+
+        local c1 = cf:PointToWorldSpace(Vector3.new( sx,  sy,  sz))
+        local c2 = cf:PointToWorldSpace(Vector3.new(-sx,  sy,  sz))
+        local c3 = cf:PointToWorldSpace(Vector3.new(-sx, -sy,  sz))
+        local c4 = cf:PointToWorldSpace(Vector3.new( sx, -sy,  sz))
+        local c5 = cf:PointToWorldSpace(Vector3.new( sx,  sy, -sz))
+        local c6 = cf:PointToWorldSpace(Vector3.new(-sx,  sy, -sz))
+        local c7 = cf:PointToWorldSpace(Vector3.new(-sx, -sy, -sz))
+        local c8 = cf:PointToWorldSpace(Vector3.new( sx, -sy, -sz))
+        local cornerPts = {c1, c2, c3, c4, c5, c6, c7, c8}
+
+        local screenCorners = {}
+        local anyOnScreen = false
+        for idxCorner = 1, 8 do
+            local sp, onScreen = Camera:WorldToViewportPoint(cornerPts[idxCorner])
+            screenCorners[idxCorner] = { x = sp.X, y = sp.Y, z = sp.Z, on = onScreen }
+            if onScreen and sp.Z > 0 then anyOnScreen = true end
+        end
+
+        local boxColor = V.VehicleESPColor or Color3.fromRGB(145, 120, 255)
+
+        if anyOnScreen and V.VehicleESPBox3D then
+            for idxEdge, pair in ipairs(VEHICLE_EDGE_PAIRS) do
+                local p1 = screenCorners[pair[1]]
+                local p2 = screenCorners[pair[2]]
+                local lineFrame = lines[idxEdge]
+                if p1 and p2 and p1.z > 0 and p2.z > 0 and (p1.on or p2.on) then
+                    local dx = p2.x - p1.x
+                    local dy = p2.y - p1.y
+                    local len = math.sqrt(dx * dx + dy * dy)
+                    local angle = math.atan2(dy, dx)
+                    lineFrame.Size = UDim2.new(0, len, 0, 1.5)
+                    lineFrame.Position = UDim2.new(0, (p1.x + p2.x) / 2, 0, (p1.y + p2.y) / 2)
+                    lineFrame.Rotation = math.deg(angle)
+                    lineFrame.BackgroundColor3 = boxColor
+                    lineFrame.Visible = true
+                else
+                    if lineFrame then lineFrame.Visible = false end
+                end
+            end
+        else
+            for _, lineFrame in ipairs(lines) do
+                lineFrame.Visible = false
+            end
+        end
+
+        local topPos = cf.Position + Vector3.new(0, sy + 0.8, 0)
+        local topScreen, topOn = Camera:WorldToViewportPoint(topPos)
+        if topOn and topScreen.Z > 0 then
+            local dist = math.floor((cf.Position - Camera.CFrame.Position).Magnitude)
+
+            if V.VehicleESPName then
+                nameLabel.Text = tostring(veh.Name)
+                nameLabel.TextColor3 = boxColor
+                nameLabel.Visible = true
+            else
+                nameLabel.Visible = false
+            end
+
+            if V.VehicleESPDist then
+                distLabel.Text = "[" .. tostring(dist) .. "m]"
+                distLabel.Visible = true
+            else
+                distLabel.Visible = false
+            end
+
+            if V.VehicleESPDriver then
+                local occ = seat.Occupant
+                if occ and occ.Parent then
+                    local p = Players:GetPlayerFromCharacter(occ.Parent)
+                    local driverName = p and ("@" .. p.Name) or occ.Parent.Name
+                    driverLabel.Text = "Conducteur: " .. driverName
+                    driverLabel.TextColor3 = Color3.fromRGB(46, 204, 113)
+                else
+                    driverLabel.Text = "[Vide]"
+                    driverLabel.TextColor3 = Color3.fromRGB(160, 165, 180)
+                end
+                driverLabel.Visible = true
+            else
+                driverLabel.Visible = false
+            end
+
+            topContainer.Position = UDim2.new(0, topScreen.X, 0, topScreen.Y)
+            topContainer.Visible = (V.VehicleESPName or V.VehicleESPDist or V.VehicleESPDriver)
+        else
+            topContainer.Visible = false
+        end
+    end)
+
+    V.VehicleESPObjects[veh] = {
+        conn = conn,
+        linesFolder = linesFolder,
+        topContainer = topContainer
+    }
+end
+
+local function scanAndCreateVehicleESP()
+    pcall(function()
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("VehicleSeat") then
+                local veh = obj:FindFirstAncestorWhichIsA("Model") or obj
+                if veh and not (V.VehicleESPObjects and V.VehicleESPObjects[veh]) then
+                    createESPForVehicle(veh, obj)
+                end
+            end
+        end
+    end)
+end
+_G.scanAndCreateVehicleESP = scanAndCreateVehicleESP
+
 task.spawn(function()
     while true do
         task.wait(1.5)
+        if V.VehicleESP then
+            scanAndCreateVehicleESP()
+        end
         if V.ESP then
             for _, player in pairs(Players:GetPlayers()) do
                 if not V.ESPObjects[player] then createESPForPlayer(player) end
@@ -10613,6 +11143,7 @@ Players.PlayerRemoving:Connect(function(p)
         if V.ESPObjects[p].healthPvText then V.ESPObjects[p].healthPvText:Destroy() end
         if V.ESPObjects[p].weaponLabel then V.ESPObjects[p].weaponLabel:Destroy() end
         if V.ESPObjects[p].skeletonFolder then V.ESPObjects[p].skeletonFolder:Destroy() end
+        if V.ESPObjects[p].skeletonHead then V.ESPObjects[p].skeletonHead:Destroy() end
         if V.ESPObjects[p].tracerLine then V.ESPObjects[p].tracerLine:Destroy() end
         V.ESPObjects[p] = nil
     end
@@ -11154,7 +11685,7 @@ do
     clTitle.Size = UDim2.new(1, -110, 0, 18)
     clTitle.Position = UDim2.new(0, 16, 0, 12)
     clTitle.BackgroundTransparency = 1
-    clTitle.Text = "Changements Recents"
+    clTitle.Text = "Changements Récents"
     clTitle.TextColor3 = Colors.Text or Color3.fromRGB(235, 235, 245)
     clTitle.Font = Enum.Font.GothamMedium
     clTitle.TextSize = 12
@@ -11186,6 +11717,12 @@ do
 
     -- Liste dynamique automatique des changements
     _G.NebulaChangelog = _G.NebulaChangelog or {
+        { text = "- Fix Menu & ESP : Anti-Desync Resolver Freecam, FOV Clic-Droit & Marges Layout", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Player Size & Weapon Size : Echelles locales, armes geantes et calage parfait au sol", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Vehicle ESP 3D : Box 3D, Nom, Distance, Statut Conducteur & Palette Couleurs", color = Color3.fromRGB(241, 196, 15) },
+        { text = "- Vehicle ESP 100% Indépendant : Toggle dédié, couleur violette par défaut & palette", color = Color3.fromRGB(145, 120, 255) },
+        { text = "- Véhicules Allégés : Ancrage / Freeze unifié avec Keybind custom, Anti-Flip & Tout-Terrain", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Anti-Desordre Recherche : Stabilisation automatique permanente du LayoutOrder", color = Color3.fromRGB(140, 100, 255) },
         { text = "- Air Walk / Jesus Walk : Escalier Celeste & plateforme dynamique dans le vide", color = Color3.fromRGB(46, 204, 113) },
         { text = "- Kill All (weapons games) : TP 1.1s dos, camera lock automatique & traque a mort", color = Color3.fromRGB(46, 204, 113) },
         { text = "- Statut Auto-Dynamique : Detection erreurs temps reel (Vert / Jaune / Rouge)", color = Color3.fromRGB(140, 100, 255) },
@@ -11847,7 +12384,7 @@ end, MovementContent,"DesyncFly")
 createSlider("Fly Speed (Desync 50-2000)", 50, 2000, 300, function(val) V.DesyncFlySpeed = val end, MovementContent,"DesyncFlySpeed")
 
 initStep = "cablage Me"
-createLabel("BODY SCALE & HITBOX", MeContent)
+createLabel("HITBOX", MeContent)
 createToggle("Hitbox Extender", false, function(enabled)
     V.HitboxExtender = enabled
     if not enabled then
@@ -11857,55 +12394,78 @@ createToggle("Hitbox Extender", false, function(enabled)
 end, MeContent,"HitboxExtender")
 createSlider("Hitbox Size (Taille)", 1, 50, 25, function(val) V.HitboxSize = val end, MeContent,"HitboxSize")
 
-function updateBodyScale()
-    pcall(function()
+-- [FAKE DEAD : EFFONDREMENT, SON & RELEVEMENT SUR ESPACE / AVANCER]
+do
+    local fakeDeadActive = false
+    local fakeDeadConn = nil
+
+    local function toggleFakeDead(forceState)
         local char = LocalPlayer.Character
-        if not char then return end
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hum then return end
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hum or not hrp then return end
 
-        local scaleVal = V.BodyScale and (V.BodyScale / 10) or 1
+        local newState = (forceState ~= nil) and forceState or not fakeDeadActive
+        fakeDeadActive = newState
 
-        if char.ScaleTo then
-            pcall(function() char:ScaleTo(scaleVal) end)
-        end
+        if newState then
+            -- Son authentique Roblox Death ("OOF")
+            pcall(function()
+                local sound = Instance.new("Sound")
+                sound.Name = "FakeDeadOofSound"
+                sound.SoundId = "rbxasset://sounds/uuhhh.mp3"
+                sound.Volume = 2.0
+                sound.Parent = hrp
+                sound:Play()
+                game:GetService("Debris"):AddItem(sound, 3)
+            end)
 
-        local hs = hum:FindFirstChild("BodyHeightScale") or Instance.new("NumberValue", hum)
-        hs.Name ="BodyHeightScale"
-        hs.Value = scaleVal
+            -- Effondrement propre au sol SANS s'enfoncer sous la map
+            pcall(function()
+                hum.PlatformStand = true
+                hum:ChangeState(Enum.HumanoidStateType.FallingDown)
 
-        local ws = hum:FindFirstChild("BodyWidthScale") or Instance.new("NumberValue", hum)
-        ws.Name ="BodyWidthScale"
-        ws.Value = scaleVal
+                -- Raycast précis vers le sol pour caler le corps au-dessus du sol
+                local rayParams = RaycastParams.new()
+                rayParams.FilterDescendantsInstances = { char }
+                rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                local groundRay = workspace:Raycast(hrp.Position, Vector3.new(0, -15, 0), rayParams)
+                local groundY = groundRay and groundRay.Position.Y or (hrp.Position.Y - 2.5)
 
-        local ds = hum:FindFirstChild("BodyDepthScale") or Instance.new("NumberValue", hum)
-        ds.Name ="BodyDepthScale"
-        ds.Value = scaleVal
+                -- Bascule le corps à l'horizontale posé net au sol
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                hrp.CFrame = CFrame.new(hrp.Position.X, groundY + 1.2, hrp.Position.Z) * CFrame.Angles(math.rad(-90), hrp.CFrame.Rotation.Y, 0)
+            end)
+            notify("Me", "Fausse Mort ACTIVE (Espace ou Avancer pour te relever)", Color3.fromRGB(255, 165, 0))
 
-        local headScale = hum:FindFirstChild("HeadScale") or Instance.new("NumberValue", hum)
-        headScale.Name ="HeadScale"
-        headScale.Value = scaleVal
-
-        hum.HipHeight = 2 * scaleVal
-
-        for _, part in pairs(char:GetChildren()) do
-            if part:IsA("BasePart") and part.Name ~="HumanoidRootPart"then
-                if not part:FindFirstChild("OriginalSize") then
-                    local origSize = Instance.new("Vector3Value", part)
-                    origSize.Name ="OriginalSize"
-                    origSize.Value = part.Size
+            if fakeDeadConn then fakeDeadConn:Disconnect() end
+            fakeDeadConn = UserInputService.InputBegan:Connect(function(input, gpe)
+                if gpe then return end
+                if not fakeDeadActive then return end
+                local kc = input.KeyCode
+                if kc == Enum.KeyCode.Space or kc == Enum.KeyCode.W or kc == Enum.KeyCode.A or kc == Enum.KeyCode.S or kc == Enum.KeyCode.D or kc == Enum.KeyCode.Z or kc == Enum.KeyCode.Q then
+                    toggleFakeDead(false)
                 end
-                local orig = part.OriginalSize.Value
-                part.Size = Vector3.new(orig.X * scaleVal, orig.Y * scaleVal, orig.Z * scaleVal)
+            end)
+        else
+            pcall(function()
+                hum.PlatformStand = false
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end)
+            if fakeDeadConn then
+                fakeDeadConn:Disconnect()
+                fakeDeadConn = nil
             end
+            notify("Me", "Tu t'es relevé !", Color3.fromRGB(80, 200, 120))
         end
-    end)
-end
+    end
+    _G.toggleFakeDead = toggleFakeDead
 
-createSlider("Body Scale (Taille Globale)", 5, 30, 10, function(val)
-    V.BodyScale = val
-    updateBodyScale()
-end, MeContent,"BodyScale")
+    createToggle("Fausse Mort (Fake Dead)", false, function(enabled)
+        toggleFakeDead(enabled)
+    end, MeContent, "FakeDead")
+end
 
 initStep = "cablage Protection"
 
@@ -12490,10 +13050,23 @@ createLabel("CAMERA", MeContent)
 createSlider("FOV Changer", 70, 120, 70, function(val)
     V.FOV = val
     V.CustomFOV = (val ~= 70)
-    if val == 70 and not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+    if val == 70 then
         Camera.FieldOfView = 70
+    else
+        Camera.FieldOfView = val
     end
 end, MeContent,"FOV")
+
+if not _G.NebulaFOVLockSignal then
+    _G.NebulaFOVLockSignal = Camera:GetPropertyChangedSignal("FieldOfView"):Connect(function()
+        if V and V.CustomFOV and V.FOV and V.FOV ~= 70 then
+            if Camera.FieldOfView ~= V.FOV then
+                Camera.FieldOfView = V.FOV
+            end
+        end
+    end)
+    addConnection(_G.NebulaFOVLockSignal)
+end
 
 FreecamMenu = nil
 FreecamMenuConn = nil
@@ -14119,9 +14692,247 @@ createToggle("Corner Box", false, function(enabled) V.ESPCornerBox = enabled end
 createToggle("Glow ESP", false, function(enabled) V.ESPGlow = enabled end, ESPContent,"ESPGlow")
 createToggle("Filled Box", false, function(enabled) V.ESPFilled = enabled end, ESPContent,"ESPFilled")
 createToggle("Name", false, function(enabled) V.ESPName = enabled end, ESPContent,"ESPName")
+-- [SPECTATOR LIST : MINI-FENETRE FLOTTANTE QUI AFFICHE QUI ME SPECTATE]
+do
+    local specGui = nil
+    local specListFrame = nil
+    local specContainer = nil
+    local specCountLbl = nil
+    local specItems = {}
+    local specConn = nil
+
+    local function createSpectatorWindow()
+        if specGui and specGui.Parent then return end
+        specGui = Instance.new("ScreenGui")
+        specGui.Name = "PearlSpectatorListGui"
+        specGui.ResetOnSpawn = false
+        specGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+        pcall(function()
+            if syn and syn.protect_gui then syn.protect_gui(specGui) end
+        end)
+        specGui.Parent = CoreGui or LocalPlayer:WaitForChild("PlayerGui")
+
+        local win = Instance.new("Frame")
+        win.Name = "SpecWindow"
+        win.Size = UDim2.new(0, 210, 0, 140)
+        win.Position = UDim2.new(0.02, 0, 0.42, 0)
+        win.BackgroundColor3 = Color3.fromRGB(16, 16, 24)
+        win.BorderSizePixel = 0
+        win.Active = true
+        win.Draggable = true
+        win.Parent = specGui
+        makeCorner(win, 8)
+        makeStroke(win, Color3.fromRGB(48, 42, 70), 1.2)
+
+        local header = Instance.new("Frame")
+        header.Name = "Header"
+        header.Size = UDim2.new(1, 0, 0, 28)
+        header.BackgroundColor3 = Color3.fromRGB(22, 20, 32)
+        header.BorderSizePixel = 0
+        header.Parent = win
+        makeCorner(header, 8)
+
+        local hTitle = Instance.new("TextLabel")
+        hTitle.Size = UDim2.new(0.65, 0, 1, 0)
+        hTitle.Position = UDim2.new(0, 10, 0, 0)
+        hTitle.BackgroundTransparency = 1
+        hTitle.Text = "SPECTATEURS"
+        hTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+        hTitle.Font = Enum.Font.GothamBold
+        hTitle.TextSize = 11
+        hTitle.TextXAlignment = Enum.TextXAlignment.Left
+        hTitle.Parent = header
+
+        specCountLbl = Instance.new("TextLabel")
+        specCountLbl.Size = UDim2.new(0, 32, 0, 18)
+        specCountLbl.Position = UDim2.new(1, -40, 0.5, -9)
+        specCountLbl.BackgroundColor3 = Color3.fromRGB(34, 26, 52)
+        specCountLbl.Text = "0"
+        specCountLbl.TextColor3 = Color3.fromRGB(180, 145, 255)
+        specCountLbl.Font = Enum.Font.GothamBold
+        specCountLbl.TextSize = 10
+        specCountLbl.Parent = header
+        makeCorner(specCountLbl, 9)
+        makeStroke(specCountLbl, Color3.fromRGB(80, 60, 130), 1)
+
+        specContainer = Instance.new("ScrollingFrame")
+        specContainer.Name = "Container"
+        specContainer.Size = UDim2.new(1, -12, 1, -36)
+        specContainer.Position = UDim2.new(0, 6, 0, 32)
+        specContainer.BackgroundTransparency = 1
+        specContainer.BorderSizePixel = 0
+        specContainer.ScrollBarThickness = 2
+        specContainer.ScrollBarImageColor3 = Color3.fromRGB(140, 75, 255)
+        specContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+        specContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        specContainer.Parent = win
+
+        local pad = Instance.new("UIPadding")
+        pad.PaddingLeft = UDim.new(0, 2)
+        pad.PaddingRight = UDim.new(0, 4)
+        pad.PaddingTop = UDim.new(0, 2)
+        pad.PaddingBottom = UDim.new(0, 4)
+        pad.Parent = specContainer
+
+        local layout = Instance.new("UIListLayout")
+        layout.Padding = UDim.new(0, 4)
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Parent = specContainer
+
+        specListFrame = win
+    end
+
+    local function destroySpectatorWindow()
+        if specConn then specConn:Disconnect(); specConn = nil end
+        if specGui then specGui:Destroy(); specGui = nil end
+        specListFrame = nil
+        specContainer = nil
+        specCountLbl = nil
+        specItems = {}
+    end
+    _G.destroySpectatorWindow = destroySpectatorWindow
+
+    local lastSpecCheck = 0
+    local function updateSpectators()
+        if not V.SpectatorList or not specContainer then return end
+        local now = tick()
+        if now - lastSpecCheck < 0.25 then return end
+        lastSpecCheck = now
+
+        local myChar = LocalPlayer.Character
+        local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myHrp then return end
+
+        local currentSpectators = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                local isSpectatingMe = false
+
+                -- 1. Attributs specifiques Roblox ou jeux (MM2, Arsenal, Axion, Da Hood, etc.)
+                pcall(function()
+                    local spectatingAttr = p:GetAttribute("Spectating") or p:GetAttribute("SpectateTarget") or p:GetAttribute("Target") or p:GetAttribute("Watching")
+                    if spectatingAttr and (tostring(spectatingAttr) == LocalPlayer.Name or tostring(spectatingAttr) == tostring(LocalPlayer.UserId)) then
+                        isSpectatingMe = true
+                    end
+                end)
+
+                -- 2. ValueObjects (ObjectValue, StringValue) dans le Player ou PlayerGui
+                if not isSpectatingMe then
+                    pcall(function()
+                        local specVal = p:FindFirstChild("Spectating") or p:FindFirstChild("Spectate") or p:FindFirstChild("SpectateTarget") or p:FindFirstChild("CameraSubject")
+                        if specVal then
+                            if specVal:IsA("ObjectValue") and (specVal.Value == LocalPlayer or specVal.Value == myChar) then
+                                isSpectatingMe = true
+                            elseif specVal:IsA("StringValue") and (specVal.Value == LocalPlayer.Name) then
+                                isSpectatingMe = true
+                            end
+                        end
+                    end)
+                end
+
+                -- 3. Joueur mort ou sans corps dont la camera cible le joueur local
+                if not isSpectatingMe then
+                    pcall(function()
+                        local tChar = p.Character
+                        local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+                        local isDead = (not tChar) or (not tHum) or (tHum.Health <= 0)
+                        if isDead then
+                            local cam = workspace.CurrentCamera
+                            if cam and cam.CameraSubject and (cam.CameraSubject == myChar or cam.CameraSubject == myHrp) then
+                                isSpectatingMe = true
+                            end
+                        end
+                    end)
+                end
+
+                -- 4. Spectate mutuel enregistre dans V.Spectators
+                if not isSpectatingMe and V._ActiveSpectators and V._ActiveSpectators[p] then
+                    isSpectatingMe = true
+                end
+
+                if isSpectatingMe then
+                    table.insert(currentSpectators, p)
+                end
+            end
+        end
+
+        specCountLbl.Text = tostring(#currentSpectators)
+
+        -- Nettoyage des anciennes lignes
+        for _, item in pairs(specContainer:GetChildren()) do
+            if item:IsA("Frame") or item:IsA("TextLabel") then
+                item:Destroy()
+            end
+        end
+
+        if #currentSpectators == 0 then
+            local noneLbl = Instance.new("TextLabel")
+            noneLbl.Size = UDim2.new(1, 0, 0, 30)
+            noneLbl.BackgroundTransparency = 1
+            noneLbl.Text = "Aucun spectateur"
+            noneLbl.TextColor3 = Color3.fromRGB(130, 130, 150)
+            noneLbl.Font = Enum.Font.GothamMedium
+            noneLbl.TextSize = 10
+            noneLbl.Parent = specContainer
+        else
+            for _, p in ipairs(currentSpectators) do
+                local row = Instance.new("Frame")
+                row.Size = UDim2.new(1, 0, 0, 30)
+                row.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
+                row.BorderSizePixel = 0
+                row.Parent = specContainer
+                makeCorner(row, 6)
+                makeStroke(row, Color3.fromRGB(44, 44, 60), 1)
+
+                local av = Instance.new("ImageLabel")
+                av.Size = UDim2.new(0, 22, 0, 22)
+                av.Position = UDim2.new(0, 4, 0.5, -11)
+                av.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+                av.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(p.UserId) .. "&w=100&h=100"
+                av.BorderSizePixel = 0
+                av.Parent = row
+                makeCorner(av, 11)
+
+                local nLbl = Instance.new("TextLabel")
+                nLbl.Size = UDim2.new(1, -34, 1, 0)
+                nLbl.Position = UDim2.new(0, 30, 0, 0)
+                nLbl.BackgroundTransparency = 1
+                nLbl.Text = p.DisplayName .. " (@" .. p.Name .. ")"
+                nLbl.TextColor3 = Color3.fromRGB(240, 240, 250)
+                nLbl.Font = Enum.Font.GothamBold
+                nLbl.TextSize = 10
+                nLbl.TextXAlignment = Enum.TextXAlignment.Left
+                nLbl.TextTruncate = Enum.TextTruncate.AtEnd
+                nLbl.Parent = row
+            end
+        end
+    end
+
+    createToggle("Spectator List (Qui me regarde)", false, function(enabled)
+        V.SpectatorList = enabled
+        if enabled then
+            createSpectatorWindow()
+            if not specConn then
+                specConn = RunService.RenderStepped:Connect(updateSpectators)
+            end
+            notify("ESP", "Spectator List AFFICHÉE", Color3.fromRGB(80, 200, 120))
+        else
+            destroySpectatorWindow()
+            notify("ESP", "Spectator List MASQUÉE", Color3.fromRGB(255, 90, 90))
+        end
+    end, ESPContent, "SpectatorList")
+end
+
 createToggle("Distance", false, function(enabled) V.ESPDist = enabled end, ESPContent,"ESPDist")
 createToggle("Tracers ESP", false, function(enabled) V.ESPTracer = enabled end, ESPContent,"ESPTracer")
 createToggle("Skeleton ESP", false, function(enabled) V.ESPSkeleton = enabled end, ESPContent,"ESPSkeleton")
+createSlider("Épaisseur Skeleton (Thickness)", 1, 10, 2, function(val)
+    V.ESPSkeletonThickness = val
+    if VP and VP.HeadDotStroke then
+        VP.HeadDotStroke.Thickness = val
+    end
+end, ESPContent, "ESPSkeletonThickness")
 createToggle("Health Bar ESP", false, function(enabled) V.ESPHealth = enabled end, ESPContent,"ESPHealth")
 createToggle("Afficher PV", false, function(enabled)
     V.ESPPV = enabled
@@ -15122,6 +15933,93 @@ tracerOriginFrame, tracerBtnObj, tracerOriginValue = createValueButton(ESPConten
     notify("ESP","Origine des Tracers : ".. V.ESPTracerOrigin, Color3.fromRGB(80, 200, 120))
     return V.ESPTracerOrigin
 end)
+
+-- SECTION VEHICLE ESP
+createLabel("VEHICLE ESP", ESPContent)
+
+createToggle("Enable Vehicle ESP", false, function(enabled)
+    V.VehicleESP = enabled
+    if VehicleESPGui then
+        VehicleESPGui.Enabled = enabled
+    end
+    if not enabled and clearVehicleESP then
+        clearVehicleESP()
+    elseif enabled and scanAndCreateVehicleESP then
+        scanAndCreateVehicleESP()
+    end
+    notify("ESP", "Vehicle ESP " .. (enabled and "ON" or "OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, ESPContent, "VehicleESP")
+
+createToggle("Box 3D (Véhicule)", true, function(enabled)
+    V.VehicleESPBox3D = enabled
+end, ESPContent, "VehicleESPBox3D")
+
+createToggle("Nom du Véhicule (Name)", true, function(enabled)
+    V.VehicleESPName = enabled
+end, ESPContent, "VehicleESPName")
+
+createToggle("Distance Véhicule", true, function(enabled)
+    V.VehicleESPDist = enabled
+end, ESPContent, "VehicleESPDist")
+
+createToggle("Indicateur Conducteur (Driver)", true, function(enabled)
+    V.VehicleESPDriver = enabled
+end, ESPContent, "VehicleESPDriver")
+
+createLabel("COULEUR BOX VEHICULE", ESPContent)
+do
+    local VehPaletteFrame = Instance.new("Frame")
+    VehPaletteFrame.Size = UDim2.new(1, 0, 0, 40)
+    VehPaletteFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    VehPaletteFrame.BorderSizePixel = 0
+    VehPaletteFrame.Parent = ESPContent
+
+    local vpc = Instance.new("UICorner")
+    vpc.CornerRadius = UDim.new(0, 8)
+    vpc.Parent = VehPaletteFrame
+
+    local vpl = Instance.new("UIListLayout")
+    vpl.FillDirection = Enum.FillDirection.Horizontal
+    vpl.Padding = UDim.new(0, 6)
+    vpl.Parent = VehPaletteFrame
+
+    local vpp = Instance.new("UIPadding")
+    vpp.PaddingLeft = UDim.new(0, 10)
+    vpp.PaddingTop = UDim.new(0, 7)
+    vpp.Parent = VehPaletteFrame
+
+    local function createVehPaletteColor(col)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 26, 0, 26)
+        btn.BackgroundColor3 = col
+        btn.BorderSizePixel = 0
+        btn.Text = ""
+        btn.Parent = VehPaletteFrame
+
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, 4)
+        c.Parent = btn
+
+        local s = Instance.new("UIStroke")
+        s.Thickness = 1
+        s.Color = Color3.fromRGB(80, 80, 90)
+        s.Transparency = 0.6
+        s.Parent = btn
+
+        btn.MouseButton1Click:Connect(function()
+            V.VehicleESPColor = col
+            notify("ESP", "Couleur Box Véhicule changée !", col)
+        end)
+    end
+
+    createVehPaletteColor(Color3.fromRGB(145, 120, 255)) -- Violet (Defaut)
+    createVehPaletteColor(Color3.fromRGB(255, 170, 0))   -- Orange / Ambre
+    createVehPaletteColor(Color3.fromRGB(255, 60, 60))   -- Rouge
+    createVehPaletteColor(Color3.fromRGB(60, 180, 255))  -- Bleu Ciel
+    createVehPaletteColor(Color3.fromRGB(46, 204, 113))  -- Vert Emeraude
+    createVehPaletteColor(Color3.fromRGB(255, 255, 255)) -- Blanc Pur
+    createVehPaletteColor(Color3.fromRGB(255, 80, 180))  -- Rose Fluo
+end
 
 createLabel("COLOR PALETTE", ESPContent)
 do
@@ -16579,7 +17477,10 @@ end
 local carjackPlayer = _G.carjackPlayer
 
 
--- Configuration de JoueurContent en 2 colonnes epurees, ultra fluides et modernes
+do
+-- ============================================================================
+-- ONGLET JOUEUR : DESIGN MODERNE, CARD-BASED, SANS EMOJIS & COULEURS BLANC/GRIS
+-- ============================================================================
 JoueurContent.ScrollBarThickness = 0
 JoueurContent.ScrollBarImageTransparency = 1
 JoueurContent.VerticalScrollBarInset = Enum.ScrollBarInset.None
@@ -16602,82 +17503,112 @@ PlayerTabRoot.ClipsDescendants = true
 PlayerTabRoot.Parent = JoueurContent
 
 local rootPad = Instance.new("UIPadding")
-rootPad.PaddingTop = UDim.new(0, 10)
+rootPad.PaddingTop = UDim.new(0, 8)
 rootPad.PaddingBottom = UDim.new(0, 10)
-rootPad.PaddingLeft = UDim.new(0, 20)
-rootPad.PaddingRight = UDim.new(0, 20)
+rootPad.PaddingLeft = UDim.new(0, 12)
+rootPad.PaddingRight = UDim.new(0, 12)
 rootPad.Parent = PlayerTabRoot
 
--- Colonne Gauche (Player List) : 53% large et aeree
+-- Colonne Gauche (Player List) : 50% - 7px
 local LeftCol = Instance.new("Frame")
 LeftCol.Name = "LeftCol"
-LeftCol.Size = UDim2.new(0.53, -10, 1, 0)
+LeftCol.Size = UDim2.new(0.5, -7, 1, 0)
 LeftCol.Position = UDim2.new(0, 0, 0, 0)
 LeftCol.BackgroundTransparency = 1
 LeftCol.BorderSizePixel = 0
 LeftCol.ClipsDescendants = true
 LeftCol.Parent = PlayerTabRoot
 
+-- Header Player List avec compteur
+local LeftHeader = Instance.new("Frame")
+LeftHeader.Name = "LeftHeader"
+LeftHeader.Size = UDim2.new(1, -12, 0, 24)
+LeftHeader.Position = UDim2.new(0, 4, 0, 0)
+LeftHeader.BackgroundTransparency = 1
+LeftHeader.Parent = LeftCol
+
 local LeftTitle = Instance.new("TextLabel")
 LeftTitle.Name = "LeftTitle"
-LeftTitle.Size = UDim2.new(1, 0, 0, 26)
-LeftTitle.Position = UDim2.new(0, 2, 0, 2)
+LeftTitle.Size = UDim2.new(0.65, 0, 1, 0)
+LeftTitle.Position = UDim2.new(0, 0, 0, 0)
 LeftTitle.BackgroundTransparency = 1
 LeftTitle.Text = "Player List"
 LeftTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 LeftTitle.Font = Enum.Font.GothamBold
-LeftTitle.TextSize = 15
+LeftTitle.TextSize = 14
 LeftTitle.TextXAlignment = Enum.TextXAlignment.Left
-LeftTitle.Parent = LeftCol
+LeftTitle.Parent = LeftHeader
 
+local PlayerCountBadge = Instance.new("TextLabel")
+PlayerCountBadge.Name = "PlayerCountBadge"
+PlayerCountBadge.Size = UDim2.new(0, 75, 0, 20)
+PlayerCountBadge.Position = UDim2.new(1, -75, 0.5, -10)
+PlayerCountBadge.BackgroundColor3 = Color3.fromRGB(24, 24, 34)
+PlayerCountBadge.Text = "0 joueurs"
+PlayerCountBadge.TextColor3 = Color3.fromRGB(215, 215, 230)
+PlayerCountBadge.Font = Enum.Font.GothamBold
+PlayerCountBadge.TextSize = 10
+PlayerCountBadge.Parent = LeftHeader
+makeCorner(PlayerCountBadge, 10)
+makeStroke(PlayerCountBadge, Color3.fromRGB(50, 50, 68), 1)
+
+-- Boîte de recherche moderne sans emoji
 local FilterContainer = Instance.new("Frame")
 FilterContainer.Name = "FilterContainer"
-FilterContainer.Size = UDim2.new(1, 0, 0, 30)
-FilterContainer.Position = UDim2.new(0, 0, 0, 32)
+FilterContainer.Size = UDim2.new(1, -12, 0, 32)
+FilterContainer.Position = UDim2.new(0, 4, 0, 28)
 FilterContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
 FilterContainer.BorderSizePixel = 0
 FilterContainer.Parent = LeftCol
-makeCorner(FilterContainer, 6)
-makeStroke(FilterContainer, Color3.fromRGB(32, 32, 46), 1)
+makeCorner(FilterContainer, 8)
+local filterStroke = makeStroke(FilterContainer, Color3.fromRGB(34, 34, 48), 1)
 
 local FilterBox = Instance.new("TextBox")
 FilterBox.Name = "FilterBox"
-FilterBox.Size = UDim2.new(1, -16, 1, 0)
-FilterBox.Position = UDim2.new(0, 8, 0, 0)
+FilterBox.Size = UDim2.new(1, -20, 1, 0)
+FilterBox.Position = UDim2.new(0, 10, 0, 0)
 FilterBox.BackgroundTransparency = 1
-FilterBox.PlaceholderText = "Player filter"
-FilterBox.PlaceholderColor3 = Color3.fromRGB(105, 105, 125)
+FilterBox.PlaceholderText = "Filtrer un joueur ou ID..."
+FilterBox.PlaceholderColor3 = Color3.fromRGB(110, 110, 130)
 FilterBox.Text = ""
-FilterBox.TextColor3 = Color3.fromRGB(225, 225, 235)
+FilterBox.TextColor3 = Color3.fromRGB(240, 240, 250)
 FilterBox.Font = Enum.Font.GothamMedium
 FilterBox.TextSize = 11
 FilterBox.TextXAlignment = Enum.TextXAlignment.Left
 FilterBox.ClearTextOnFocus = false
 FilterBox.Parent = FilterContainer
 
+FilterBox.Focused:Connect(function()
+    filterStroke.Color = Color3.fromRGB(140, 75, 255)
+end)
+FilterBox.FocusLost:Connect(function()
+    filterStroke.Color = Color3.fromRGB(34, 34, 48)
+end)
+
+-- Liste scrollable des joueurs parfaitement alignée
 local PlayerListScroll = Instance.new("ScrollingFrame")
 PlayerListScroll.Name = "PlayerListScroll"
 PlayerListScroll.Size = UDim2.new(1, 0, 1, -66)
-PlayerListScroll.Position = UDim2.new(0, 0, 0, 64)
+PlayerListScroll.Position = UDim2.new(0, 0, 0, 66)
 PlayerListScroll.BackgroundTransparency = 1
 PlayerListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 PlayerListScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-PlayerListScroll.ScrollBarThickness = 2
-PlayerListScroll.ScrollBarImageColor3 = Color3.fromRGB(70, 60, 95)
-PlayerListScroll.ScrollBarImageTransparency = 0.5
+PlayerListScroll.ScrollBarThickness = 3
+PlayerListScroll.ScrollBarImageColor3 = Color3.fromRGB(140, 75, 255)
+PlayerListScroll.ScrollBarImageTransparency = 0.2
 PlayerListScroll.BorderSizePixel = 0
 PlayerListScroll.ClipsDescendants = true
 PlayerListScroll.Parent = LeftCol
 
 local PlayerListPad = Instance.new("UIPadding")
-PlayerListPad.PaddingLeft = UDim.new(0, 0)
-PlayerListPad.PaddingRight = UDim.new(0, 6)
+PlayerListPad.PaddingLeft = UDim.new(0, 4)
+PlayerListPad.PaddingRight = UDim.new(0, 8)
 PlayerListPad.PaddingTop = UDim.new(0, 4)
 PlayerListPad.PaddingBottom = UDim.new(0, 14)
 PlayerListPad.Parent = PlayerListScroll
 
 local PlayerListLayout = Instance.new("UIListLayout")
-PlayerListLayout.Padding = UDim.new(0, 8)
+PlayerListLayout.Padding = UDim.new(0, 6)
 PlayerListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 PlayerListLayout.Parent = PlayerListScroll
 
@@ -16685,20 +17616,20 @@ PlayerListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(functio
     PlayerListScroll.CanvasSize = UDim2.new(0, 0, 0, PlayerListLayout.AbsoluteContentSize.Y + 16)
 end)
 
--- Ligne de separation verticale centrale
+-- Ligne de séparation centrale
 local CenterDivider = Instance.new("Frame")
 CenterDivider.Name = "CenterDivider"
-CenterDivider.Size = UDim2.new(0, 1, 1, -8)
-CenterDivider.Position = UDim2.new(0.53, 0, 0, 4)
-CenterDivider.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+CenterDivider.Size = UDim2.new(0, 1, 1, -12)
+CenterDivider.Position = UDim2.new(0.5, 0, 0, 6)
+CenterDivider.BackgroundColor3 = Color3.fromRGB(32, 32, 46)
 CenterDivider.BorderSizePixel = 0
 CenterDivider.Parent = PlayerTabRoot
 
--- Colonne Droite (Settings) : 47% equilibre
+-- Colonne Droite (Actions Joueur) : 50% - 7px
 local RightCol = Instance.new("Frame")
 RightCol.Name = "RightCol"
-RightCol.Size = UDim2.new(0.47, -12, 1, 0)
-RightCol.Position = UDim2.new(0.53, 12, 0, 0)
+RightCol.Size = UDim2.new(0.5, -7, 1, 0)
+RightCol.Position = UDim2.new(0.5, 7, 0, 0)
 RightCol.BackgroundTransparency = 1
 RightCol.BorderSizePixel = 0
 RightCol.ClipsDescendants = true
@@ -16706,52 +17637,101 @@ RightCol.Parent = PlayerTabRoot
 
 local RightTitle = Instance.new("TextLabel")
 RightTitle.Name = "RightTitle"
-RightTitle.Size = UDim2.new(1, 0, 0, 26)
-RightTitle.Position = UDim2.new(0, 2, 0, 2)
+RightTitle.Size = UDim2.new(1, -12, 0, 24)
+RightTitle.Position = UDim2.new(0, 4, 0, 0)
 RightTitle.BackgroundTransparency = 1
-RightTitle.Text = "Settings"
+RightTitle.Text = "Actions Joueur"
 RightTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 RightTitle.Font = Enum.Font.GothamBold
-RightTitle.TextSize = 15
+RightTitle.TextSize = 14
 RightTitle.TextXAlignment = Enum.TextXAlignment.Left
 RightTitle.Parent = RightCol
 
-local TargetIndicator = Instance.new("TextLabel")
-TargetIndicator.Name = "TargetIndicator"
-TargetIndicator.Size = UDim2.new(1, 0, 0, 18)
-TargetIndicator.Position = UDim2.new(0, 2, 0, 30)
-TargetIndicator.BackgroundTransparency = 1
-TargetIndicator.Text = "Cible : Aucun joueur sélectionné"
-TargetIndicator.TextColor3 = Color3.fromRGB(155, 140, 225)
-TargetIndicator.Font = Enum.Font.GothamMedium
-TargetIndicator.TextSize = 11
-TargetIndicator.TextXAlignment = Enum.TextXAlignment.Left
-TargetIndicator.TextTruncate = Enum.TextTruncate.AtEnd
-TargetIndicator.Parent = RightCol
+-- Carte Profil de la Cible (Target Card) - Palette Blanc & Gris
+local TargetCard = Instance.new("Frame")
+TargetCard.Name = "TargetCard"
+TargetCard.Size = UDim2.new(1, -12, 0, 48)
+TargetCard.Position = UDim2.new(0, 4, 0, 28)
+TargetCard.BackgroundColor3 = Color3.fromRGB(16, 15, 26)
+TargetCard.BorderSizePixel = 0
+TargetCard.ClipsDescendants = true
+TargetCard.Parent = RightCol
+makeCorner(TargetCard, 8)
+local targetCardStroke = makeStroke(TargetCard, Color3.fromRGB(48, 38, 74), 1)
 
+local TargetAvatar = Instance.new("ImageLabel")
+TargetAvatar.Name = "TargetAvatar"
+TargetAvatar.Size = UDim2.new(0, 34, 0, 34)
+TargetAvatar.Position = UDim2.new(0, 8, 0.5, -17)
+TargetAvatar.BackgroundColor3 = Color3.fromRGB(24, 22, 34)
+TargetAvatar.Image = "rbxthumb://type=AvatarHeadShot&id=1&w=100&h=100"
+TargetAvatar.BorderSizePixel = 0
+TargetAvatar.Parent = TargetCard
+makeCorner(TargetAvatar, 17)
+makeStroke(TargetAvatar, Color3.fromRGB(140, 75, 255), 1)
+
+local TargetHeaderLbl = Instance.new("TextLabel")
+TargetHeaderLbl.Name = "TargetHeaderLbl"
+TargetHeaderLbl.Size = UDim2.new(1, -95, 0, 14)
+TargetHeaderLbl.Position = UDim2.new(0, 48, 0, 7)
+TargetHeaderLbl.BackgroundTransparency = 1
+TargetHeaderLbl.Text = "CIBLE ACTIVE (VOUS)"
+TargetHeaderLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+TargetHeaderLbl.Font = Enum.Font.GothamBold
+TargetHeaderLbl.TextSize = 9
+TargetHeaderLbl.TextXAlignment = Enum.TextXAlignment.Left
+TargetHeaderLbl.Parent = TargetCard
+
+local TargetNameLbl = Instance.new("TextLabel")
+TargetNameLbl.Name = "TargetNameLbl"
+TargetNameLbl.Size = UDim2.new(1, -95, 0, 18)
+TargetNameLbl.Position = UDim2.new(0, 48, 0, 22)
+TargetNameLbl.BackgroundTransparency = 1
+TargetNameLbl.Text = "Aucun joueur"
+TargetNameLbl.TextColor3 = Color3.fromRGB(245, 245, 255)
+TargetNameLbl.Font = Enum.Font.GothamBold
+TargetNameLbl.TextSize = 12
+TargetNameLbl.TextXAlignment = Enum.TextXAlignment.Left
+TargetNameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+TargetNameLbl.Parent = TargetCard
+
+local TargetStatusPill = Instance.new("TextLabel")
+TargetStatusPill.Name = "TargetStatusPill"
+TargetStatusPill.Size = UDim2.new(0, 46, 0, 18)
+TargetStatusPill.Position = UDim2.new(1, -52, 0.5, -9)
+TargetStatusPill.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+TargetStatusPill.Text = "Moi"
+TargetStatusPill.TextColor3 = Color3.fromRGB(240, 240, 250)
+TargetStatusPill.Font = Enum.Font.GothamBold
+TargetStatusPill.TextSize = 9
+TargetStatusPill.Parent = TargetCard
+makeCorner(TargetStatusPill, 9)
+local statusStroke = makeStroke(TargetStatusPill, Color3.fromRGB(60, 60, 78), 1)
+
+-- Conteneur d'actions avec boutons calibrés
 local SettingsContainer = Instance.new("ScrollingFrame")
 SettingsContainer.Name = "SettingsContainer"
-SettingsContainer.Size = UDim2.new(1, 0, 1, -54)
-SettingsContainer.Position = UDim2.new(0, 0, 0, 52)
+SettingsContainer.Size = UDim2.new(1, 0, 1, -82)
+SettingsContainer.Position = UDim2.new(0, 0, 0, 82)
 SettingsContainer.BackgroundTransparency = 1
 SettingsContainer.BorderSizePixel = 0
-SettingsContainer.ScrollBarThickness = 2
-SettingsContainer.ScrollBarImageColor3 = Color3.fromRGB(70, 60, 95)
-SettingsContainer.ScrollBarImageTransparency = 0.5
+SettingsContainer.ScrollBarThickness = 3
+SettingsContainer.ScrollBarImageColor3 = Color3.fromRGB(140, 75, 255)
+SettingsContainer.ScrollBarImageTransparency = 0.2
 SettingsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
 SettingsContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
 SettingsContainer.ClipsDescendants = true
 SettingsContainer.Parent = RightCol
 
 local SettingsPad = Instance.new("UIPadding")
-SettingsPad.PaddingLeft = UDim.new(0, 0)
-SettingsPad.PaddingRight = UDim.new(0, 4)
+SettingsPad.PaddingLeft = UDim.new(0, 4)
+SettingsPad.PaddingRight = UDim.new(0, 8)
 SettingsPad.PaddingTop = UDim.new(0, 4)
-SettingsPad.PaddingBottom = UDim.new(0, 12)
+SettingsPad.PaddingBottom = UDim.new(0, 14)
 SettingsPad.Parent = SettingsContainer
 
 local SettingsLayout = Instance.new("UIListLayout")
-SettingsLayout.Padding = UDim.new(0, 8)
+SettingsLayout.Padding = UDim.new(0, 6)
 SettingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 SettingsLayout.Parent = SettingsContainer
 
@@ -16765,16 +17745,33 @@ local playerRowsByPlayer = {}
 
 local function updateTargetIndicator()
     if selectedPlayer and selectedPlayer.Parent then
-        if selectedPlayer == LocalPlayer then
-            TargetIndicator.Text = "Cible : " .. selectedPlayer.DisplayName .. " (@" .. selectedPlayer.Name .. ") [Moi]"
-            TargetIndicator.TextColor3 = Color3.fromRGB(120, 200, 255)
+        local isMe = (selectedPlayer == LocalPlayer)
+        TargetAvatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(selectedPlayer.UserId) .. "&w=100&h=100"
+        TargetNameLbl.Text = selectedPlayer.DisplayName .. " (@" .. selectedPlayer.Name .. ")"
+        if isMe then
+            TargetHeaderLbl.Text = "CIBLE ACTIVE (VOUS)"
+            TargetHeaderLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            TargetStatusPill.Text = "Moi"
+            TargetStatusPill.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
+            TargetStatusPill.TextColor3 = Color3.fromRGB(245, 245, 255)
+            statusStroke.Color = Color3.fromRGB(65, 65, 85)
         else
-            TargetIndicator.Text = "Cible : " .. selectedPlayer.DisplayName .. " (@" .. selectedPlayer.Name .. ")"
-            TargetIndicator.TextColor3 = Color3.fromRGB(175, 145, 255)
+            TargetHeaderLbl.Text = "CIBLE SÉLECTIONNÉE"
+            TargetHeaderLbl.TextColor3 = Color3.fromRGB(185, 185, 200)
+            TargetStatusPill.Text = "En jeu"
+            TargetStatusPill.BackgroundColor3 = Color3.fromRGB(26, 26, 36)
+            TargetStatusPill.TextColor3 = Color3.fromRGB(210, 210, 225)
+            statusStroke.Color = Color3.fromRGB(50, 50, 68)
         end
     else
-        TargetIndicator.Text = "Cible : Aucun joueur sélectionné"
-        TargetIndicator.TextColor3 = Color3.fromRGB(130, 130, 150)
+        TargetAvatar.Image = "rbxthumb://type=AvatarHeadShot&id=1&w=100&h=100"
+        TargetHeaderLbl.Text = "AUCUNE CIBLE"
+        TargetHeaderLbl.TextColor3 = Color3.fromRGB(140, 140, 160)
+        TargetNameLbl.Text = "Sélectionnez un joueur"
+        TargetStatusPill.Text = "Aucun"
+        TargetStatusPill.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+        TargetStatusPill.TextColor3 = Color3.fromRGB(150, 150, 165)
+        statusStroke.Color = Color3.fromRGB(45, 45, 60)
     end
 end
 
@@ -16789,47 +17786,114 @@ local function updateSelectionHighlight()
         if rowData.btn and rowData.btn.Parent then
             local isSel = (p == selectedPlayer)
             if isSel then
-                rowData.btn.BackgroundColor3 = Color3.fromRGB(46, 26, 76)
-                rowData.stroke.Color = Color3.fromRGB(140, 75, 255)
-                rowData.lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+                rowData.btn.BackgroundColor3 = Color3.fromRGB(44, 22, 72)
+                rowData.stroke.Color = Color3.fromRGB(150, 85, 255)
+                rowData.dispLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+                rowData.userLbl.TextColor3 = Color3.fromRGB(195, 175, 240)
             else
                 rowData.btn.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
                 rowData.stroke.Color = Color3.fromRGB(32, 32, 46)
-                rowData.lbl.TextColor3 = (p == LocalPlayer) and Color3.fromRGB(140, 200, 255) or Color3.fromRGB(215, 215, 230)
+                rowData.dispLbl.TextColor3 = Color3.fromRGB(240, 240, 250)
+                rowData.userLbl.TextColor3 = Color3.fromRGB(135, 135, 155)
             end
         end
     end
 end
 
+local function updatePlayerCount()
+    local total = #Players:GetPlayers()
+    PlayerCountBadge.Text = tostring(total) .. " joueur" .. (total > 1 and "s" or "")
+end
+
 local function createPlayerRow(p)
     if not p or playerRowsByPlayer[p] then return end
 
+    local isMe = (p == LocalPlayer)
+    local isSel = (p == selectedPlayer)
+
     local row = Instance.new("TextButton")
-    row.Size = UDim2.new(1, -4, 0, 36)
-    row.BackgroundColor3 = (p == selectedPlayer) and Color3.fromRGB(46, 26, 76) or Color3.fromRGB(18, 18, 26)
+    row.Size = UDim2.new(1, -12, 0, 40) -- Bonne taille calibrée
+    row.BackgroundColor3 = isSel and Color3.fromRGB(44, 22, 72) or Color3.fromRGB(18, 18, 26)
     row.BorderSizePixel = 0
     row.Text = ""
     row.AutoButtonColor = false
     row.ClipsDescendants = true
-    row.LayoutOrder = (p == LocalPlayer) and 0 or 1
+    row.LayoutOrder = isMe and 0 or 1
     row.Parent = PlayerListScroll
-    makeCorner(row, 6)
-    local rowStroke = makeStroke(row, (p == selectedPlayer) and Color3.fromRGB(140, 75, 255) or Color3.fromRGB(32, 32, 46), 1)
+    makeCorner(row, 8)
+    local rowStroke = makeStroke(row, isSel and Color3.fromRGB(150, 85, 255) or Color3.fromRGB(32, 32, 46), 1)
 
-    local rowLabel = Instance.new("TextLabel")
-    rowLabel.Size = UDim2.new(1, -16, 1, 0)
-    rowLabel.Position = UDim2.new(0, 8, 0, 0)
-    rowLabel.BackgroundTransparency = 1
-    local tag = (p == LocalPlayer) and " (Moi)" or ""
-    rowLabel.Text = p.DisplayName .. " (@" .. p.Name .. ")" .. tag
-    rowLabel.TextColor3 = (p == selectedPlayer) and Color3.fromRGB(255, 255, 255) or ((p == LocalPlayer) and Color3.fromRGB(140, 200, 255) or Color3.fromRGB(215, 215, 230))
-    rowLabel.Font = Enum.Font.GothamBold
-    rowLabel.TextSize = 11
-    rowLabel.TextXAlignment = Enum.TextXAlignment.Left
-    rowLabel.TextTruncate = Enum.TextTruncate.AtEnd
-    rowLabel.Parent = row
+    -- Avatar du joueur
+    local avatar = Instance.new("ImageLabel")
+    avatar.Name = "Avatar"
+    avatar.Size = UDim2.new(0, 28, 0, 28)
+    avatar.Position = UDim2.new(0, 6, 0.5, -14)
+    avatar.BackgroundColor3 = Color3.fromRGB(26, 26, 38)
+    avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(p.UserId) .. "&w=100&h=100"
+    avatar.BorderSizePixel = 0
+    avatar.Parent = row
+    makeCorner(avatar, 14)
+    makeStroke(avatar, Color3.fromRGB(48, 48, 68), 1)
+
+    -- Nom d'affichage (Blanc)
+    local dispLabel = Instance.new("TextLabel")
+    dispLabel.Name = "DisplayName"
+    dispLabel.Size = UDim2.new(1, -96, 0, 16)
+    dispLabel.Position = UDim2.new(0, 42, 0, 4)
+    dispLabel.BackgroundTransparency = 1
+    dispLabel.Text = p.DisplayName
+    dispLabel.TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(240, 240, 250)
+    dispLabel.Font = Enum.Font.GothamBold
+    dispLabel.TextSize = 11
+    dispLabel.TextXAlignment = Enum.TextXAlignment.Left
+    dispLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    dispLabel.Parent = row
+
+    -- Username (@Name) (Gris)
+    local userLabel = Instance.new("TextLabel")
+    userLabel.Name = "Username"
+    userLabel.Size = UDim2.new(1, -96, 0, 14)
+    userLabel.Position = UDim2.new(0, 42, 0, 20)
+    userLabel.BackgroundTransparency = 1
+    userLabel.Text = "@" .. p.Name
+    userLabel.TextColor3 = isSel and Color3.fromRGB(195, 175, 240) or Color3.fromRGB(140, 140, 160)
+    userLabel.Font = Enum.Font.GothamMedium
+    userLabel.TextSize = 10
+    userLabel.TextXAlignment = Enum.TextXAlignment.Left
+    userLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    userLabel.Parent = row
+
+    -- Badge "MOI" sobre (Blanc et Gris)
+    if isMe then
+        local meBadge = Instance.new("TextLabel")
+        meBadge.Name = "MeBadge"
+        meBadge.Size = UDim2.new(0, 36, 0, 18)
+        meBadge.Position = UDim2.new(1, -44, 0.5, -9)
+        meBadge.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
+        meBadge.Text = "MOI"
+        meBadge.TextColor3 = Color3.fromRGB(240, 240, 250)
+        meBadge.Font = Enum.Font.GothamBold
+        meBadge.TextSize = 9
+        meBadge.Parent = row
+        makeCorner(meBadge, 6)
+        makeStroke(meBadge, Color3.fromRGB(58, 58, 76), 1)
+    end
 
     local searchKey = string.lower(p.Name .. " " .. p.DisplayName .. " " .. tostring(p.UserId))
+
+    row.MouseEnter:Connect(function()
+        if selectedPlayer ~= p then
+            row.BackgroundColor3 = Color3.fromRGB(26, 26, 38)
+            rowStroke.Color = Color3.fromRGB(48, 48, 68)
+        end
+    end)
+
+    row.MouseLeave:Connect(function()
+        if selectedPlayer ~= p then
+            row.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+            rowStroke.Color = Color3.fromRGB(32, 32, 46)
+        end
+    end)
 
     row.MouseButton1Click:Connect(function()
         playClick()
@@ -16841,7 +17905,7 @@ local function createPlayerRow(p)
         refreshAllActions()
     end)
 
-    playerRowsByPlayer[p] = {btn = row, stroke = rowStroke, lbl = rowLabel, searchKey = searchKey}
+    playerRowsByPlayer[p] = {btn = row, stroke = rowStroke, dispLbl = dispLabel, userLbl = userLabel, searchKey = searchKey}
 end
 
 local function removePlayerRow(p)
@@ -16860,6 +17924,7 @@ local function removePlayerRow(p)
         updateSelectionHighlight()
         refreshAllActions()
     end
+    updatePlayerCount()
 end
 
 local function applyFilter()
@@ -16875,7 +17940,7 @@ local function applyFilter()
     end
 end
 
--- Remplissage initial fluide avec TOUS les joueurs du serveur
+-- Remplissage initial
 for _, p in ipairs(Players:GetPlayers()) do
     createPlayerRow(p)
 end
@@ -16884,6 +17949,7 @@ if not selectedPlayer or not selectedPlayer.Parent then
     V.SelectedJoueurPlayer = LocalPlayer
     _G.SelectedJoueurPlayer = LocalPlayer
 end
+updatePlayerCount()
 updateTargetIndicator()
 updateSelectionHighlight()
 
@@ -16893,28 +17959,28 @@ Players.PlayerAdded:Connect(function(p)
     createPlayerRow(p)
     applyFilter()
     updateSelectionHighlight()
+    updatePlayerCount()
 end)
 
 Players.PlayerRemoving:Connect(function(p)
     removePlayerRow(p)
 end)
 
--- Creation des 5 boutons d'action (attach, spectate, teleport, WarpCar, fling)
--- Pas de coloration au survol de la souris, coloration uniquement a l'appui / actif
+-- Creation des boutons d'action de bonne taille sans emojis
 local function createActionButton(btnTitle, callback, checkActive)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -4, 0, 36)
+    btn.Size = UDim2.new(1, -12, 0, 35) -- Bonne taille proportionnee et elegante
     btn.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
     btn.BorderSizePixel = 0
     btn.Text = btnTitle
-    btn.TextColor3 = Color3.fromRGB(220, 220, 235)
+    btn.TextColor3 = Color3.fromRGB(235, 235, 245)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 12
     btn.RichText = true
     btn.AutoButtonColor = false
     btn.Parent = SettingsContainer
-    makeCorner(btn, 6)
-    local stroke = makeStroke(btn, Color3.fromRGB(32, 32, 46), 1)
+    makeCorner(btn, 8)
+    local stroke = makeStroke(btn, Color3.fromRGB(34, 34, 48), 1)
 
     local function refreshState()
         local active = false
@@ -16924,26 +17990,42 @@ local function createActionButton(btnTitle, callback, checkActive)
             end)
         end
         if active then
-            btn.BackgroundColor3 = Color3.fromRGB(55, 20, 32)
-            btn.TextColor3 = Color3.fromRGB(255, 95, 110)
-            stroke.Color = Color3.fromRGB(210, 48, 62)
+            btn.BackgroundColor3 = Color3.fromRGB(56, 18, 30)
+            btn.TextColor3 = Color3.fromRGB(255, 95, 115)
+            stroke.Color = Color3.fromRGB(215, 48, 64)
         else
             btn.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
-            btn.TextColor3 = Color3.fromRGB(220, 220, 235)
-            stroke.Color = Color3.fromRGB(32, 32, 46)
+            btn.TextColor3 = Color3.fromRGB(235, 235, 245)
+            stroke.Color = Color3.fromRGB(34, 34, 48)
         end
     end
 
     table.insert(actionRefreshers, refreshState)
 
+    btn.MouseEnter:Connect(function()
+        local active = false
+        if checkActive then pcall(function() active = checkActive(btn) end) end
+        if not active then
+            btn.BackgroundColor3 = Color3.fromRGB(26, 26, 38)
+            stroke.Color = Color3.fromRGB(52, 50, 72)
+        end
+    end)
+
+    btn.MouseLeave:Connect(function()
+        local active = false
+        if checkActive then pcall(function() active = checkActive(btn) end) end
+        if not active then
+            btn.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+            stroke.Color = Color3.fromRGB(34, 34, 48)
+        end
+    end)
+
     btn.MouseButton1Down:Connect(function()
         local active = false
-        if checkActive then
-            pcall(function() active = checkActive(btn) end)
-        end
+        if checkActive then pcall(function() active = checkActive(btn) end) end
         if not active then
-            btn.BackgroundColor3 = Color3.fromRGB(38, 24, 60)
-            stroke.Color = Color3.fromRGB(140, 75, 255)
+            btn.BackgroundColor3 = Color3.fromRGB(42, 24, 68)
+            stroke.Color = Color3.fromRGB(150, 85, 255)
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         end
     end)
@@ -17072,7 +18154,7 @@ end, function(btn)
     return active
 end)
 
--- 4. WarpCar
+-- 5. WarpCar
 createActionButton("WarpCar", function(btn)
     if selectedPlayer == LocalPlayer then
         notify("Player", "Vous êtes déjà dans votre session !", Color3.fromRGB(255, 165, 0))
@@ -17085,7 +18167,7 @@ createActionButton("WarpCar", function(btn)
     end
 end)
 
--- 5. Fling
+-- 6. Fling
 createActionButton("Fling", function(btn)
     if selectedPlayer == LocalPlayer then
         notify("Fling", "Impossible de fling son propre personnage !", Color3.fromRGB(255, 165, 0))
@@ -17109,6 +18191,8 @@ _G.refreshPlayerList = function()
     end
     applyFilter()
     updateSelectionHighlight()
+    updatePlayerCount()
+end
 end
 
 
@@ -17640,8 +18724,23 @@ end, "VehicleBoostMode")
 
 createToggle("Vehicle Noclip", false, function(enabled)
     V.VehicleNoclip = enabled
-    notify("Vehicle","Vehicle Noclip".. (enabled and"ON"or"OFF"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
-end, VehicleContent,"VehicleNoclip")
+    if not enabled then
+        pcall(function()
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local seat = hum and hum.SeatPart
+            local veh = seat and (seat:FindFirstAncestorOfClass("Model") or seat.Parent)
+            if veh then
+                for _, part in ipairs(veh:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = true
+                    end
+                end
+            end
+        end)
+    end
+    notify("Vehicle", "Vehicle Noclip " .. (enabled and "ACTIF" or "DÉSACTIVÉ"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, VehicleContent, "VehicleNoclip")
 
 function jumpCar(force)
     pcall(function()
@@ -18097,6 +19196,435 @@ createButton("Freinage Instantané (Touche N)", function()
     instantBrake()
 end, VehicleContent)
 
+-- ==============================================================
+-- [NOUVELLES FONCTIONNALITES VEHICULE AVANCEES]
+-- ==============================================================
+createLabel("TENUE DE ROUTE (ANTI-CRASH)", VehicleContent)
+
+createToggle("Anti-Flip Automatique (Auto-Stabilizer)", false, function(enabled)
+    V.VehicleAutoAntiFlip = enabled
+    notify("Vehicle", "Anti-Flip Auto " .. (enabled and "ACTIF" or "DESACTIVE"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, VehicleContent, "VehicleAutoAntiFlip")
+
+createLabel("FRANCHISSEMENT SURNATUREL (WATER & WALL)", VehicleContent)
+
+do
+local vehicleWaterPlate = nil
+createToggle("Jesus Car (Rouler sur l'eau)", false, function(enabled)
+    V.VehicleWaterDrive = enabled
+    if not enabled and vehicleWaterPlate and vehicleWaterPlate.Parent then
+        pcall(function() vehicleWaterPlate:Destroy() end)
+        vehicleWaterPlate = nil
+    end
+    notify("Vehicle", "Jesus Car " .. (enabled and "ACTIF" or "DESACTIVE"), enabled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(255, 90, 90))
+end, VehicleContent, "VehicleWaterDrive")
+
+createLabel("CONTROLE & TACTIQUE VEHICULE", VehicleContent)
+
+
+-- [FONCTIONS ROBUSTES SUPPRIMER & GHOST VEHICULE (DEFINIES EN AMONT)]
+local origVehTransparency = {}
+
+local function toggleVehicleInvisible(forcedState)
+    pcall(function()
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local seat = hum and hum.SeatPart
+        if not seat and not V._invisVehModel then
+            notify("Vehicle", "Tu dois être assis dans un véhicule !", Color3.fromRGB(255, 165, 0))
+            return
+        end
+        local veh = (seat and (seat:FindFirstAncestorOfClass("Model") or seat.Parent)) or V._invisVehModel
+        if not veh then return end
+
+        local newState = (forcedState ~= nil) and forcedState or not V.VehicleInvisibleActive
+        V.VehicleInvisibleActive = newState
+
+        if newState then
+            V._invisVehModel = veh
+            for _, part in pairs(veh:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    if origVehTransparency[part] == nil then
+                        origVehTransparency[part] = part.Transparency
+                    end
+                    part.Transparency = 1
+                    part.CastShadow = false
+                elseif part:IsA("Decal") or part:IsA("Texture") then
+                    if origVehTransparency[part] == nil then
+                        origVehTransparency[part] = part.Transparency
+                    end
+                    part.Transparency = 1
+                elseif part:IsA("SurfaceGui") or part:IsA("BillboardGui") or part:IsA("ParticleEmitter") or part:IsA("Light") then
+                    part.Enabled = false
+                end
+            end
+            notify("Vehicle", "Ghost Car ACTIF (Véhicule invisible)", Color3.fromRGB(80, 200, 120))
+        else
+            if V._invisVehModel then
+                for part, origTr in pairs(origVehTransparency) do
+                    if part and part.Parent then
+                        pcall(function()
+                            part.Transparency = origTr
+                            if part:IsA("BasePart") then part.CastShadow = true end
+                            if part:IsA("SurfaceGui") or part:IsA("BillboardGui") or part:IsA("ParticleEmitter") or part:IsA("Light") then
+                                part.Enabled = true
+                            end
+                        end)
+                    end
+                end
+            end
+            origVehTransparency = {}
+            V._invisVehModel = nil
+            notify("Vehicle", "Ghost Car DÉSACTIVÉ", Color3.fromRGB(255, 90, 90))
+        end
+    end)
+end
+_G.toggleVehicleInvisible = toggleVehicleInvisible
+KeybindCallbacks["VehicleInvisible"] = function() toggleVehicleInvisible() end
+
+local function deleteCurrentVehicle()
+    pcall(function()
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local seat = hum and hum.SeatPart
+        if not seat then
+            notify("Vehicle", "Tu dois être assis dans un véhicule !", Color3.fromRGB(255, 165, 0))
+            return
+        end
+        local veh = seat:FindFirstAncestorOfClass("Model") or (seat.Parent:IsA("Model") and seat.Parent or seat)
+        hum.Sit = false
+        task.wait(0.05)
+        pcall(function() veh:Destroy() end)
+        notify("Vehicle", "Véhicule supprimé avec succès !", Color3.fromRGB(80, 200, 120))
+    end)
+end
+_G.deleteCurrentVehicle = deleteCurrentVehicle
+KeybindCallbacks["VehicleDelete"] = function() deleteCurrentVehicle() end
+
+-- Bouton Delete Vehicule avec bind
+do
+    local delCard = createCard(VehicleContent, 0, 44)
+    local delTitle = Instance.new("TextLabel")
+    delTitle.Size = UDim2.new(0.6, 0, 1, 0)
+    delTitle.Position = UDim2.new(0, 14, 0, 0)
+    delTitle.BackgroundTransparency = 1
+    delTitle.Text = "Supprimer le Véhicule (Delete)"
+    delTitle.TextColor3 = theme.text
+    delTitle.Font = Enum.Font.GothamMedium
+    delTitle.TextSize = 12
+    delTitle.TextXAlignment = Enum.TextXAlignment.Left
+    delTitle.Parent = delCard
+
+    local delBtn = Instance.new("TextButton")
+    delBtn.Size = UDim2.new(0, 70, 0, 26)
+    delBtn.Position = UDim2.new(1, -164, 0.5, -13)
+    delBtn.BackgroundColor3 = Color3.fromRGB(55, 20, 28)
+    delBtn.BorderSizePixel = 0
+    delBtn.Text = "Delete"
+    delBtn.TextColor3 = Color3.fromRGB(255, 90, 100)
+    delBtn.Font = Enum.Font.GothamBold
+    delBtn.TextSize = 11
+    delBtn.Parent = delCard
+    makeCorner(delBtn, 6)
+    makeStroke(delBtn, Color3.fromRGB(210, 48, 62), 1)
+
+    local delKeyBtn = Instance.new("TextButton")
+    delKeyBtn.Size = UDim2.new(0, 80, 0, 26)
+    delKeyBtn.Position = UDim2.new(1, -88, 0.5, -13)
+    delKeyBtn.BackgroundColor3 = theme.cardHover
+    delKeyBtn.BorderSizePixel = 0
+    delKeyBtn.Text = (Keybinds.VehicleDelete and Keybinds.VehicleDelete ~= Enum.KeyCode.Unknown) and Keybinds.VehicleDelete.Name or "Aucun"
+    delKeyBtn.TextColor3 = theme.accent
+    delKeyBtn.Font = Enum.Font.GothamBold
+    delKeyBtn.TextSize = 11
+    delKeyBtn.Parent = delCard
+    makeCorner(delKeyBtn, 6)
+    local dStroke = makeStroke(delKeyBtn, theme.border, 1)
+
+    KeybindButtons["VehicleDelete"] = delKeyBtn
+    delBtn.MouseButton1Click:Connect(function()
+        playClick()
+        deleteCurrentVehicle()
+    end)
+    delKeyBtn.MouseButton1Click:Connect(function()
+        pcall(function() GuiService.SelectedObject = nil end)
+        KeybindSystem.Binding = true
+        KeybindSystem.BindingName = "VehicleDelete"
+        KeybindSystem.BindingBtn = delKeyBtn
+        delKeyBtn.Text = "Press..."
+    end)
+    registerSearchCard(delCard, "Delete Supprimer Vehicule Detruire Car", VehicleContent)
+end
+
+-- Bouton Vehicule Invisible (Ghost Car) avec bind
+do
+    local invCard = createCard(VehicleContent, 0, 44)
+    local invTitle = Instance.new("TextLabel")
+    invTitle.Size = UDim2.new(0.6, 0, 1, 0)
+    invTitle.Position = UDim2.new(0, 14, 0, 0)
+    invTitle.BackgroundTransparency = 1
+    invTitle.Text = "Véhicule Invisible (Ghost Car)"
+    invTitle.TextColor3 = theme.text
+    invTitle.Font = Enum.Font.GothamMedium
+    invTitle.TextSize = 12
+    invTitle.TextXAlignment = Enum.TextXAlignment.Left
+    invTitle.Parent = invCard
+
+    local invBtn = Instance.new("TextButton")
+    invBtn.Size = UDim2.new(0, 70, 0, 26)
+    invBtn.Position = UDim2.new(1, -164, 0.5, -13)
+    invBtn.BackgroundColor3 = theme.cardHover
+    invBtn.BorderSizePixel = 0
+    invBtn.Text = "Ghost"
+    invBtn.TextColor3 = theme.accent
+    invBtn.Font = Enum.Font.GothamBold
+    invBtn.TextSize = 11
+    invBtn.Parent = invCard
+    makeCorner(invBtn, 6)
+    makeStroke(invBtn, theme.border, 1)
+
+    local invKeyBtn = Instance.new("TextButton")
+    invKeyBtn.Size = UDim2.new(0, 80, 0, 26)
+    invKeyBtn.Position = UDim2.new(1, -88, 0.5, -13)
+    invKeyBtn.BackgroundColor3 = theme.cardHover
+    invKeyBtn.BorderSizePixel = 0
+    invKeyBtn.Text = (Keybinds.VehicleInvisible and Keybinds.VehicleInvisible ~= Enum.KeyCode.Unknown) and Keybinds.VehicleInvisible.Name or "Aucun"
+    invKeyBtn.TextColor3 = theme.accent
+    invKeyBtn.Font = Enum.Font.GothamBold
+    invKeyBtn.TextSize = 11
+    invKeyBtn.Parent = invCard
+    makeCorner(invKeyBtn, 6)
+    local iStroke = makeStroke(invKeyBtn, theme.border, 1)
+
+    KeybindButtons["VehicleInvisible"] = invKeyBtn
+    invBtn.MouseButton1Click:Connect(function()
+        playClick()
+        toggleVehicleInvisible()
+        invBtn.TextColor3 = V.VehicleInvisibleActive and Color3.fromRGB(80, 220, 140) or theme.accent
+    end)
+    invKeyBtn.MouseButton1Click:Connect(function()
+        pcall(function() GuiService.SelectedObject = nil end)
+        KeybindSystem.Binding = true
+        KeybindSystem.BindingName = "VehicleInvisible"
+        KeybindSystem.BindingBtn = invKeyBtn
+        invKeyBtn.Text = "Press..."
+    end)
+    registerSearchCard(invCard, "Vehicule Invisible Ghost Car Transparent", VehicleContent)
+end
+
+-- (Delete and Ghost functions already initialized)
+
+local function toggleVehicleFreeze(enable)
+    pcall(function()
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local seat = hum and hum.SeatPart
+        if not seat and not V._lastAnchoredRoot then
+            notify("Vehicle", "Tu dois etre dans un vehicule !", Color3.fromRGB(255, 165, 0))
+            return
+        end
+        local veh = seat and (seat.Parent:IsA("Model") and seat.Parent or seat) or V._lastAnchoredVeh
+        local root = seat and (veh:IsA("Model") and (veh.PrimaryPart or seat) or seat) or V._lastAnchoredRoot
+        if not root then return end
+
+        local shouldFreeze = (enable ~= nil) and enable or (not root.Anchored)
+        V.VehicleAnchorFreeze = shouldFreeze
+
+        if shouldFreeze then
+            V._lastAnchoredVeh = veh
+            V._lastAnchoredRoot = root
+            for _, p in pairs(veh:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    p.AssemblyLinearVelocity = Vector3.zero
+                    p.AssemblyAngularVelocity = Vector3.zero
+                    p.Anchored = true
+                end
+            end
+            root.Anchored = true
+            notify("Vehicle", "Vehicule Ancre / Fige (Sky Parking) !", Color3.fromRGB(80, 200, 120))
+        else
+            for _, p in pairs(veh:GetDescendants()) do
+                if p:IsA("BasePart") then
+                    p.Anchored = false
+                end
+            end
+            root.Anchored = false
+            V._lastAnchoredVeh = nil
+            V._lastAnchoredRoot = nil
+            notify("Vehicle", "Vehicule Libere / Defreeze !", Color3.fromRGB(255, 165, 0))
+        end
+
+        if _G.updateVehicleFreezeUI then
+            _G.updateVehicleFreezeUI(shouldFreeze)
+        end
+    end)
+end
+_G.toggleVehicleFreeze = toggleVehicleFreeze
+
+-- Carte unifiée pour Ancrage / Freeze avec support Keybind custom (défaut non défini)
+local freezeCard = createCard(VehicleContent, 0, 48)
+
+local freezeTitle = Instance.new("TextLabel")
+freezeTitle.Size = UDim2.new(1, -165, 1, 0)
+freezeTitle.Position = UDim2.new(0, 14, 0, 0)
+freezeTitle.BackgroundTransparency = 1
+freezeTitle.Text = "Ancrage / Freeze (Sky Parking)"
+freezeTitle.TextColor3 = Colors.Text
+freezeTitle.Font = Enum.Font.GothamMedium
+freezeTitle.TextSize = 12
+freezeTitle.TextXAlignment = Enum.TextXAlignment.Left
+freezeTitle.ZIndex = 8
+freezeTitle.Parent = freezeCard
+
+local freezeKeyBtn = Instance.new("TextButton")
+freezeKeyBtn.Size = UDim2.new(0, 72, 0, 26)
+freezeKeyBtn.Position = UDim2.new(1, -140, 0.5, -13)
+freezeKeyBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+freezeKeyBtn.BorderSizePixel = 0
+freezeKeyBtn.Text = (Keybinds.VehicleFreeze and Keybinds.VehicleFreeze ~= Enum.KeyCode.Unknown) and Keybinds.VehicleFreeze.Name or "[None]"
+freezeKeyBtn.TextColor3 = Colors.Accent
+freezeKeyBtn.Font = Enum.Font.GothamBold
+freezeKeyBtn.TextSize = 11
+freezeKeyBtn.ZIndex = 8
+freezeKeyBtn.Parent = freezeCard
+makeCorner(freezeKeyBtn, 6)
+local fkbStroke = makeStroke(freezeKeyBtn, Colors.Border, 1)
+
+freezeKeyBtn.MouseEnter:Connect(function()
+    if not (KeybindSystem.Binding and KeybindSystem.BindingName == "VehicleFreeze") then
+        fkbStroke.Color = Colors.Accent
+    end
+end)
+freezeKeyBtn.MouseLeave:Connect(function()
+    if not (KeybindSystem.Binding and KeybindSystem.BindingName == "VehicleFreeze") then
+        fkbStroke.Color = Colors.Border
+    end
+end)
+
+freezeKeyBtn.MouseButton1Click:Connect(function()
+    pcall(function() GuiService.SelectedObject = nil end)
+    KeybindSystem.Binding = true
+    KeybindSystem.BindingName = "VehicleFreeze"
+    KeybindSystem.BindingBtn = freezeKeyBtn
+    freezeKeyBtn.Text = "Press..."
+    freezeKeyBtn.BackgroundColor3 = Colors.Accent
+    freezeKeyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    fkbStroke.Color = Colors.Accent
+end)
+
+KeybindButtons["VehicleFreeze"] = freezeKeyBtn
+KeybindCallbacks["VehicleFreeze"] = function()
+    toggleVehicleFreeze()
+end
+
+local freezeToggleBtn = Instance.new("TextButton")
+freezeToggleBtn.Size = UDim2.new(0, 52, 0, 24)
+freezeToggleBtn.Position = UDim2.new(1, -62, 0.5, -12)
+freezeToggleBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+freezeToggleBtn.BorderSizePixel = 0
+freezeToggleBtn.Text = "OFF"
+freezeToggleBtn.TextColor3 = Colors.TextDim
+freezeToggleBtn.Font = Enum.Font.GothamBold
+freezeToggleBtn.TextSize = 10
+freezeToggleBtn.AutoButtonColor = false
+freezeToggleBtn.ZIndex = 8
+freezeToggleBtn.Parent = freezeCard
+makeCorner(freezeToggleBtn, 6)
+local ftStroke = makeStroke(freezeToggleBtn, Colors.Border, 1)
+
+local function updateFreezeBtnState(active)
+    if active then
+        freezeToggleBtn.Text = "ON"
+        freezeToggleBtn.TextColor3 = Colors.Success
+        freezeToggleBtn.BackgroundColor3 = Colors.CardActive
+        ftStroke.Color = Colors.Success
+    else
+        freezeToggleBtn.Text = "OFF"
+        freezeToggleBtn.TextColor3 = Colors.TextDim
+        freezeToggleBtn.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+        ftStroke.Color = Colors.Border
+    end
+end
+_G.updateVehicleFreezeUI = updateFreezeBtnState
+
+freezeToggleBtn.MouseButton1Click:Connect(function()
+    playClick()
+    local newState = not V.VehicleAnchorFreeze
+    toggleVehicleFreeze(newState)
+    updateFreezeBtnState(newState)
+end)
+
+registerSearchCard(freezeCard, "Ancrage Freeze Vehicule Sky Parking Bind Keybind", VehicleContent)
+
+local lastDrivenSeat = nil
+local function ejectFromVehicle()
+    pcall(function()
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local seat = hum and hum.SeatPart
+        if not seat or not hrp then
+            notify("Vehicle", "Tu dois etre assis dans un vehicule !", Color3.fromRGB(255, 165, 0))
+            return
+        end
+        lastDrivenSeat = seat
+        hum.Sit = false
+        task.wait(0.04)
+        hrp.CFrame = hrp.CFrame + Vector3.new(0, 35, 0)
+        hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 25, hrp.AssemblyLinearVelocity.Z)
+        notify("Vehicle", "Ejection Tactique reussie (+35 studs) !", Color3.fromRGB(80, 200, 120))
+    end)
+end
+_G.ejectFromVehicle = ejectFromVehicle
+
+local function autoRecallToVehicle()
+    pcall(function()
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp or not hum then return end
+
+        local targetSeat = lastDrivenSeat
+        if not targetSeat or not targetSeat.Parent then
+            local closestDist = 150
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("VehicleSeat") then
+                    local dist = (obj.Position - hrp.Position).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        targetSeat = obj
+                    end
+                end
+            end
+        end
+
+        if not targetSeat or not targetSeat.Parent then
+            notify("Vehicle", "Aucun vehicule a rappeler a proximite !", Color3.fromRGB(255, 90, 90))
+            return
+        end
+
+        hrp.CFrame = targetSeat.CFrame + Vector3.new(0, 2.5, 0)
+        task.wait(0.05)
+        if _G.sitInSeat then
+            _G.sitInSeat(hum, hrp, targetSeat)
+        else
+            targetSeat:Sit(hum)
+        end
+        lastDrivenSeat = targetSeat
+        notify("Vehicle", "Retour automatique au volant !", Color3.fromRGB(80, 200, 120))
+    end)
+end
+_G.autoRecallToVehicle = autoRecallToVehicle
+
+createButton("Ejection Tactique (Eject 35 studs)", function()
+    ejectFromVehicle()
+end, VehicleContent)
+
+createButton("Auto-Recall (Retour au Volant)", function()
+    autoRecallToVehicle()
+end, VehicleContent)
+end
+
 if V.VehicleBoostHoldConn then V.VehicleBoostHoldConn:Disconnect() end
 UserInputService.InputBegan:Connect(function(input, gpe)
     if not gpe and input.KeyCode == Enum.KeyCode.Space then
@@ -18260,17 +19788,22 @@ task.spawn(function()
                 local hum = char and char:FindFirstChildOfClass("Humanoid")
                 local seat = hum and hum.SeatPart
                 if seat then
-                    local veh = seat.Parent
+                    local veh = seat:FindFirstAncestorOfClass("Model") or (seat.Parent:IsA("Model") and seat.Parent or seat)
                     if veh then
-                        for _, part in pairs(veh:GetDescendants()) do
+                        for _, part in ipairs(veh:GetDescendants()) do
                             if part:IsA("BasePart") then
-                                part.CanCollide = false
+                                local pName = string.lower(part.Name)
+                                local isWheel = pName:find("wheel") or pName:find("tire") or pName:find("roue") or pName:find("cylind") or pName:find("rim")
+                                if isWheel then
+                                    part.CanCollide = true
+                                else
+                                    part.CanCollide = false
+                                end
                             end
                         end
                     end
-                    seat.CanCollide = false
                     if char then
-                        for _, p in pairs(char:GetDescendants()) do
+                        for _, p in ipairs(char:GetDescendants()) do
                             if p:IsA("BasePart") then
                                 p.CanCollide = false
                             end
@@ -18279,6 +19812,92 @@ task.spawn(function()
                 end
             end)
         end
+
+
+
+        -- [FEATURE: ANTI-FLIP AUTOMATIQUE PERMANENT (GYRO-STABILIZER)]
+        if V.VehicleAutoAntiFlip then
+            pcall(function()
+                local char = LocalPlayer.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                local seat = hum and hum.SeatPart
+                if seat then
+                    local vehModel = seat.Parent:IsA("Model") and seat.Parent or nil
+                    local root = (vehModel and vehModel.PrimaryPart) or seat
+                    local up = root.CFrame.UpVector
+                    if up.Y < 0.55 then
+                        local cf = root.CFrame
+                        local look = cf.LookVector
+                        local flatLook = Vector3.new(look.X, 0, look.Z)
+                        if flatLook.Magnitude < 0.05 then flatLook = Vector3.new(0, 0, -1) else flatLook = flatLook.Unit end
+                        local targetCF = CFrame.lookAt(root.Position + Vector3.new(0, 1.2, 0), root.Position + Vector3.new(0, 1.2, 0) + flatLook)
+                        if vehModel and vehModel.PrimaryPart then
+                            vehModel:SetPrimaryPartCFrame(targetCF)
+                        else
+                            root.CFrame = targetCF
+                        end
+                        root.AssemblyAngularVelocity = Vector3.new(0, root.AssemblyAngularVelocity.Y, 0)
+                    end
+                end
+            end)
+        end
+
+
+
+        -- [FEATURE: JESUS CAR (ROULER SUR L'EAU)]
+        if V.VehicleWaterDrive then
+            pcall(function()
+                local char = LocalPlayer.Character
+                local hum = char and char:FindFirstChildOfClass("Humanoid")
+                local seat = hum and hum.SeatPart
+                if seat then
+                    local vehModel = seat.Parent:IsA("Model") and seat.Parent or nil
+                    local root = (vehModel and vehModel.PrimaryPart) or seat
+                    local rootPos = root.Position
+
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterDescendantsInstances = { char, (vehModel or seat.Parent) }
+                    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+                    rayParams.IgnoreWater = false
+
+                    local rayResult = workspace:Raycast(rootPos + Vector3.new(0, 3, 0), Vector3.new(0, -30, 0), rayParams)
+                    local isWater = false
+                    local waterY = nil
+
+                    if rayResult then
+                        if rayResult.Material == Enum.Material.Water or (rayResult.Instance and (rayResult.Instance.Name:lower():find("water") or rayResult.Instance.Material == Enum.Material.Water)) then
+                            isWater = true
+                            waterY = rayResult.Position.Y
+                        end
+                    end
+
+                    if isWater and waterY then
+                        if not vehicleWaterPlate or not vehicleWaterPlate.Parent then
+                            vehicleWaterPlate = Instance.new("Part")
+                            vehicleWaterPlate.Name = "NebulaVehicleWaterPlate"
+                            vehicleWaterPlate.Size = Vector3.new(24, 1.2, 34)
+                            vehicleWaterPlate.Transparency = 1
+                            vehicleWaterPlate.Anchored = true
+                            vehicleWaterPlate.CanCollide = true
+                            vehicleWaterPlate.Material = Enum.Material.SmoothPlastic
+                            vehicleWaterPlate.Parent = workspace
+                        end
+                        vehicleWaterPlate.CFrame = CFrame.new(rootPos.X, waterY - 0.5, rootPos.Z) * CFrame.Angles(0, math.rad(root.Orientation.Y), 0)
+                    else
+                        if vehicleWaterPlate and vehicleWaterPlate.Parent then
+                            vehicleWaterPlate.CFrame = CFrame.new(0, -9999, 0)
+                        end
+                    end
+                end
+            end)
+        elseif not V.VehicleWaterDrive and vehicleWaterPlate then
+            pcall(function() vehicleWaterPlate:Destroy() end)
+            vehicleWaterPlate = nil
+        end
+
+
+
+
     end
 end)
 
@@ -18729,7 +20348,9 @@ do
     createToggle("Marcher sur l'eau (Sans degats)", false, function(enabled)
         toggleWaterWalk(enabled)
     end, FunContent, "WaterWalk")
+end
 
+do
     local airPart = nil
     local airWalkConn = nil
     local currentPlatformY = nil
@@ -19082,6 +20703,8 @@ do
     end)
 end
 
+createLabel("PERSONNALISATION DU MENU", SettingsContent)
+
 createToggle("Bulles Animées (Background)", true, function(enabled)
     V.BubblesEnabled = enabled
     if BubblesContainer then
@@ -19103,11 +20726,7 @@ createSlider("Opacité Fond Sombre (Dimmer)", 0, 100, 80, function(val)
     end
 end, SettingsContent,"DimmerOpacity")
 
--- [UI Opacity / Transparency removed as requested]
-
-
-
-createLabel("SYSTEM", SettingsContent)
+createLabel("SYSTEME & ACCESSIBILITE", SettingsContent)
 
 do
     local shiftLockEnabled = false
@@ -19356,7 +20975,7 @@ createLabel("KEYBINDS", SettingsContent)
         KeyBtn.Position = UDim2.new(1, -96, 0.5, -13)
         KeyBtn.BackgroundColor3 = theme.cardHover
         KeyBtn.BorderSizePixel = 0
-        KeyBtn.Text = Keybinds[name] and Keybinds[name].Name or defaultKey.Name
+        KeyBtn.Text = (Keybinds[name] and Keybinds[name] ~= Enum.KeyCode.Unknown) and Keybinds[name].Name or ((defaultKey and defaultKey ~= Enum.KeyCode.Unknown) and defaultKey.Name or "Aucun")
         KeyBtn.TextColor3 = theme.accent
         KeyBtn.Font = Enum.Font.GothamBold
         KeyBtn.TextSize = 11
@@ -19428,6 +21047,15 @@ createLabel("KEYBINDS", SettingsContent)
     end)
     createKeybindButton("RecordMovement", Keybinds.RecordMovement, function() toggleMovementRecording() end)
     createKeybindButton("ReplayMovement", Keybinds.ReplayMovement, function() toggleMovementReplaying() end)
+    createKeybindButton("VehicleFreeze", Keybinds.VehicleFreeze or Enum.KeyCode.Unknown, function()
+        if _G.toggleVehicleFreeze then _G.toggleVehicleFreeze() end
+    end)
+    createKeybindButton("VehicleDelete", Keybinds.VehicleDelete or Enum.KeyCode.Unknown, function()
+        if _G.deleteCurrentVehicle then _G.deleteCurrentVehicle() end
+    end)
+    createKeybindButton("VehicleInvisible", Keybinds.VehicleInvisible or Enum.KeyCode.Unknown, function()
+        if _G.toggleVehicleInvisible then _G.toggleVehicleInvisible() end
+    end)
 end
 
 createLabel("UNLOAD", SettingsContent)
@@ -19516,6 +21144,14 @@ do
                 if kb.VehiclePropulse and Enum.KeyCode[kb.VehiclePropulse] then Keybinds.VehiclePropulse = Enum.KeyCode[kb.VehiclePropulse] end
                 if kb.RecordMovement and Enum.KeyCode[kb.RecordMovement] then Keybinds.RecordMovement = Enum.KeyCode[kb.RecordMovement] end
                 if kb.ReplayMovement and Enum.KeyCode[kb.ReplayMovement] then Keybinds.ReplayMovement = Enum.KeyCode[kb.ReplayMovement] end
+                if kb.VehicleFreeze and Enum.KeyCode[kb.VehicleFreeze] then Keybinds.VehicleFreeze = Enum.KeyCode[kb.VehicleFreeze] end
+                if kb.VehicleDelete and Enum.KeyCode[kb.VehicleDelete] then Keybinds.VehicleDelete = Enum.KeyCode[kb.VehicleDelete] end
+                if kb.VehicleInvisible and Enum.KeyCode[kb.VehicleInvisible] then Keybinds.VehicleInvisible = Enum.KeyCode[kb.VehicleInvisible] end
+                for bName, bCode in pairs(Keybinds) do
+                    if KeybindButtons[bName] then
+                        KeybindButtons[bName].Text = (bCode ~= Enum.KeyCode.Unknown) and bCode.Name or "Aucun"
+                    end
+                end
                 if kb.Aimlock then
                     local kName = tostring(kb.Aimlock)
                     _G.Aimlock_KeyName = kName
@@ -19863,25 +21499,38 @@ do
                 return fallback
             end
 
+            local function getBindNameClean(bind, fallback)
+                if typeof(bind) == "EnumItem" then
+                    if bind == Enum.KeyCode.Unknown then return "Aucun" end
+                    return bind.Name
+                elseif type(bind) == "string" then
+                    return bind
+                end
+                return fallback or "Aucun"
+            end
+
             cfg.Keybinds = {
-                Fly = getBindName(Keybinds.Fly, "F"),
-                Noclip = getBindName(Keybinds.Noclip, "V"),
-                Invisible = getBindName(Keybinds.Invisible, "C"),
-                DesyncFly = getBindName(Keybinds.DesyncFly, "G"),
-                ESP = getBindName(Keybinds.ESP, "M"),
-                Speed = getBindName(Keybinds.Speed, "R"),
-                Respawn = getBindName(Keybinds.Respawn, "B"),
-                Menu = getBindName(Keybinds.Menu, "Insert"),
-                Freecam = getBindName(Keybinds.Freecam, "X"),
-                VehicleFly = getBindName(Keybinds.VehicleFly, "H"),
-                VehicleBoost = getBindName(Keybinds.VehicleBoost, "T"),
-                InstantBrake = getBindName(Keybinds.InstantBrake, "N"),
-                VehicleSeatTP = getBindName(Keybinds.VehicleSeatTP, "J"),
-                VehicleAutoFlip = getBindName(Keybinds.VehicleAutoFlip, "K"),
-                VehicleExplode = getBindName(Keybinds.VehicleExplode, "L"),
-                VehiclePropulse = getBindName(Keybinds.VehiclePropulse, "P"),
-                RecordMovement = getBindName(Keybinds.RecordMovement, "Y"),
-                ReplayMovement = getBindName(Keybinds.ReplayMovement, "O"),
+                Fly = getBindNameClean(Keybinds.Fly),
+                Noclip = getBindNameClean(Keybinds.Noclip),
+                Invisible = getBindNameClean(Keybinds.Invisible),
+                DesyncFly = getBindNameClean(Keybinds.DesyncFly),
+                ESP = getBindNameClean(Keybinds.ESP),
+                Speed = getBindNameClean(Keybinds.Speed),
+                Respawn = getBindNameClean(Keybinds.Respawn),
+                Menu = getBindNameClean(Keybinds.Menu, "Insert"),
+                Freecam = getBindNameClean(Keybinds.Freecam),
+                VehicleFly = getBindNameClean(Keybinds.VehicleFly),
+                VehicleBoost = getBindNameClean(Keybinds.VehicleBoost),
+                InstantBrake = getBindNameClean(Keybinds.InstantBrake),
+                VehicleSeatTP = getBindNameClean(Keybinds.VehicleSeatTP),
+                VehicleAutoFlip = getBindNameClean(Keybinds.VehicleAutoFlip),
+                VehicleExplode = getBindNameClean(Keybinds.VehicleExplode),
+                VehiclePropulse = getBindNameClean(Keybinds.VehiclePropulse),
+                RecordMovement = getBindNameClean(Keybinds.RecordMovement),
+                ReplayMovement = getBindNameClean(Keybinds.ReplayMovement),
+                VehicleFreeze = getBindNameClean(Keybinds.VehicleFreeze),
+                VehicleDelete = getBindNameClean(Keybinds.VehicleDelete),
+                VehicleInvisible = getBindNameClean(Keybinds.VehicleInvisible),
                 Aimlock = tostring(_G.Aimlock_KeyName or Aimlock_KeyName or "Aucun")
             }
 
@@ -20705,6 +22354,37 @@ createButton("Lancer SimpleSpy V3 (Remote Logger)", function()
     end)
 end, CodeContent, "Lancer")
 end
+
+-- ==============================================================
+-- [VERROUILLAGE PERMANENT DE L'ORDRE ORIGINAL (ANTI-DESORDRE RECHERCHE)]
+-- ==============================================================
+local function lockAllNebulaLayoutOrders()
+    for _, p in pairs(panels) do
+        if p and p ~= SearchPanel and p:IsA("ScrollingFrame") then
+            local counter = 0
+            for _, child in ipairs(p:GetChildren()) do
+                if child:IsA("GuiObject") and not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+                    counter = counter + 1
+                    child.LayoutOrder = counter
+                    pcall(function() child:SetAttribute("NebulaOrigOrder", counter) end)
+                end
+            end
+        end
+    end
+    for _, item in ipairs(AllRegisteredCards) do
+        if item.card then
+            local attrOrder = nil
+            pcall(function() attrOrder = item.card:GetAttribute("NebulaOrigOrder") end)
+            if attrOrder and attrOrder > 0 then
+                item.origOrder = attrOrder
+            elseif item.card.LayoutOrder > 0 then
+                item.origOrder = item.card.LayoutOrder
+            end
+        end
+    end
+end
+pcall(lockAllNebulaLayoutOrders)
+_G.lockAllNebulaLayoutOrders = lockAllNebulaLayoutOrders
 
 if V.UnifiedInputConn then V.UnifiedInputConn:Disconnect() end
 V.UnifiedInputConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
