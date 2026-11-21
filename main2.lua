@@ -4894,6 +4894,72 @@ PanelTitle.TextXAlignment = Enum.TextXAlignment.Left
 PanelTitle.ZIndex = 8
 PanelTitle.Parent = TopBar
 
+_G.NebulaHealth = _G.NebulaHealth or {
+    failedOptions = {}
+}
+
+function _G.reportOptionResult(name, success, err)
+    if not name then return end
+    local cleanName = tostring(name):gsub("<[^>]->", "")
+    if not success then
+        _G.NebulaHealth.failedOptions[cleanName] = tostring(err or "Erreur")
+    else
+        _G.NebulaHealth.failedOptions[cleanName] = nil
+    end
+    if _G.updateNebulaStatusUI then
+        pcall(_G.updateNebulaStatusUI)
+    end
+end
+
+local TopBarStatusPill = Instance.new("Frame")
+TopBarStatusPill.Name = "TopBarStatusPill"
+TopBarStatusPill.Size = UDim2.new(0, 115, 0, 26)
+TopBarStatusPill.Position = UDim2.new(1, -172, 0.5, -13)
+TopBarStatusPill.BackgroundColor3 = Color3.fromRGB(18, 22, 28)
+TopBarStatusPill.BorderSizePixel = 0
+TopBarStatusPill.ZIndex = 8
+TopBarStatusPill.Parent = TopBar
+
+local tbCorner = Instance.new("UICorner")
+tbCorner.CornerRadius = UDim.new(0, 7)
+tbCorner.Parent = TopBarStatusPill
+
+local tbStroke = Instance.new("UIStroke")
+tbStroke.Color = Color3.fromRGB(46, 204, 113)
+tbStroke.Thickness = 1
+tbStroke.Transparency = 0.5
+tbStroke.Parent = TopBarStatusPill
+
+local tbDot = Instance.new("Frame")
+tbDot.Name = "Dot"
+tbDot.Size = UDim2.new(0, 8, 0, 8)
+tbDot.Position = UDim2.new(0, 8, 0.5, -4)
+tbDot.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+tbDot.BorderSizePixel = 0
+tbDot.ZIndex = 9
+tbDot.Parent = TopBarStatusPill
+local tbDotCorner = Instance.new("UICorner") tbDotCorner.CornerRadius = UDim.new(1, 0) tbDotCorner.Parent = tbDot
+
+local tbLabel = Instance.new("TextLabel")
+tbLabel.Name = "Label"
+tbLabel.Size = UDim2.new(1, -22, 1, 0)
+tbLabel.Position = UDim2.new(0, 20, 0, 0)
+tbLabel.BackgroundTransparency = 1
+tbLabel.Text = "100% Fonctionnel"
+tbLabel.TextColor3 = Color3.fromRGB(46, 204, 113)
+tbLabel.Font = Enum.Font.GothamBold
+tbLabel.TextSize = 10
+tbLabel.TextXAlignment = Enum.TextXAlignment.Left
+tbLabel.ZIndex = 9
+tbLabel.Parent = TopBarStatusPill
+
+_G.TopBarStatusElements = {
+    pill = TopBarStatusPill,
+    stroke = tbStroke,
+    dot = tbDot,
+    label = tbLabel,
+}
+
 local AvatarHolder = Instance.new("Frame")
 AvatarHolder.Name = "AvatarHolder"
 AvatarHolder.Size = UDim2.new(0, 36, 0, 36)
@@ -6848,7 +6914,10 @@ function createToggle(name, default, callback, parent, configKey)
 		enabled = (value == true)
 		if configKey then V[configKey] = enabled end
 		updateBoxVisual(enabled)
-		pcall(callback, enabled)
+		local ok, err = pcall(callback, enabled)
+		if _G.reportOptionResult then
+			_G.reportOptionResult(name, ok, err)
+		end
 	end
 
 	local function toggleState()
@@ -7080,7 +7149,12 @@ function createButton(name, callback, parent, customBtnText, isDanger)
 		CreateTween(btn, {BackgroundColor3 = Color3.fromRGB(32, 32, 40)}, 0.15)
 		pcall(function() GuiService.SelectedObject = nil end)
 		playClick()
-		if callback then pcall(callback) end
+		if callback then
+			local ok, err = pcall(callback)
+			if _G.reportOptionResult then
+				_G.reportOptionResult(name, ok, err)
+			end
+		end
 	end)
 
 	registerSearchCard(card, name, parent)
@@ -10629,94 +10703,57 @@ do
     -- Status Hero Card parfaitement centree
     local statusCard = createCard(InformationContent, 0, 64)
 
-    local statusColor = Color3.fromRGB(46, 204, 113)
-    local statusTitle = "Statut : 100% Fonctionnel"
-    local statusDesc = "Toutes les options sont a jour et fonctionnent parfaitement."
-    local statusBadge = "ACTIF"
-
-    local currentStatusUpper = string.upper(tostring(SCRIPT_STATUS or "FONCTIONNEL"))
-    if currentStatusUpper == "PROBLEMES" or currentStatusUpper == "PROBLEME" or currentStatusUpper == "WARNING" then
-        statusColor = Color3.fromRGB(241, 196, 15)
-        statusTitle = "Statut : Quelques problemes"
-        statusDesc = "Certaines fonctionnalites sont instables ou en cours de fix."
-        statusBadge = "INSTABLE"
-    elseif currentStatusUpper == "OFFLINE" or currentStatusUpper == "DOWN" or currentStatusUpper == "PATCH" or currentStatusUpper == "PATCHED" then
-        statusColor = Color3.fromRGB(231, 76, 60)
-        statusTitle = "Statut : Ne fonctionne pas"
-        statusDesc = "Le script rencontre des dysfonctionnements majeurs (patche)."
-        statusBadge = "OFFLINE"
-    end
-
     -- 1. Onde radar dynamique (Expansion & Fade)
     local ping = Instance.new("Frame")
     ping.AnchorPoint = Vector2.new(0.5, 0.5)
     ping.Size = UDim2.new(0, 10, 0, 10)
     ping.Position = UDim2.new(0, 26, 0.5, 0)
-    ping.BackgroundColor3 = statusColor
+    ping.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
     ping.BackgroundTransparency = 0.35
     ping.BorderSizePixel = 0
     ping.ZIndex = 8
     ping.Parent = statusCard
-    local pingCorner = Instance.new("UICorner")
-    pingCorner.CornerRadius = UDim.new(1, 0)
-    pingCorner.Parent = ping
+    local pingCorner = Instance.new("UICorner") pingCorner.CornerRadius = UDim.new(1, 0) pingCorner.Parent = ping
 
     -- 2. Halo doux en arriere-plan
     local halo = Instance.new("Frame")
     halo.AnchorPoint = Vector2.new(0.5, 0.5)
     halo.Size = UDim2.new(0, 18, 0, 18)
     halo.Position = UDim2.new(0, 26, 0.5, 0)
-    halo.BackgroundColor3 = statusColor
+    halo.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
     halo.BackgroundTransparency = 0.75
     halo.BorderSizePixel = 0
     halo.ZIndex = 9
     halo.Parent = statusCard
-    local haloCorner = Instance.new("UICorner")
-    haloCorner.CornerRadius = UDim.new(1, 0)
-    haloCorner.Parent = halo
+    local haloCorner = Instance.new("UICorner") haloCorner.CornerRadius = UDim.new(1, 0) haloCorner.Parent = halo
 
-    -- 3. Point vert central net et respirant
+    -- 3. Point central net et respirant
     local dot = Instance.new("Frame")
     dot.AnchorPoint = Vector2.new(0.5, 0.5)
     dot.Size = UDim2.new(0, 10, 0, 10)
     dot.Position = UDim2.new(0, 26, 0.5, 0)
-    dot.BackgroundColor3 = statusColor
+    dot.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
     dot.BorderSizePixel = 0
     dot.ZIndex = 10
     dot.Parent = statusCard
-    local dotCorner = Instance.new("UICorner")
-    dotCorner.CornerRadius = UDim.new(1, 0)
-    dotCorner.Parent = dot
+    local dotCorner = Instance.new("UICorner") dotCorner.CornerRadius = UDim.new(1, 0) dotCorner.Parent = dot
 
     local dotScale = Instance.new("UIScale")
     dotScale.Scale = 1
     dotScale.Parent = dot
 
-    -- Animations ultra-fluides C++ natives (zero lag, zero saccade)
-    local pingAnim = TweenService:Create(ping, TweenInfo.new(
-        1.3,
-        Enum.EasingStyle.Quart,
-        Enum.EasingDirection.Out,
-        -1,
-        false
-    ), {
+    local pingAnim = TweenService:Create(ping, TweenInfo.new(1.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out, -1, false), {
         Size = UDim2.new(0, 30, 0, 30),
         BackgroundTransparency = 1
     })
     pingAnim:Play()
 
-    local dotPulse = TweenService:Create(dotScale, TweenInfo.new(
-        1.1,
-        Enum.EasingStyle.Sine,
-        Enum.EasingDirection.InOut,
-        -1,
-        true
-    ), {
+    local dotPulse = TweenService:Create(dotScale, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
         Scale = 1.2
     })
     dotPulse:Play()
 
-    -- Container des textes pour un centrage vertical mathematique parfait
+    -- Container des textes pour un centrage vertical parfait
     local sTextContainer = Instance.new("Frame")
     sTextContainer.Size = UDim2.new(1, -165, 0, 36)
     sTextContainer.Position = UDim2.new(0, 48, 0.5, -18)
@@ -10729,8 +10766,8 @@ do
     sTitleLbl.Size = UDim2.new(1, 0, 0, 18)
     sTitleLbl.Position = UDim2.new(0, 0, 0, 0)
     sTitleLbl.BackgroundTransparency = 1
-    sTitleLbl.Text = statusTitle
-    sTitleLbl.TextColor3 = statusColor
+    sTitleLbl.Text = "Statut : 100% Fonctionnel"
+    sTitleLbl.TextColor3 = Color3.fromRGB(46, 204, 113)
     sTitleLbl.Font = Enum.Font.GothamBold
     sTitleLbl.TextSize = 13
     sTitleLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -10741,7 +10778,7 @@ do
     sDescLbl.Size = UDim2.new(1, 0, 0, 16)
     sDescLbl.Position = UDim2.new(0, 0, 0, 19)
     sDescLbl.BackgroundTransparency = 1
-    sDescLbl.Text = statusDesc
+    sDescLbl.Text = "Toutes les options sont a jour et fonctionnent parfaitement."
     sDescLbl.TextColor3 = Colors.TextDim or Color3.fromRGB(150, 150, 170)
     sDescLbl.Font = Enum.Font.Gotham
     sDescLbl.TextSize = 10
@@ -10753,31 +10790,83 @@ do
     local badge = Instance.new("Frame")
     badge.Size = UDim2.new(0, 72, 0, 24)
     badge.Position = UDim2.new(1, -84, 0.5, -12)
-    badge.BackgroundColor3 = statusColor
+    badge.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
     badge.BackgroundTransparency = 0.85
     badge.BorderSizePixel = 0
     badge.ZIndex = 9
     badge.Parent = statusCard
-    local badgeCorner = Instance.new("UICorner")
-    badgeCorner.CornerRadius = UDim.new(0, 6)
-    badgeCorner.Parent = badge
-    local badgeStroke = Instance.new("UIStroke")
-    badgeStroke.Color = statusColor
-    badgeStroke.Thickness = 1
-    badgeStroke.Transparency = 0.4
-    badgeStroke.Parent = badge
+    local badgeCorner = Instance.new("UICorner") badgeCorner.CornerRadius = UDim.new(0, 6) badgeCorner.Parent = badge
+    local badgeStroke = Instance.new("UIStroke") badgeStroke.Color = Color3.fromRGB(46, 204, 113) badgeStroke.Thickness = 1 badgeStroke.Transparency = 0.4 badgeStroke.Parent = badge
 
     local badgeLbl = Instance.new("TextLabel")
     badgeLbl.Size = UDim2.new(1, 0, 1, 0)
     badgeLbl.BackgroundTransparency = 1
-    badgeLbl.Text = statusBadge
-    badgeLbl.TextColor3 = statusColor
+    badgeLbl.Text = "ACTIF"
+    badgeLbl.TextColor3 = Color3.fromRGB(46, 204, 113)
     badgeLbl.Font = Enum.Font.GothamBold
     badgeLbl.TextSize = 10
     badgeLbl.TextXAlignment = Enum.TextXAlignment.Center
     badgeLbl.TextYAlignment = Enum.TextYAlignment.Center
     badgeLbl.ZIndex = 10
     badgeLbl.Parent = badge
+
+    local function updateNebulaStatusUI()
+        local failedCount = 0
+        local failedNames = {}
+        if _G.NebulaHealth and _G.NebulaHealth.failedOptions then
+            for optName, _ in pairs(_G.NebulaHealth.failedOptions) do
+                failedCount = failedCount + 1
+                table.insert(failedNames, optName)
+            end
+        end
+
+        local statusColor = Color3.fromRGB(46, 204, 113) -- Vert (OK)
+        local statusTitle = "Statut : 100% Fonctionnel"
+        local statusDesc = "Toutes les options sont a jour et fonctionnent parfaitement."
+        local statusBadge = "ACTIF"
+        local topBarStatusText = "100% Fonctionnel"
+
+        if failedCount >= 1 and failedCount <= 2 then
+            statusColor = Color3.fromRGB(241, 196, 15) -- Jaune (Warning)
+            statusTitle = "Statut : " .. tostring(failedCount) .. " probleme(s) detecte(s)"
+            statusDesc = "Option(s) instable(s) : " .. table.concat(failedNames, ", ")
+            statusBadge = "ATTENTION"
+            topBarStatusText = "Instable (" .. tostring(failedCount) .. ")"
+        elseif failedCount >= 3 then
+            statusColor = Color3.fromRGB(231, 76, 60) -- Rouge (Trop d'erreurs)
+            statusTitle = "Statut : Problemes multiples (" .. tostring(failedCount) .. ")"
+            statusDesc = "Trop d'options en erreur. Certaines fonctionnalites sont indisponibles."
+            statusBadge = "CRITIQUE"
+            topBarStatusText = "Critique (" .. tostring(failedCount) .. ")"
+        end
+
+        pcall(function()
+            sTitleLbl.Text = statusTitle
+            sTitleLbl.TextColor3 = statusColor
+            sDescLbl.Text = statusDesc
+            badge.BackgroundColor3 = statusColor
+            badgeStroke.Color = statusColor
+            badgeLbl.Text = statusBadge
+            badgeLbl.TextColor3 = statusColor
+            ping.BackgroundColor3 = statusColor
+            halo.BackgroundColor3 = statusColor
+            dot.BackgroundColor3 = statusColor
+        end)
+
+        pcall(function()
+            if _G.TopBarStatusElements then
+                local tb = _G.TopBarStatusElements
+                if tb.dot then tb.dot.BackgroundColor3 = statusColor end
+                if tb.stroke then tb.stroke.Color = statusColor end
+                if tb.label then
+                    tb.label.Text = topBarStatusText
+                    tb.label.TextColor3 = statusColor
+                end
+            end
+        end)
+    end
+    _G.updateNebulaStatusUI = updateNebulaStatusUI
+    updateNebulaStatusUI()
 
     createLabel("INFORMATIONS & MISES A JOUR", InformationContent)
 
@@ -11058,11 +11147,12 @@ do
     -- Card 5: Derniere Mise a Jour (Changelog Recents)
     createLabel("DERNIERE MISE A JOUR (CHANGELOG)", InformationContent)
 
-    local changelogCard = createCard(InformationContent, 0, 215)
+    local changelogCard = createCard(InformationContent, 0, 310)
 
+    -- Titre bien espacé et aéré
     local clTitle = Instance.new("TextLabel")
-    clTitle.Size = UDim2.new(1, -110, 0, 16)
-    clTitle.Position = UDim2.new(0, 14, 0, 8)
+    clTitle.Size = UDim2.new(1, -110, 0, 18)
+    clTitle.Position = UDim2.new(0, 16, 0, 12)
     clTitle.BackgroundTransparency = 1
     clTitle.Text = "Changements Recents"
     clTitle.TextColor3 = Colors.Text or Color3.fromRGB(235, 235, 245)
@@ -11074,7 +11164,7 @@ do
 
     local clBadge = Instance.new("Frame")
     clBadge.Size = UDim2.new(0, 68, 0, 20)
-    clBadge.Position = UDim2.new(1, -80, 0, 7)
+    clBadge.Position = UDim2.new(1, -80, 0, 11)
     clBadge.BackgroundColor3 = Color3.fromRGB(24, 30, 40)
     clBadge.BorderSizePixel = 0
     clBadge.ZIndex = 9
@@ -11085,7 +11175,7 @@ do
     local clbLbl = Instance.new("TextLabel")
     clbLbl.Size = UDim2.new(1, 0, 1, 0)
     clbLbl.BackgroundTransparency = 1
-    clbLbl.Text = "RECENT"
+    clbLbl.Text = "AUTO"
     clbLbl.TextColor3 = Color3.fromRGB(46, 204, 113)
     clbLbl.Font = Enum.Font.GothamBold
     clbLbl.TextSize = 10
@@ -11094,42 +11184,72 @@ do
     clbLbl.ZIndex = 10
     clbLbl.Parent = clBadge
 
-    local changes = {
-        { text = "- Stealth Bypass : Disallowed Services elimines (Anti-Cheat 267)", color = Color3.fromRGB(46, 204, 113) },
-        { text = "- Freecam : Bind/Toggle replace camera sans TP perso", color = Color3.fromRGB(46, 204, 113) },
-        { text = "- Invisibilite FE : Glitch Seat Desync (Invischair)", color = Color3.fromRGB(46, 204, 113) },
-        { text = "- FPS Booster Ultra : Boost massif (Distance intacte)", color = Color3.fromRGB(46, 204, 113) },
-        { text = "- Menu : Categorie Information par defaut", color = Color3.fromRGB(46, 204, 113) },
+    -- Liste dynamique automatique des changements
+    _G.NebulaChangelog = _G.NebulaChangelog or {
+        { text = "- Air Walk / Jesus Walk : Escalier Celeste & plateforme dynamique dans le vide", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Kill All (weapons games) : TP 1.1s dos, camera lock automatique & traque a mort", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Statut Auto-Dynamique : Detection erreurs temps reel (Vert / Jaune / Rouge)", color = Color3.fromRGB(140, 100, 255) },
+        { text = "- TopBar Health Badge : Statut de sante du script affiche en direct tout en haut", color = Color3.fromRGB(140, 100, 255) },
+        { text = "- Onglet Joueur : Layout 2 colonnes elargi (53%/47%) sans aucune coupure de pseudo", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Stealth Bypass : Disallowed Services elimines (Anti-Cheat code 267)", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Freecam AZERTY : Remplacement camera fluide sans TP du personnage", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Invisibilite FE : Glitch Seat Desync 100% invisible (Invischair clean)", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- FPS Booster Ultra : Boost massif sans impacter la distance d'affichage", color = Color3.fromRGB(46, 204, 113) },
         { text = "- Clavier 100% ZQSD strict en AZERTY (WASD desactive)", color = Color3.fromRGB(46, 204, 113) },
-        { text = "- Retrait Anti-Aim / Desync & Hitbox Resolver", color = Color3.fromRGB(235, 75, 75) },
-        { text = "- Correction bug vitesse (Restore WalkSpeed Unload)", color = Color3.fromRGB(245, 245, 250) },
+        { text = "- Menu : Categorie Information chargee par defaut a l'ouverture", color = Color3.fromRGB(46, 204, 113) },
     }
 
-    local startY = 30
-    for idxRow, item in ipairs(changes) do
-        local rowY = startY + (idxRow - 1) * 23
+    local renderedChangelogRows = {}
+    local function renderChangelog()
+        for _, obj in ipairs(renderedChangelogRows) do
+            pcall(function() obj:Destroy() end)
+        end
+        renderedChangelogRows = {}
 
-        local rowDot = Instance.new("Frame")
-        rowDot.Size = UDim2.new(0, 6, 0, 6)
-        rowDot.Position = UDim2.new(0, 16, 0, rowY + 6)
-        rowDot.BackgroundColor3 = item.color
-        rowDot.BorderSizePixel = 0
-        rowDot.ZIndex = 9
-        rowDot.Parent = changelogCard
-        local dotCorner = Instance.new("UICorner") dotCorner.CornerRadius = UDim.new(1, 0) dotCorner.Parent = rowDot
+        local changes = _G.NebulaChangelog or {}
+        local startY = 44 -- Espace genereux de 14px sous le titre pour respirer
+        local rowHeight = 23
+        local totalCardHeight = startY + (#changes * rowHeight) + 14
+        changelogCard.Size = UDim2.new(1, 0, 0, totalCardHeight)
 
-        local rowLbl = Instance.new("TextLabel")
-        rowLbl.Size = UDim2.new(1, -36, 0, 18)
-        rowLbl.Position = UDim2.new(0, 28, 0, rowY)
-        rowLbl.BackgroundTransparency = 1
-        rowLbl.Text = item.text
-        rowLbl.TextColor3 = item.color
-        rowLbl.Font = Enum.Font.GothamMedium
-        rowLbl.TextSize = 11
-        rowLbl.TextXAlignment = Enum.TextXAlignment.Left
-        rowLbl.ZIndex = 9
-        rowLbl.Parent = changelogCard
+        for idxRow, item in ipairs(changes) do
+            local rowY = startY + (idxRow - 1) * rowHeight
+
+            local rowDot = Instance.new("Frame")
+            rowDot.Size = UDim2.new(0, 6, 0, 6)
+            rowDot.Position = UDim2.new(0, 16, 0, rowY + 6)
+            rowDot.BackgroundColor3 = item.color or Color3.fromRGB(46, 204, 113)
+            rowDot.BorderSizePixel = 0
+            rowDot.ZIndex = 9
+            rowDot.Parent = changelogCard
+            local dotCorner = Instance.new("UICorner") dotCorner.CornerRadius = UDim.new(1, 0) dotCorner.Parent = rowDot
+            table.insert(renderedChangelogRows, rowDot)
+
+            local rowLbl = Instance.new("TextLabel")
+            rowLbl.Size = UDim2.new(1, -36, 0, 18)
+            rowLbl.Position = UDim2.new(0, 28, 0, rowY)
+            rowLbl.BackgroundTransparency = 1
+            rowLbl.Text = item.text
+            rowLbl.TextColor3 = item.color or Color3.fromRGB(235, 235, 245)
+            rowLbl.Font = Enum.Font.GothamMedium
+            rowLbl.TextSize = 11
+            rowLbl.TextXAlignment = Enum.TextXAlignment.Left
+            rowLbl.ZIndex = 9
+            rowLbl.Parent = changelogCard
+            table.insert(renderedChangelogRows, rowLbl)
+        end
     end
+
+    _G.addNebulaChangelog = function(text, color)
+        if not text then return end
+        table.insert(_G.NebulaChangelog, 1, {
+            text = text,
+            color = color or Color3.fromRGB(46, 204, 113)
+        })
+        pcall(renderChangelog)
+    end
+
+    renderChangelog()
 
 end
 
