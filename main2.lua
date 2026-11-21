@@ -1,12 +1,39 @@
-Players = game:GetService("Players")
-TweenService = game:GetService("TweenService")
-UserInputService = game:GetService("UserInputService")
-RunService = game:GetService("RunService")
-HttpService = game:GetService("HttpService")
-TeleportService = game:GetService("TeleportService")
-ProximityPromptService = game:GetService("ProximityPromptService")
-UserService = game:GetService("UserService")
-local MarketplaceService = game:GetService("MarketplaceService")
+local cloneref = cloneref or function(o) return o end
+local function getService(name)
+    local ok, s = pcall(function()
+        return cloneref(game:GetService(name))
+    end)
+    if ok and s then return s end
+    return game:GetService(name)
+end
+
+local function getSafeGuiParent()
+    if gethui then
+        local ok, h = pcall(gethui)
+        if ok and h then return h end
+    end
+    if syn and syn.protect_gui then
+        local ok, cg = pcall(function() return cloneref(game:GetService("CoreGui")) end)
+        if ok and cg then return cg end
+    end
+    if LocalPlayer then
+        local ok, pg = pcall(function() return LocalPlayer:WaitForChild("PlayerGui", 5) end)
+        if ok and pg then return pg end
+    end
+    return nil
+end
+
+Players = getService("Players")
+TweenService = getService("TweenService")
+UserInputService = getService("UserInputService")
+RunService = getService("RunService")
+HttpService = getService("HttpService")
+TeleportService = getService("TeleportService")
+ProximityPromptService = getService("ProximityPromptService")
+UserService = getService("UserService")
+local MarketplaceService = getService("MarketplaceService")
+local GuiService = getService("GuiService")
+local Debris = getService("Debris")
 
 LocalPlayer = Players.LocalPlayer
 if not LocalPlayer then
@@ -57,17 +84,7 @@ local function isCurrentUserWhitelisted()
 end
 
 local function showWhitelistMenu()
-    local guiTarget = nil
-    pcall(function()
-        if gethui then
-            guiTarget = gethui()
-        elseif syn and syn.protect_gui then
-            guiTarget = game:GetService("CoreGui")
-        else
-            guiTarget = game:GetService("CoreGui")
-        end
-    end)
-    if not guiTarget then guiTarget = LocalPlayer:WaitForChild("PlayerGui") end
+    local guiTarget = getSafeGuiParent()
 
     for _, c in ipairs(guiTarget:GetChildren()) do
         if c.Name == "PearlWhitelistUI" or c.Name == "PearlBlacklistUI" then
@@ -1258,17 +1275,7 @@ ScreenGui.Name ="EternalFlick_GUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 9999
-pcall(function()
-    if gethui then
-        ScreenGui.Parent = gethui()
-    elseif syn and syn.protect_gui then
-        syn.protect_gui(ScreenGui)
-        ScreenGui.Parent = game:GetService("CoreGui")
-    else
-        ScreenGui.Parent = game:GetService("CoreGui")
-    end
-end)
-if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+ScreenGui.Parent = getSafeGuiParent()
 
 BackgroundDimmer = Instance.new("Frame")
 BackgroundDimmer.Name = "BackgroundDimmer"
@@ -1574,10 +1581,7 @@ AvatarImageCorner.CornerRadius = UDim.new(1, 0)
 AvatarImageCorner.Parent = AvatarImage
 
 pcall(function()
-    local thumb = game:GetService("Thumbnails"):GetPlayerThumbnail(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-    if thumb and thumb ~= "" then
-        AvatarImage.Image = thumb
-    end
+    AvatarImage.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LocalPlayer.UserId) .. "&w=48&h=48"
 end)
 
 AccountName = Instance.new("TextLabel")
@@ -2223,9 +2227,7 @@ local function GetOverlayGui()
     gui.Name ="ESP_OverlayGui"
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
-    if gethui then gui.Parent = gethui()
-    elseif syn and syn.protect_gui then syn.protect_gui(gui); gui.Parent = game:GetService("CoreGui")
-    else gui.Parent = game:GetService("CoreGui") end
+    gui.Parent = getSafeGuiParent()
     espOverlayGui = gui
     return gui
 end
@@ -4004,6 +4006,7 @@ KeybindSystem = { Binding = false, BindingName = nil, BindingBtn = nil }
 
 V.INVISIBILITY_POSITION = Vector3.new(0, 100000, 0)
 V.FOV = 70
+V.CustomFOV = false
 
 DefaultConfig = {
     KeyboardLayout = "AZERTY",
@@ -4049,7 +4052,7 @@ UserInputService = game:GetService("UserInputService")
 
 LocalPlayer = Players.LocalPlayer
 
-local parent = (gethui and gethui()) or game:GetService("CoreGui")
+local parent = getSafeGuiParent()
 
 if getgenv().BloxFruitsUILoaded then
     for _, child in ipairs(parent:GetChildren()) do
@@ -5423,7 +5426,7 @@ function createToggleCard(parent, text, subtext, order, getter, setter)
 	bStroke.Parent = btn
 
 	btn.MouseButton1Click:Connect(function()
-		pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+		pcall(function() GuiService.SelectedObject = nil end)
 		playClick()
 		CreateTween(btnScale, {Scale = 0.8}, 0.08)
 		task.delay(0.08, function()
@@ -5465,7 +5468,7 @@ local setVisualPreviewVisible
 do
 local function initVisualPreview()
 	local VP = {}
-	local PreviewGuiService = game:GetService("GuiService")
+	local PreviewGuiService = GuiService
 
 	local VisualPreview = Instance.new("Frame")
 	VisualPreview.Name = "VisualPreviewWindow"
@@ -6858,7 +6861,7 @@ function createToggle(name, default, callback, parent, configKey)
 	end
 
 	btn.MouseButton1Click:Connect(function()
-		pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+		pcall(function() GuiService.SelectedObject = nil end)
 		playClick()
 		toggleState()
 	end)
@@ -7075,7 +7078,7 @@ function createButton(name, callback, parent, customBtnText, isDanger)
 	btn.MouseButton1Up:Connect(function()
 		CreateTween(btnScale, {Scale = 1.04}, 0.15, Enum.EasingStyle.Back)
 		CreateTween(btn, {BackgroundColor3 = Color3.fromRGB(32, 32, 40)}, 0.15)
-		pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+		pcall(function() GuiService.SelectedObject = nil end)
 		playClick()
 		if callback then pcall(callback) end
 	end)
@@ -7303,6 +7306,8 @@ function performFullUnload()
             V.InfiniteStamina = false
             V.AntiVoid = false
             V.AntiRagdoll = false
+V.AirWalk = false
+V.KillAll = false
             V.AntiFling = false
             V.SpeedEnabled = false
             V.JumpEnabled = false
@@ -7480,7 +7485,7 @@ function performFullUnload()
         LocalPlayer.CameraMinZoomDistance = 0.5
         UserInputService.MouseBehavior = Enum.MouseBehavior.Default
         UserInputService.MouseIconEnabled = true
-        pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+        pcall(function() GuiService.SelectedObject = nil end)
     end)
 
     pcall(function()
@@ -7834,17 +7839,7 @@ KeyGui = nil
 function createKeySystemUI()
     if KeyGui then KeyGui:Destroy() end
 
-    local guiTarget = nil
-    pcall(function()
-        if gethui then
-            guiTarget = gethui()
-        elseif syn and syn.protect_gui then
-            guiTarget = game:GetService("CoreGui")
-        else
-            guiTarget = game:GetService("CoreGui")
-        end
-    end)
-    if not guiTarget then guiTarget = LocalPlayer:WaitForChild("PlayerGui") end
+    local guiTarget = getSafeGuiParent()
 
     for _, c in ipairs(guiTarget:GetChildren()) do
         if c.Name == "PearlKeySystemUI" then
@@ -8271,7 +8266,7 @@ function createKeySystemUI()
                 Panel.Position = panelPos + UDim2.new(0, 0, 0, 16)
                 TweenService:Create(PanelScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
                 TweenService:Create(Panel, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = panelPos }):Play()
-                switchCategory("Movement")
+                switchCategory("Information")
                 notify("Pearl Hub", "Bienvenue @" .. tostring(LocalPlayer.Name) .. " !", Color3.fromRGB(80, 200, 120))
             end)
         end)
@@ -8310,7 +8305,7 @@ task.delay(0.1, function()
         Panel.Position = panelPos + UDim2.new(0, 0, 0, 16)
         TweenService:Create(PanelScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
         TweenService:Create(Panel, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = panelPos}):Play()
-        switchCategory("Movement")
+        switchCategory("Information")
         return
     end
     Panel.Visible = false
@@ -8478,7 +8473,7 @@ V.DesyncConn = nil
 V.DesyncOrigin = nil
 
 initStep = "connexions base"
-parentTarget = (gethui and gethui()) or game:GetService("CoreGui")
+parentTarget = getSafeGuiParent()
 
 Debris = game:GetService("Debris")
 
@@ -8498,8 +8493,14 @@ V.FPSConn = RunService.RenderStepped:Connect(function()
         frames = 0
         lastTime = currentTime
     end
-    if Camera.FieldOfView ~= V.FOV then
-        Camera.FieldOfView = V.FOV
+    if V and V.CustomFOV and V.FOV and V.FOV ~= 70 then
+        local isAiming = false
+        pcall(function()
+            isAiming = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+        end)
+        if not isAiming and Camera.FieldOfView ~= V.FOV then
+            Camera.FieldOfView = V.FOV
+        end
     end
 end)
 addConnection(V.FPSConn)
@@ -8664,17 +8665,59 @@ function stopNoclip()
 end
 
 invisSound = Instance.new("Sound")
-invisSound.SoundId ="rbxassetid://942127495"
+invisSound.SoundId = "rbxassetid://942127495"
 invisSound.Volume = 0.5
 invisSound.Parent = game:GetService("Workspace")
 
-invisOriginalTrans = {}
 local invisActive = false
-local invisOriginalTrans = {}
-local invisOriginalModifiers = {}
-local invisOriginalShadows = {}
-local invisOriginalEffects = {}
-local invisOrigDisplayNameType = nil
+local INVIS_POSITION = Vector3.new(-25.95, 84, 3537.55)
+
+local function setInvisCharacterTransparency(character, transparency)
+    if not character then return end
+    for _, descendant in ipairs(character:GetDescendants()) do
+        if descendant:IsA("BasePart") then
+            if descendant.Name ~= "HumanoidRootPart" then
+                if transparency > 0 then
+                    if not descendant:GetAttribute("_InvisOrigTrans") then
+                        descendant:SetAttribute("_InvisOrigTrans", descendant.Transparency)
+                    end
+                    descendant.Transparency = 1
+                else
+                    descendant.Transparency = descendant:GetAttribute("_InvisOrigTrans") or 0
+                end
+            else
+                descendant.Transparency = 1
+            end
+        elseif descendant:IsA("Decal") or descendant:IsA("Texture") then
+            if transparency > 0 then
+                if not descendant:GetAttribute("_InvisOrigTrans") then
+                    descendant:SetAttribute("_InvisOrigTrans", descendant.Transparency)
+                end
+                descendant.Transparency = 1
+            else
+                descendant.Transparency = descendant:GetAttribute("_InvisOrigTrans") or 0
+            end
+        elseif descendant:IsA("ParticleEmitter") or descendant:IsA("Trail") or descendant:IsA("Beam") or descendant:IsA("Fire") or descendant:IsA("Smoke") or descendant:IsA("Sparkles") then
+            if transparency > 0 then
+                if not descendant:GetAttribute("_InvisOrigEnabled") then
+                    descendant:SetAttribute("_InvisOrigEnabled", descendant.Enabled)
+                end
+                descendant.Enabled = false
+            else
+                descendant.Enabled = descendant:GetAttribute("_InvisOrigEnabled") ~= false
+            end
+        elseif descendant:IsA("BillboardGui") or descendant:IsA("SurfaceGui") then
+            if transparency > 0 then
+                if not descendant:GetAttribute("_InvisOrigEnabled") then
+                    descendant:SetAttribute("_InvisOrigEnabled", descendant.Enabled)
+                end
+                descendant.Enabled = false
+            else
+                descendant.Enabled = descendant:GetAttribute("_InvisOrigEnabled") ~= false
+            end
+        end
+    end
+end
 
 function toggleInvisibility(enabled)
     local targetState
@@ -8698,101 +8741,52 @@ function toggleInvisibility(enabled)
             pcall(function() if invisSound then invisSound:Play() end end)
 
             if invisActive then
-                -- Sauvegarder les etats originaux
-                invisOriginalTrans = {}
-                invisOriginalModifiers = {}
-                invisOriginalShadows = {}
-                invisOriginalEffects = {}
-                invisOrigDisplayNameType = hum.DisplayDistanceType
+                local savedPosition = hrp.CFrame
 
-                -- Cacher le nom au-dessus de la tete
-                pcall(function() hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None end)
+                -- Teleport a la position d'invisibilite pour desynchroniser le serveur
+                char:MoveTo(INVIS_POSITION)
+                task.wait(0.15)
 
-                for _, descendant in ipairs(char:GetDescendants()) do
-                    if descendant:IsA("BasePart") then
-                        invisOriginalTrans[descendant] = descendant.Transparency
-                        invisOriginalModifiers[descendant] = descendant.LocalTransparencyModifier
-                        invisOriginalShadows[descendant] = descendant.CastShadow
-                        descendant.Transparency = 1
-                        descendant.LocalTransparencyModifier = 1
-                        descendant.CastShadow = false
-                    elseif descendant:IsA("Decal") then
-                        invisOriginalTrans[descendant] = descendant.Transparency
-                        descendant.Transparency = 1
-                    elseif descendant:IsA("ParticleEmitter") or descendant:IsA("Trail") or descendant:IsA("Beam") or descendant:IsA("Fire") or descendant:IsA("Smoke") or descendant:IsA("Sparkles") or descendant:IsA("Highlight") then
-                        invisOriginalEffects[descendant] = descendant.Enabled
-                        descendant.Enabled = false
-                    end
-                end
+                -- Nettoyage de tout ancien siege existant
+                local oldChair = workspace:FindFirstChild("invischair")
+                if oldChair then pcall(function() oldChair:Destroy() end) end
 
-                if V.InvisConn then V.InvisConn:Disconnect() end
-                -- RenderStepped force l'invisibilite totale a 100% pour contrer le CameraScript natif de Roblox
-                V.InvisConn = RunService.RenderStepped:Connect(function()
-                    local c = LocalPlayer.Character
-                    if not c or not invisActive then return end
-                    for _, part in ipairs(c:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.Transparency = 1
-                            part.LocalTransparencyModifier = 1
-                        elseif part:IsA("Decal") then
-                            part.Transparency = 1
-                        elseif part:IsA("ParticleEmitter") or part:IsA("Trail") or part:IsA("Beam") or part:IsA("Highlight") then
-                            if part.Enabled then part.Enabled = false end
-                        end
-                    end
-                end)
-                addConnection(V.InvisConn)
+                -- Creation du siege invisible
+                local seat = Instance.new("Seat")
+                seat.Name = "invischair"
+                seat.Size = Vector3.new(0.01, 0.01, 0.01)
+                seat.Anchored = false
+                seat.CanCollide = false
+                seat.Transparency = 1
+                seat.CastShadow = false
+                seat.Position = INVIS_POSITION
+                seat.Parent = workspace
 
-                notify("Invisibility", "Mode Invisible Actif (100% Invisible)", Color3.fromRGB(80, 200, 120))
+                -- Soudure du siege au torse
+                local torso = char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso") or hrp
+                local weld = Instance.new("Weld")
+                weld.Name = "InvisWeld"
+                weld.Part0 = seat
+                weld.Part1 = torso
+                weld.Parent = seat
+
+                task.wait(0.05)
+                seat.CFrame = savedPosition
+
+                -- Transparence client complete (100% invisible, aucun residu)
+                setInvisCharacterTransparency(char, 1)
+
+                notify("Invisibility", "Mode Invisible Actif (FE Seat Desync)", Color3.fromRGB(80, 200, 120))
             else
-                if V.InvisConn then V.InvisConn:Disconnect() V.InvisConn = nil end
-
-                -- Restaurer le nom au-dessus de la tete
-                pcall(function()
-                    hum.DisplayDistanceType = invisOrigDisplayNameType or Enum.HumanoidDisplayDistanceType.Viewer
-                end)
-
-                -- Restaurer les transparences exactes
-                for part, origTrans in pairs(invisOriginalTrans) do
-                    if part and part.Parent then
-                        pcall(function()
-                            part.Transparency = origTrans
-                            if part:IsA("BasePart") then
-                                local origMod = invisOriginalModifiers[part]
-                                part.LocalTransparencyModifier = origMod or ((origTrans >= 0.95) and 1 or 0)
-                                if invisOriginalShadows[part] ~= nil then
-                                    part.CastShadow = invisOriginalShadows[part]
-                                end
-                            end
-                        end)
-                    end
+                -- Suppression de la chaise invisible
+                local invisChair = workspace:FindFirstChild("invischair")
+                if invisChair then
+                    pcall(function() invisChair:Destroy() end)
                 end
 
-                for effect, origEnabled in pairs(invisOriginalEffects) do
-                    if effect and effect.Parent then
-                        pcall(function() effect.Enabled = origEnabled end)
-                    end
-                end
-
-                table.clear(invisOriginalTrans)
-                table.clear(invisOriginalModifiers)
-                table.clear(invisOriginalShadows)
-                table.clear(invisOriginalEffects)
-
-                -- Securite : restaurer les parties du corps si non sauvegardees
-                for _, part in ipairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        local pName = part.Name:lower()
-                        if pName == "humanoidrootpart" or pName:find("root") or pName:find("hitbox") then
-                            part.Transparency = 1
-                            part.LocalTransparencyModifier = 1
-                        elseif part.Transparency == 1 then
-                            part.Transparency = 0
-                            part.LocalTransparencyModifier = 0
-                        end
-                    elseif part:IsA("Decal") and part.Transparency == 1 then
-                        part.Transparency = 0
-                    end
+                -- Restauration de la visibilite complete
+                if char then
+                    setInvisCharacterTransparency(char, 0)
                 end
 
                 notify("Invisibility", "Mode Invisible Desactive", Color3.fromRGB(255, 90, 90))
@@ -8803,6 +8797,8 @@ end
 
 addConnection(LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.4)
+    local invisChair = workspace:FindFirstChild("invischair")
+    if invisChair then pcall(function() invisChair:Destroy() end) end
     if V and V.Invis then
         toggleInvisibility(true)
     end
@@ -8877,8 +8873,8 @@ function startDesyncFly()
             if not cam then return end
 
             local moveDirection = Vector3.zero
-            local isFwd = UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z) or UserInputService:IsKeyDown(Enum.KeyCode.Up)
-            local isLeft = UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.Left)
+            local isFwd = UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up)
+            local isLeft = UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left)
             local isBack = UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down)
             local isRight = UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right)
 
@@ -9435,61 +9431,147 @@ function toggleInfiniteRange(enabled)
     end
 end
 
+local _FPSBoostCache = {
+    Parts = {},
+    Decals = {},
+    Effects = {},
+    Lighting = {},
+    Terrain = {}
+}
+
 function applyFPSBoost(obj)
-    if obj:IsA("BasePart") then
-        if not Cache.FPSBoost[obj] then
-            Cache.FPSBoost[obj] = {Material = obj.Material, Reflectance = obj.Reflectance}
+    if not V.FPSBoost then return end
+    pcall(function()
+        if obj:IsA("BasePart") then
+            if not _FPSBoostCache.Parts[obj] then
+                _FPSBoostCache.Parts[obj] = {
+                    Material = obj.Material,
+                    Reflectance = obj.Reflectance,
+                    CastShadow = obj.CastShadow
+                }
+            end
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.Reflectance = 0
+            obj.CastShadow = false
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+            if not _FPSBoostCache.Decals[obj] then
+                _FPSBoostCache.Decals[obj] = obj.Transparency
+            end
+            obj.Transparency = 1
+        elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") or obj:IsA("Explosion") or obj:IsA("Highlight") or obj:IsA("PostEffect") then
+            if not _FPSBoostCache.Effects[obj] then
+                _FPSBoostCache.Effects[obj] = obj.Enabled
+            end
+            obj.Enabled = false
         end
-        obj.Material = Enum.Material.Plastic
-        obj.Reflectance = 0
-    elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") then
-        if not Cache.FPSBoost[obj] then
-            Cache.FPSBoost[obj] = {Enabled = obj.Enabled}
-        end
-        obj.Enabled = false
-    elseif obj:IsA("PostEffect") then
-        if not Cache.FPSBoost[obj] then
-            Cache.FPSBoost[obj] = {Enabled = obj.Enabled}
-        end
-        obj.Enabled = false
-    end
+    end)
 end
 
 function toggleFPSBooster(enabled)
     V.FPSBoost = enabled
     if enabled then
+        -- 1. Sauvegarde du Lighting sans toucher a la distance de rendu (Render Distance preservee a 100%)
+        _FPSBoostCache.Lighting.GlobalShadows = Lighting.GlobalShadows
         Lighting.GlobalShadows = false
-        Lighting.FogEnd = 1e6
-        Lighting.FogStart = 0
-        settings().Rendering.QualityLevel = 1
 
-        for _, obj in pairs(workspace:GetDescendants()) do applyFPSBoost(obj) end
-        for _, obj in pairs(Lighting:GetChildren()) do applyFPSBoost(obj) end
+        -- 2. Sauvegarde et optimisation du Terrain (Eau & Herbe volumetrique)
+        local terr = workspace:FindFirstChildOfClass("Terrain")
+        if terr then
+            _FPSBoostCache.Terrain = {
+                WaterWaveSize = terr.WaterWaveSize,
+                WaterWaveSpeed = terr.WaterWaveSpeed,
+                WaterReflectance = terr.WaterReflectance,
+                WaterTransparency = terr.WaterTransparency,
+                Decoration = terr.Decoration
+            }
+            pcall(function()
+                terr.WaterWaveSize = 0
+                terr.WaterWaveSpeed = 0
+                terr.WaterReflectance = 0
+                terr.WaterTransparency = 0
+                terr.Decoration = false
+            end)
+        end
 
-        V.FPSBoost1 = workspace.DescendantAdded:Connect(function(obj) applyFPSBoost(obj) end)
-        V.FPSBoost2 = Lighting.ChildAdded:Connect(function(obj) applyFPSBoost(obj) end)
-        notify("Server","FPS Booster ON", Color3.fromRGB(80, 200, 120))
+        -- 3. Application massive sur toute la map et le Lighting
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            applyFPSBoost(obj)
+        end
+        for _, obj in ipairs(Lighting:GetChildren()) do
+            applyFPSBoost(obj)
+        end
+
+        -- 4. Ecouteurs d'ajouts dynamiques
+        if V.FPSBoost1 then V.FPSBoost1:Disconnect() end
+        if V.FPSBoost2 then V.FPSBoost2:Disconnect() end
+        V.FPSBoost1 = workspace.DescendantAdded:Connect(function(obj)
+            applyFPSBoost(obj)
+        end)
+        V.FPSBoost2 = Lighting.ChildAdded:Connect(function(obj)
+            applyFPSBoost(obj)
+        end)
+
+        notify("Server", "FPS Booster Ultra ON (Distance intacte)", Color3.fromRGB(80, 200, 120))
     else
+        -- Deconnexion des ecouteurs
         if V.FPSBoost1 then V.FPSBoost1:Disconnect() V.FPSBoost1 = nil end
         if V.FPSBoost2 then V.FPSBoost2:Disconnect() V.FPSBoost2 = nil end
 
-        for obj, data in pairs(Cache.FPSBoost) do
+        -- Restauration exacte de toutes les parties
+        for obj, data in pairs(_FPSBoostCache.Parts) do
             if obj and obj.Parent then
-                if obj:IsA("BasePart") then
+                pcall(function()
                     obj.Material = data.Material
                     obj.Reflectance = data.Reflectance
-                elseif obj:IsA("Decal") or obj:IsA("Texture") then
-                    obj.Transparency = data.Transparency
-                elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") or obj:IsA("PostEffect") then
-                    obj.Enabled = data.Enabled
-                end
+                    obj.CastShadow = data.CastShadow
+                end)
             end
         end
-        Cache.FPSBoost = {}
 
-        settings().Rendering.QualityLevel = Enum.RenderSettings.DefaultQualityLevel
-        Lighting.GlobalShadows = true
-        notify("Server","FPS Booster OFF", Color3.fromRGB(255, 90, 90))
+        -- Restauration des Decals et Textures
+        for obj, origTrans in pairs(_FPSBoostCache.Decals) do
+            if obj and obj.Parent then
+                pcall(function()
+                    obj.Transparency = origTrans
+                end)
+            end
+        end
+
+        -- Restauration des particules et effets
+        for obj, origEnabled in pairs(_FPSBoostCache.Effects) do
+            if obj and obj.Parent then
+                pcall(function()
+                    obj.Enabled = origEnabled
+                end)
+            end
+        end
+
+        -- Restauration du Terrain
+        local terr = workspace:FindFirstChildOfClass("Terrain")
+        if terr and _FPSBoostCache.Terrain.Decoration ~= nil then
+            pcall(function()
+                terr.WaterWaveSize = _FPSBoostCache.Terrain.WaterWaveSize
+                terr.WaterWaveSpeed = _FPSBoostCache.Terrain.WaterWaveSpeed
+                terr.WaterReflectance = _FPSBoostCache.Terrain.WaterReflectance
+                terr.WaterTransparency = _FPSBoostCache.Terrain.WaterTransparency
+                terr.Decoration = _FPSBoostCache.Terrain.Decoration
+            end)
+        end
+
+        -- Restauration du Lighting
+        if _FPSBoostCache.Lighting.GlobalShadows ~= nil then
+            Lighting.GlobalShadows = _FPSBoostCache.Lighting.GlobalShadows
+        else
+            Lighting.GlobalShadows = true
+        end
+
+        _FPSBoostCache.Parts = {}
+        _FPSBoostCache.Decals = {}
+        _FPSBoostCache.Effects = {}
+        _FPSBoostCache.Lighting = {}
+        _FPSBoostCache.Terrain = {}
+
+        notify("Server", "FPS Booster OFF (Monde restaure)", Color3.fromRGB(255, 90, 90))
     end
 end
 
@@ -9730,7 +9812,7 @@ function createESPForCharacter(charInstance, customName)
         local dist = (localHrp.Position - resolvedPos).Magnitude
 
         local screenPos, onScreen = Camera:WorldToViewportPoint(resolvedPos)
-        if not onScreen or screenPos.Z <= 0 then
+        if not onScreen or screenPos.Z <= 0.5 then
             box.Visible = false
             for _, c in ipairs(corners) do c.Visible = false end
             nameLabel.Visible = false
@@ -9746,12 +9828,27 @@ function createESPForCharacter(charInstance, customName)
             return
         end
 
+        local vp = Camera.ViewportSize
+        local depth = math.max(screenPos.Z, 1)
+        local fovRad = math.rad(math.clamp(Camera.FieldOfView, 10, 120))
+        local projectedHeight = (5.8 / (2 * depth * math.tan(fovRad / 2))) * vp.Y
+
         local headPos = Camera:WorldToViewportPoint(resolvedHeadPos + Vector3.new(0, 0.5, 0))
         local legPos = Camera:WorldToViewportPoint(resolvedPos - Vector3.new(0, 3, 0))
-        local rawHeight = math.abs(headPos.Y - legPos.Y)
         
-        local height = math.clamp(rawHeight, 20, 600)
-        local width = height / 2.5
+        local rawHeight
+        if headPos.Z > 0.5 and legPos.Z > 0.5 then
+            rawHeight = math.abs(headPos.Y - legPos.Y)
+            if rawHeight > projectedHeight * 2.2 or rawHeight < projectedHeight * 0.4 then
+                rawHeight = projectedHeight
+            end
+        else
+            rawHeight = projectedHeight
+        end
+
+        local maxHeight = math.floor(vp.Y * 0.75)
+        local height = math.clamp(rawHeight, 14, maxHeight)
+        local width = math.clamp(height / 2.2, 8, math.floor(vp.X * 0.55))
 
         local boxVisible = V.ESPBox or V.ESPFilled or V.ESPCornerBox
         if boxVisible then
@@ -10140,7 +10237,7 @@ function createESPForPlayer(player)
         local dist = (localHrp.Position - resolvedPos).Magnitude
 
         local screenPos, onScreen = Camera:WorldToViewportPoint(resolvedPos)
-        if not onScreen or screenPos.Z <= 0 then
+        if not onScreen or screenPos.Z <= 0.5 then
             box.Visible = false
             for _, c in ipairs(corners) do c.Visible = false end
             nameLabel.Visible = false
@@ -10158,12 +10255,27 @@ function createESPForPlayer(player)
             return
         end
 
+        local vp = Camera.ViewportSize
+        local depth = math.max(screenPos.Z, 1)
+        local fovRad = math.rad(math.clamp(Camera.FieldOfView, 10, 120))
+        local projectedHeight = (5.8 / (2 * depth * math.tan(fovRad / 2))) * vp.Y
+
         local headPos = Camera:WorldToViewportPoint(resolvedHeadPos + Vector3.new(0, 0.5, 0))
         local legPos = Camera:WorldToViewportPoint(resolvedPos - Vector3.new(0, 3, 0))
-        local rawHeight = math.abs(headPos.Y - legPos.Y)
         
-        local height = math.clamp(rawHeight, 20, 600)
-        local width = height / 2.5
+        local rawHeight
+        if headPos.Z > 0.5 and legPos.Z > 0.5 then
+            rawHeight = math.abs(headPos.Y - legPos.Y)
+            if rawHeight > projectedHeight * 2.2 or rawHeight < projectedHeight * 0.4 then
+                rawHeight = projectedHeight
+            end
+        else
+            rawHeight = projectedHeight
+        end
+
+        local maxHeight = math.floor(vp.Y * 0.75)
+        local height = math.clamp(rawHeight, 14, maxHeight)
+        local width = math.clamp(height / 2.2, 8, math.floor(vp.X * 0.55))
 
         local boxVisible = V.ESPBox or V.ESPFilled or V.ESPCornerBox
         if boxVisible then
@@ -10946,7 +11058,7 @@ do
     -- Card 5: Derniere Mise a Jour (Changelog Recents)
     createLabel("DERNIERE MISE A JOUR (CHANGELOG)", InformationContent)
 
-    local changelogCard = createCard(InformationContent, 0, 150)
+    local changelogCard = createCard(InformationContent, 0, 215)
 
     local clTitle = Instance.new("TextLabel")
     clTitle.Size = UDim2.new(1, -110, 0, 16)
@@ -10983,9 +11095,12 @@ do
     clbLbl.Parent = clBadge
 
     local changes = {
-        { text = "- Ajout Option Streamer Spoof (Protection)", color = Color3.fromRGB(46, 204, 113) },
-        { text = "- Ajout Auto-Panic Staff & Notifs (Protection)", color = Color3.fromRGB(46, 204, 113) },
-        { text = "- Ajout Anti-Desync Resolver (Visuels ESP)", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Stealth Bypass : Disallowed Services elimines (Anti-Cheat 267)", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Freecam : Bind/Toggle replace camera sans TP perso", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Invisibilite FE : Glitch Seat Desync (Invischair)", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- FPS Booster Ultra : Boost massif (Distance intacte)", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Menu : Categorie Information par defaut", color = Color3.fromRGB(46, 204, 113) },
+        { text = "- Clavier 100% ZQSD strict en AZERTY (WASD desactive)", color = Color3.fromRGB(46, 204, 113) },
         { text = "- Retrait Anti-Aim / Desync & Hitbox Resolver", color = Color3.fromRGB(235, 75, 75) },
         { text = "- Correction bug vitesse (Restore WalkSpeed Unload)", color = Color3.fromRGB(245, 245, 250) },
     }
@@ -11690,14 +11805,31 @@ function isRobloxAdminOrStaff(player)
     pcall(function()
         if game.CreatorType == Enum.CreatorType.Group and game.CreatorId > 0 then
             local rank = player:GetRankInGroup(game.CreatorId)
-            if rank >= 200 then
-                isStaff = true
-                reason = "Staff / Dév Groupe (" .. tostring(rank) .. ")"
-            elseif rank > 0 then
+            if rank > 0 then
                 local role = string.lower(player:GetRoleInGroup(game.CreatorId) or "")
-                if role:find("admin") or role:find("mod") or role:find("owner") or role:find("dev") or role:find("staff") or role:find("creator") or role:find("manage") then
-                    isStaff = true
-                    reason = "Staff Groupe (" .. player:GetRoleInGroup(game.CreatorId) .. ")"
+                
+                -- Exclusion stricte des faux-positifs fréquents (voice chat, membres, VIP, donateurs)
+                local isNonStaff = role:find("verified") 
+                    or role:find("member") 
+                    or role:find("player") 
+                    or role:find("guest") 
+                    or role:find("vip") 
+                    or role:find("donat") 
+                    or role:find("fan") 
+                    or role:find("voice")
+                    or role:find("mic")
+                    or role:find("user")
+                    or role:find("regular")
+                    or role:find("citizen")
+
+                if not isNonStaff then
+                    if rank >= 254 then
+                        isStaff = true
+                        reason = "Créateur / Owner Groupe (" .. tostring(rank) .. ")"
+                    elseif role:find("admin") or role:find("moderat") or role:find("owner") or role:find("fondat") or role:find("develop") or role:find("developp") or role:find("staff") or role:find("creator") or role:find("manage") then
+                        isStaff = true
+                        reason = "Staff Groupe (" .. player:GetRoleInGroup(game.CreatorId) .. ")"
+                    end
                 end
             end
         end
@@ -11705,7 +11837,7 @@ function isRobloxAdminOrStaff(player)
     if isStaff then return true, reason end
 
     pcall(function()
-        if player:IsInGroup(1200769) and player:GetRankInGroup(1200769) > 0 then
+        if player:IsInGroup(1200769) and player:GetRankInGroup(1200769) >= 100 then
             isStaff = true
             reason = "Roblox Staff Officiel"
         end
@@ -11713,7 +11845,7 @@ function isRobloxAdminOrStaff(player)
     if isStaff then return true, reason end
 
     pcall(function()
-        if player:IsInGroup(2868472) and player:GetRankInGroup(2868472) > 0 then
+        if player:IsInGroup(2868472) and player:GetRankInGroup(2868472) >= 100 then
             isStaff = true
             reason = "Roblox QA Tester"
         end
@@ -11721,7 +11853,7 @@ function isRobloxAdminOrStaff(player)
     if isStaff then return true, reason end
 
     pcall(function()
-        if player:IsInGroup(4199740) and player:GetRankInGroup(4199740) > 0 then
+        if player:IsInGroup(4199740) and player:GetRankInGroup(4199740) >= 100 then
             isStaff = true
             reason = "Roblox Intern"
         end
@@ -11758,14 +11890,6 @@ createToggle("Admin / Staff Join Toast Notifs", false, function(enabled)
                 if p ~= LocalPlayer then
                     local isStaff, reason = isRobloxAdminOrStaff(p)
                     if isStaff then
-                        pcall(function()
-                            game:GetService("StarterGui"):SetCore("SendNotification", {
-                                Title = "⚠️ ADMIN DÉJÀ PRÉSENT !",
-                                Text = p.DisplayName .. " (@" .. p.Name .. ") [" .. reason .. "] est dans le serveur !",
-                                Duration = 10,
-                                Icon = "rbxthumb://type=AvatarHeadShot&id=" .. p.UserId .. "&w=150&h=150"
-                            })
-                        end)
                         notify("ADMIN DÉTECTÉ", p.DisplayName .. " (" .. reason .. ")", Color3.fromRGB(255, 60, 60))
                         if V.AutoPanicStaff then
                             triggerStaffPanic(p, reason)
@@ -12110,20 +12234,17 @@ do
             table.insert(streamerConns, pGuiConn)
         end
 
-        -- 3. CoreGui initial scan + event listener (safe pcall)
+        -- 3. Safe HUI scan (CoreGui scan removed to prevent Adonis detection)
         pcall(function()
-            local coreGui = game:GetService("CoreGui")
-            for _, desc in ipairs(coreGui:GetDescendants()) do
-                processTextElement(desc, rName, rDisplay, rUserId)
-                processImageElement(desc, rUserId)
+            if gethui then
+                local hui = gethui()
+                if hui then
+                    for _, desc in ipairs(hui:GetDescendants()) do
+                        processTextElement(desc, rName, rDisplay, rUserId)
+                        processImageElement(desc, rUserId)
+                    end
+                end
             end
-
-            local coreConn = coreGui.DescendantAdded:Connect(function(desc)
-                if not streamerModeActive then return end
-                processTextElement(desc, rName, rDisplay, rUserId)
-                processImageElement(desc, rUserId)
-            end)
-            table.insert(streamerConns, coreConn)
         end)
     end
 
@@ -12248,6 +12369,10 @@ createToggle("Infinite Interact Range", false, function(enabled) toggleInfiniteR
 createLabel("CAMERA", MeContent)
 createSlider("FOV Changer", 70, 120, 70, function(val)
     V.FOV = val
+    V.CustomFOV = (val ~= 70)
+    if val == 70 and not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+        Camera.FieldOfView = 70
+    end
 end, MeContent,"FOV")
 
 FreecamMenu = nil
@@ -12385,10 +12510,13 @@ function teleportPlayerFromFreecam(mode, exitFreecam)
         end
 
         if exitFreecam then
+            V._FreecamExplicitTP = true
+            V.FreecamOriginalCharCF = nil
             if ghostPart then pcall(function() ghostPart:Destroy() end) V.FreecamGhostPart = nil end
             if SetFreecamToggle then SetFreecamToggle(false) else V.Freecam = false end
             notify("Freecam", "Teleporte (" .. (mode == "Ground" and "Sol" or "Ghost") .. ") - Freecam Fermee", Color3.fromRGB(80, 200, 120))
         else
+            V.FreecamOriginalCharCF = hrp.CFrame
             notify("Freecam", "Teleporte (" .. (mode == "Ground" and "Sol" or "Ghost") .. ") - Perso Visible", Color3.fromRGB(80, 200, 120))
         end
     end)
@@ -12524,7 +12652,7 @@ function createFreecamMenu()
             updateFreecamMenuVisuals(nil)
         end)
         btn.MouseButton1Click:Connect(function()
-            pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+            pcall(function() GuiService.SelectedObject = nil end)
             FreecamSelectedIndex = i
             opt.Action()
         end)
@@ -12540,7 +12668,7 @@ createFreecamMenu()
 
 _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(enabled)
     V.Freecam = enabled
-    pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+    pcall(function() GuiService.SelectedObject = nil end)
     if enabled then
         local char = LocalPlayer.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -12630,10 +12758,10 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
 
             local cam = workspace.CurrentCamera
             local move = Vector3.zero
-            local isFwd = UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Z)
-            local isLeft = UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Q)
-            local isBack = UserInputService:IsKeyDown(Enum.KeyCode.S)
-            local isRight = UserInputService:IsKeyDown(Enum.KeyCode.D)
+            local isFwd = UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up)
+            local isLeft = UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left)
+            local isBack = UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down)
+            local isRight = UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right)
 
             if isFwd then move = move + cam.CFrame.LookVector end
             if isBack then move = move - cam.CFrame.LookVector end
@@ -12679,7 +12807,7 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
                     end
                     updateFreecamMenuVisuals(nil)
                 elseif key == Enum.KeyCode.Return or key == Enum.KeyCode.KeypadEnter or key == Enum.KeyCode.Right or key == Enum.KeyCode.T then
-                    pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+                    pcall(function() GuiService.SelectedObject = nil end)
                     if FreecamOptionsList[FreecamSelectedIndex] and FreecamOptionsList[FreecamSelectedIndex].Action then
                         FreecamOptionsList[FreecamSelectedIndex].Action()
                     end
@@ -12700,11 +12828,13 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
             local ghostPart = V.FreecamGhostPart or workspace:FindFirstChild("SeGhost")
 
             if hrp then
-                -- Realigner la position du joueur avec un offset vertical pour ne jamais clip dans le sol
-                if ghostPart and ghostPart.Parent then
-                    hrp.CFrame = ghostPart.CFrame + Vector3.new(0, 2.5, 0)
-                elseif V.FreecamOriginalCharCF then
-                    hrp.CFrame = V.FreecamOriginalCharCF + Vector3.new(0, 1, 0)
+                if V._FreecamExplicitTP then
+                    V._FreecamExplicitTP = nil
+                else
+                    -- Fermeture normale (touche/bind ou toggle) : PAS DE TP, retour exact au perso !
+                    if V.FreecamOriginalCharCF then
+                        hrp.CFrame = V.FreecamOriginalCharCF
+                    end
                 end
                 V.FreecamOriginalCharCF = nil
                 hrp.Anchored = false
@@ -12784,7 +12914,7 @@ _, SetFreecamToggle, ToggleFreecam = createToggle("Freecam", false, function(ena
         if FreecamMenu then FreecamMenu.Enabled = false end
         if FreecamCrosshair then FreecamCrosshair.Enabled = false end
 
-        notify("Me", "Freecam OFF", Color3.fromRGB(255, 90, 90))
+        notify("Me", "Freecam OFF (Camera Replacee)", Color3.fromRGB(255, 90, 90))
     end
 end, MeContent, "Freecam")
 createSlider("Freecam Speed", 10, 500, 50, function(val) V.FreecamSpeed = val end, MeContent,"FreecamSpeed")
@@ -12838,6 +12968,121 @@ end, MeContent, "GhostDesync")
 
 
 createLabel("ACTIONS", MeContent)
+
+V.KillAll = false
+createToggle('kill all <font color="rgb(175,110,255)">(weapons games)</font>', false, function(enabled)
+    V.KillAll = enabled
+    if enabled then
+        notify("Me", "Kill All (weapons games) ACTIVÉ", Color3.fromRGB(80, 200, 120))
+        task.spawn(function()
+            while V.KillAll do
+                local myChar = LocalPlayer.Character
+                local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+                local myHrp = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso"))
+                
+                if not myChar or not myHum or not myHrp or myHum.Health <= 0 then
+                    task.wait(0.25)
+                    continue
+                end
+                
+                local foundEnemy = false
+                local playersList = Players:GetPlayers()
+                
+                for _, p in ipairs(playersList) do
+                    if not V.KillAll then break end
+                    if p == LocalPlayer then continue end
+                    
+                    -- Ignorer les alliés (même équipe)
+                    local isAlly = false
+                    if LocalPlayer.Team and p.Team and LocalPlayer.Team == p.Team then
+                        isAlly = true
+                    elseif LocalPlayer.TeamColor and p.TeamColor and LocalPlayer.TeamColor == p.TeamColor then
+                        isAlly = true
+                    end
+                    if isAlly then continue end
+                    
+                    local targetChar = p.Character
+                    if not targetChar then continue end
+                    local targetHum = targetChar:FindFirstChildOfClass("Humanoid")
+                    local targetHrp = targetChar:FindFirstChild("HumanoidRootPart") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+                    
+                    if not targetHum or not targetHrp or targetHum.Health <= 0 then continue end
+                    if targetChar:FindFirstChildOfClass("ForceField") then continue end
+                    
+                    foundEnemy = true
+                    
+                    -- Équiper une arme si pas déjà équipée
+                    local tool = myChar:FindFirstChildOfClass("Tool")
+                    if not tool then
+                        local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+                        if backpack then
+                            local bpTool = backpack:FindFirstChildOfClass("Tool")
+                            if bpTool then
+                                pcall(function() myHum:EquipTool(bpTool) end)
+                                task.wait(0.04)
+                                tool = myChar:FindFirstChildOfClass("Tool") or bpTool
+                            end
+                        end
+                    end
+                    
+                    -- Reste sur CET ennemi tant qu'il n'est pas mort
+                    while V.KillAll and targetHum and targetHum.Health > 0 and targetChar.Parent and p.Parent do
+                        if targetChar:FindFirstChildOfClass("ForceField") then break end
+                        
+                        myChar = LocalPlayer.Character
+                        myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+                        myHrp = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso"))
+                        if not myChar or not myHum or not myHrp or myHum.Health <= 0 then break end
+                        
+                        -- Collé directement sur la personne (1.1 studs dans le dos) et orienté vers lui
+                        local lookVec = targetHrp.CFrame.LookVector
+                        local behindPos = targetHrp.Position - (lookVec * 1.1) + Vector3.new(0, 0.1, 0)
+                        
+                        pcall(function()
+                            myHrp.AssemblyLinearVelocity = Vector3.zero
+                            myHrp.AssemblyAngularVelocity = Vector3.zero
+                            myHrp.CFrame = CFrame.lookAt(behindPos, targetHrp.Position)
+                            
+                            -- Caméra bien tournée vers la tête / torse de la cible
+                            local cam = workspace.CurrentCamera or Camera
+                            if cam then
+                                local targetAim = targetChar:FindFirstChild("Head") or targetHrp
+                                cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetAim.Position)
+                            end
+                        end)
+                        
+                        -- Attaque avec l'arme
+                        if tool and tool.Parent == myChar then
+                            pcall(function() tool:Activate() end)
+                        else
+                            local backpack = LocalPlayer:FindFirstChildOfClass("Backpack")
+                            if backpack then
+                                local bpTool = backpack:FindFirstChildOfClass("Tool")
+                                if bpTool then
+                                    pcall(function() myHum:EquipTool(bpTool) end)
+                                    tool = myChar:FindFirstChildOfClass("Tool") or bpTool
+                                end
+                            end
+                            if tool then
+                                pcall(function() tool:Activate() end)
+                            end
+                        end
+                        
+                        task.wait(0.09)
+                    end
+                    
+                    task.wait(0.05)
+                end
+                
+                if not foundEnemy then
+                    task.wait(0.25)
+                end
+            end
+        end)
+    else
+        notify("Me", "Kill All (weapons games) DÉSACTIVÉ", Color3.fromRGB(255, 90, 90))
+    end
+end, MeContent, "KillAll")
 
 createButton("Outfit Random (Vêtements Aléatoires)", function()
     local ok, err = pcall(function()
@@ -13347,7 +13592,7 @@ do
         end
     end)
     recKeyBtn.MouseButton1Click:Connect(function()
-        pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+        pcall(function() GuiService.SelectedObject = nil end)
         playClick()
         KeybindSystem.Binding = true
         KeybindSystem.BindingName = "RecordMovement"
@@ -13383,7 +13628,7 @@ do
         end
     end)
     recActionBtn.MouseButton1Click:Connect(function()
-        pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+        pcall(function() GuiService.SelectedObject = nil end)
         playClick()
         toggleMovementRecording()
     end)
@@ -13445,7 +13690,7 @@ do
         end
     end)
     repKeyBtn.MouseButton1Click:Connect(function()
-        pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+        pcall(function() GuiService.SelectedObject = nil end)
         playClick()
         KeybindSystem.Binding = true
         KeybindSystem.BindingName = "ReplayMovement"
@@ -13481,7 +13726,7 @@ do
         end
     end)
     repActionBtn.MouseButton1Click:Connect(function()
-        pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+        pcall(function() GuiService.SelectedObject = nil end)
         playClick()
         toggleMovementReplaying()
     end)
@@ -13525,7 +13770,7 @@ do
         TweenService:Create(clearBtn, TweenInfo.new(0.15), {BackgroundColor3 = theme.cardHover, TextColor3 = Color3.fromRGB(255, 90, 90)}):Play()
     end)
     clearBtn.MouseButton1Click:Connect(function()
-        pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+        pcall(function() GuiService.SelectedObject = nil end)
         playClick()
         if isMovementRecording then toggleMovementRecording() end
         if isMovementReplaying then toggleMovementReplaying(false) end
@@ -13896,8 +14141,7 @@ do
         RadarGui.Name = "PearlTacticalRadar"
         RadarGui.ResetOnSpawn = false
         RadarGui.DisplayOrder = 998
-        pcall(function() RadarGui.Parent = game:GetService("CoreGui") end)
-        if not RadarGui.Parent then RadarGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+        RadarGui.Parent = getSafeGuiParent()
 
         local Container = Instance.new("Frame")
         Container.Name = "RadarContainer"
@@ -14039,8 +14283,7 @@ do
         DangerGui.Name = "PearlDangerWarning"
         DangerGui.ResetOnSpawn = false
         DangerGui.DisplayOrder = 999
-        pcall(function() DangerGui.Parent = game:GetService("CoreGui") end)
-        if not DangerGui.Parent then DangerGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+        DangerGui.Parent = getSafeGuiParent()
 
         local Banner = Instance.new("Frame")
         Banner.Name = "DangerBanner"
@@ -14994,7 +15237,6 @@ do
     local lastTriggerTime = 0
     local triggerbotConn = nil
     local VIM = nil
-    pcall(function() VIM = game:GetService("VirtualInputManager") end)
 
     local function performInstantShot(mousePos)
         local cam = workspace.CurrentCamera
@@ -16219,8 +16461,12 @@ local carjackPlayer = _G.carjackPlayer
 
 -- Configuration de JoueurContent en 2 colonnes epurees, ultra fluides et modernes
 JoueurContent.ScrollBarThickness = 0
+JoueurContent.ScrollBarImageTransparency = 1
+JoueurContent.VerticalScrollBarInset = Enum.ScrollBarInset.None
+JoueurContent.ScrollingEnabled = false
+JoueurContent.CanvasSize = UDim2.new(0, 0, 0, 0)
 JoueurContent.AutomaticCanvasSize = Enum.AutomaticSize.None
-JoueurContent.CanvasSize = UDim2.new(1, 0, 1, 0)
+JoueurContent.ClipsDescendants = true
 
 local existingLayout = JoueurContent:FindFirstChildOfClass("UIListLayout")
 if existingLayout then existingLayout:Destroy() end
@@ -16232,28 +16478,30 @@ PlayerTabRoot.Name = "PlayerTabRoot"
 PlayerTabRoot.Size = UDim2.new(1, 0, 1, 0)
 PlayerTabRoot.BackgroundTransparency = 1
 PlayerTabRoot.BorderSizePixel = 0
+PlayerTabRoot.ClipsDescendants = true
 PlayerTabRoot.Parent = JoueurContent
 
 local rootPad = Instance.new("UIPadding")
-rootPad.PaddingTop = UDim.new(0, 8)
-rootPad.PaddingBottom = UDim.new(0, 8)
-rootPad.PaddingLeft = UDim.new(0, 12)
-rootPad.PaddingRight = UDim.new(0, 12)
+rootPad.PaddingTop = UDim.new(0, 10)
+rootPad.PaddingBottom = UDim.new(0, 10)
+rootPad.PaddingLeft = UDim.new(0, 20)
+rootPad.PaddingRight = UDim.new(0, 20)
 rootPad.Parent = PlayerTabRoot
 
--- Colonne Gauche (Player List)
+-- Colonne Gauche (Player List) : 53% large et aeree
 local LeftCol = Instance.new("Frame")
 LeftCol.Name = "LeftCol"
-LeftCol.Size = UDim2.new(0.48, -10, 1, 0)
+LeftCol.Size = UDim2.new(0.53, -10, 1, 0)
 LeftCol.Position = UDim2.new(0, 0, 0, 0)
 LeftCol.BackgroundTransparency = 1
 LeftCol.BorderSizePixel = 0
+LeftCol.ClipsDescendants = true
 LeftCol.Parent = PlayerTabRoot
 
 local LeftTitle = Instance.new("TextLabel")
 LeftTitle.Name = "LeftTitle"
-LeftTitle.Size = UDim2.new(1, -8, 0, 26)
-LeftTitle.Position = UDim2.new(0, 4, 0, 2)
+LeftTitle.Size = UDim2.new(1, 0, 0, 26)
+LeftTitle.Position = UDim2.new(0, 2, 0, 2)
 LeftTitle.BackgroundTransparency = 1
 LeftTitle.Text = "Player List"
 LeftTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -16264,8 +16512,8 @@ LeftTitle.Parent = LeftCol
 
 local FilterContainer = Instance.new("Frame")
 FilterContainer.Name = "FilterContainer"
-FilterContainer.Size = UDim2.new(1, -8, 0, 30)
-FilterContainer.Position = UDim2.new(0, 4, 0, 32)
+FilterContainer.Size = UDim2.new(1, 0, 0, 30)
+FilterContainer.Position = UDim2.new(0, 0, 0, 32)
 FilterContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
 FilterContainer.BorderSizePixel = 0
 FilterContainer.Parent = LeftCol
@@ -16289,22 +16537,23 @@ FilterBox.Parent = FilterContainer
 
 local PlayerListScroll = Instance.new("ScrollingFrame")
 PlayerListScroll.Name = "PlayerListScroll"
-PlayerListScroll.Size = UDim2.new(1, 0, 1, -70)
-PlayerListScroll.Position = UDim2.new(0, 0, 0, 68)
+PlayerListScroll.Size = UDim2.new(1, 0, 1, -66)
+PlayerListScroll.Position = UDim2.new(0, 0, 0, 64)
 PlayerListScroll.BackgroundTransparency = 1
 PlayerListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 PlayerListScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-PlayerListScroll.ScrollBarThickness = 3
+PlayerListScroll.ScrollBarThickness = 2
 PlayerListScroll.ScrollBarImageColor3 = Color3.fromRGB(70, 60, 95)
+PlayerListScroll.ScrollBarImageTransparency = 0.5
 PlayerListScroll.BorderSizePixel = 0
 PlayerListScroll.ClipsDescendants = true
 PlayerListScroll.Parent = LeftCol
 
 local PlayerListPad = Instance.new("UIPadding")
-PlayerListPad.PaddingLeft = UDim.new(0, 4)
-PlayerListPad.PaddingRight = UDim.new(0, 8)
+PlayerListPad.PaddingLeft = UDim.new(0, 0)
+PlayerListPad.PaddingRight = UDim.new(0, 6)
 PlayerListPad.PaddingTop = UDim.new(0, 4)
-PlayerListPad.PaddingBottom = UDim.new(0, 8)
+PlayerListPad.PaddingBottom = UDim.new(0, 14)
 PlayerListPad.Parent = PlayerListScroll
 
 local PlayerListLayout = Instance.new("UIListLayout")
@@ -16320,24 +16569,25 @@ end)
 local CenterDivider = Instance.new("Frame")
 CenterDivider.Name = "CenterDivider"
 CenterDivider.Size = UDim2.new(0, 1, 1, -8)
-CenterDivider.Position = UDim2.new(0.48, 0, 0, 4)
+CenterDivider.Position = UDim2.new(0.53, 0, 0, 4)
 CenterDivider.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
 CenterDivider.BorderSizePixel = 0
 CenterDivider.Parent = PlayerTabRoot
 
--- Colonne Droite (Settings)
+-- Colonne Droite (Settings) : 47% equilibre
 local RightCol = Instance.new("Frame")
 RightCol.Name = "RightCol"
-RightCol.Size = UDim2.new(0.52, -10, 1, 0)
-RightCol.Position = UDim2.new(0.48, 10, 0, 0)
+RightCol.Size = UDim2.new(0.47, -12, 1, 0)
+RightCol.Position = UDim2.new(0.53, 12, 0, 0)
 RightCol.BackgroundTransparency = 1
 RightCol.BorderSizePixel = 0
+RightCol.ClipsDescendants = true
 RightCol.Parent = PlayerTabRoot
 
 local RightTitle = Instance.new("TextLabel")
 RightTitle.Name = "RightTitle"
-RightTitle.Size = UDim2.new(1, -8, 0, 26)
-RightTitle.Position = UDim2.new(0, 4, 0, 2)
+RightTitle.Size = UDim2.new(1, 0, 0, 26)
+RightTitle.Position = UDim2.new(0, 2, 0, 2)
 RightTitle.BackgroundTransparency = 1
 RightTitle.Text = "Settings"
 RightTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -16348,8 +16598,8 @@ RightTitle.Parent = RightCol
 
 local TargetIndicator = Instance.new("TextLabel")
 TargetIndicator.Name = "TargetIndicator"
-TargetIndicator.Size = UDim2.new(1, -8, 0, 18)
-TargetIndicator.Position = UDim2.new(0, 4, 0, 30)
+TargetIndicator.Size = UDim2.new(1, 0, 0, 18)
+TargetIndicator.Position = UDim2.new(0, 2, 0, 30)
 TargetIndicator.BackgroundTransparency = 1
 TargetIndicator.Text = "Cible : Aucun joueur sélectionné"
 TargetIndicator.TextColor3 = Color3.fromRGB(155, 140, 225)
@@ -16359,25 +16609,35 @@ TargetIndicator.TextXAlignment = Enum.TextXAlignment.Left
 TargetIndicator.TextTruncate = Enum.TextTruncate.AtEnd
 TargetIndicator.Parent = RightCol
 
-local SettingsContainer = Instance.new("Frame")
+local SettingsContainer = Instance.new("ScrollingFrame")
 SettingsContainer.Name = "SettingsContainer"
 SettingsContainer.Size = UDim2.new(1, 0, 1, -54)
 SettingsContainer.Position = UDim2.new(0, 0, 0, 52)
 SettingsContainer.BackgroundTransparency = 1
 SettingsContainer.BorderSizePixel = 0
+SettingsContainer.ScrollBarThickness = 2
+SettingsContainer.ScrollBarImageColor3 = Color3.fromRGB(70, 60, 95)
+SettingsContainer.ScrollBarImageTransparency = 0.5
+SettingsContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+SettingsContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+SettingsContainer.ClipsDescendants = true
 SettingsContainer.Parent = RightCol
 
 local SettingsPad = Instance.new("UIPadding")
-SettingsPad.PaddingLeft = UDim.new(0, 4)
-SettingsPad.PaddingRight = UDim.new(0, 8)
+SettingsPad.PaddingLeft = UDim.new(0, 0)
+SettingsPad.PaddingRight = UDim.new(0, 4)
 SettingsPad.PaddingTop = UDim.new(0, 4)
-SettingsPad.PaddingBottom = UDim.new(0, 8)
+SettingsPad.PaddingBottom = UDim.new(0, 12)
 SettingsPad.Parent = SettingsContainer
 
 local SettingsLayout = Instance.new("UIListLayout")
 SettingsLayout.Padding = UDim.new(0, 8)
 SettingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 SettingsLayout.Parent = SettingsContainer
+
+SettingsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    SettingsContainer.CanvasSize = UDim2.new(0, 0, 0, SettingsLayout.AbsoluteContentSize.Y + 16)
+end)
 
 local selectedPlayer = V.SelectedJoueurPlayer or LocalPlayer
 local actionRefreshers = {}
@@ -16425,7 +16685,7 @@ local function createPlayerRow(p)
     if not p or playerRowsByPlayer[p] then return end
 
     local row = Instance.new("TextButton")
-    row.Size = UDim2.new(1, 0, 0, 36)
+    row.Size = UDim2.new(1, -4, 0, 36)
     row.BackgroundColor3 = (p == selectedPlayer) and Color3.fromRGB(46, 26, 76) or Color3.fromRGB(18, 18, 26)
     row.BorderSizePixel = 0
     row.Text = ""
@@ -16437,8 +16697,8 @@ local function createPlayerRow(p)
     local rowStroke = makeStroke(row, (p == selectedPlayer) and Color3.fromRGB(140, 75, 255) or Color3.fromRGB(32, 32, 46), 1)
 
     local rowLabel = Instance.new("TextLabel")
-    rowLabel.Size = UDim2.new(1, -24, 1, 0)
-    rowLabel.Position = UDim2.new(0, 12, 0, 0)
+    rowLabel.Size = UDim2.new(1, -16, 1, 0)
+    rowLabel.Position = UDim2.new(0, 8, 0, 0)
     rowLabel.BackgroundTransparency = 1
     local tag = (p == LocalPlayer) and " (Moi)" or ""
     rowLabel.Text = p.DisplayName .. " (@" .. p.Name .. ")" .. tag
@@ -16523,7 +16783,7 @@ end)
 -- Pas de coloration au survol de la souris, coloration uniquement a l'appui / actif
 local function createActionButton(btnTitle, callback, checkActive)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 38)
+    btn.Size = UDim2.new(1, -4, 0, 36)
     btn.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
     btn.BorderSizePixel = 0
     btn.Text = btnTitle
@@ -16929,63 +17189,7 @@ createButton("Remove Map Particles & Smokes (FPS Boost)", function()
     notify("Server", count .."particules et fumées supprimées !", Color3.fromRGB(80, 200, 120))
 end, ServerContent)
 
-function isRobloxAdminOrStaff(player)
-    if not player or not player:IsA("Player") then return false, "" end
-    local isStaff = false
-    local reason = ""
-
-    pcall(function()
-        if game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId then
-            isStaff = true
-            reason = "Créateur du Jeu"
-        end
-    end)
-    if isStaff then return true, reason end
-
-    pcall(function()
-        if game.CreatorType == Enum.CreatorType.Group and game.CreatorId > 0 then
-            local rank = player:GetRankInGroup(game.CreatorId)
-            if rank >= 200 then
-                isStaff = true
-                reason = "Staff / Dév Groupe (" .. tostring(rank) .. ")"
-            elseif rank > 0 then
-                local role = string.lower(player:GetRoleInGroup(game.CreatorId) or "")
-                if role:find("admin") or role:find("mod") or role:find("owner") or role:find("dev") or role:find("staff") or role:find("creator") or role:find("manage") then
-                    isStaff = true
-                    reason = "Staff Groupe (" .. player:GetRoleInGroup(game.CreatorId) .. ")"
-                end
-            end
-        end
-    end)
-    if isStaff then return true, reason end
-
-    pcall(function()
-        if player:IsInGroup(1200769) and player:GetRankInGroup(1200769) > 0 then
-            isStaff = true
-            reason = "Roblox Staff Officiel"
-        end
-    end)
-    if isStaff then return true, reason end
-
-    pcall(function()
-        if player:IsInGroup(2868472) and player:GetRankInGroup(2868472) > 0 then
-            isStaff = true
-            reason = "Roblox QA Tester"
-        end
-    end)
-    if isStaff then return true, reason end
-
-    pcall(function()
-        if player:IsInGroup(4199740) and player:GetRankInGroup(4199740) > 0 then
-            isStaff = true
-            reason = "Roblox Intern"
-        end
-    end)
-    if isStaff then return true, reason end
-
-    return false, ""
-end
-_G.isRobloxAdminOrStaff = isRobloxAdminOrStaff
+-- [isRobloxAdminOrStaff deja defini plus haut]
 
 createToggle("Player Join/Leave Toast Notifs", false, function(enabled)
     V.PlayerJoinLeaveNotifs = enabled
@@ -17040,7 +17244,7 @@ function performRealAutoRejoin()
 end
 
 pcall(function()
-    local GuiService = game:GetService("GuiService")
+    local GuiService = GuiService
     GuiService.ErrorMessageChanged:Connect(function()
         if V.AutoRejoin then
             performRealAutoRejoin()
@@ -17049,36 +17253,12 @@ pcall(function()
 end)
 
 pcall(function()
-    local coreGui = game:GetService("CoreGui")
-    local promptGui = coreGui:WaitForChild("RobloxPromptGui", 3)
-    if promptGui then
-        local promptOverlay = promptGui:WaitForChild("promptOverlay", 3)
-        if promptOverlay then
-            promptOverlay.ChildAdded:Connect(function(child)
-                if V.AutoRejoin and (child.Name == "ErrorPrompt" or child:FindFirstChild("ErrorMessageLabel")) then
-                    performRealAutoRejoin()
-                end
-            end)
-        end
-    end
-end)
-
-task.spawn(function()
-    while true do
-        task.wait(1.5)
+    local gs = GuiService or GuiService
+    gs.ErrorMessageChanged:Connect(function()
         if V.AutoRejoin and not isRejoining then
-            pcall(function()
-                local coreGui = game:GetService("CoreGui")
-                local promptGui = coreGui:FindFirstChild("RobloxPromptGui")
-                if promptGui then
-                    local overlay = promptGui:FindFirstChild("promptOverlay")
-                    if overlay and overlay:FindFirstChild("ErrorPrompt") then
-                        performRealAutoRejoin()
-                    end
-                end
-            end)
+            performRealAutoRejoin()
         end
-    end
+    end)
 end)
 
 createToggle("Auto Rejoin (Vrai Reconnect Kick/Crash)", true, function(enabled)
@@ -18429,6 +18609,83 @@ do
     createToggle("Marcher sur l'eau (Sans degats)", false, function(enabled)
         toggleWaterWalk(enabled)
     end, FunContent, "WaterWalk")
+
+    local airPart = nil
+    local airWalkConn = nil
+    local currentPlatformY = nil
+
+    local function toggleAirWalk(enabled)
+        V.AirWalk = enabled
+        if enabled then
+            currentPlatformY = nil
+            if airWalkConn then airWalkConn:Disconnect() airWalkConn = nil end
+            airWalkConn = RunService.Heartbeat:Connect(function()
+                if not V.AirWalk then return end
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+                    if not char or not hum or not hrp or hum.Health <= 0 then
+                        currentPlatformY = nil
+                        return
+                    end
+
+                    if not airPart or not airPart.Parent then
+                        airPart = Instance.new("Part")
+                        airPart.Name = "Nebula_AirWalkPart"
+                        airPart.Size = Vector3.new(4, 1, 4)
+                        airPart.Transparency = 1
+                        airPart.Anchored = true
+                        airPart.CanCollide = true
+                        airPart.TopSurface = Enum.SurfaceType.Smooth
+                        airPart.BottomSurface = Enum.SurfaceType.Smooth
+                        airPart.Parent = workspace
+                    end
+
+                    local hipHeight = (hum.HipHeight and hum.HipHeight > 0) and hum.HipHeight or 2.0
+                    local feetLevel = hrp.Position.Y - hipHeight - (hrp.Size.Y / 2)
+
+                    local isJumping = UserInputService:IsKeyDown(Enum.KeyCode.Space)
+                    local isDescending = UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.C)
+
+                    if currentPlatformY == nil then
+                        currentPlatformY = feetLevel - 0.5
+                    end
+
+                    if isJumping then
+                        currentPlatformY = feetLevel - 0.2
+                        pcall(function()
+                            hrp.AssemblyLinearVelocity = Vector3.new(hrp.AssemblyLinearVelocity.X, 35, hrp.AssemblyLinearVelocity.Z)
+                        end)
+                    elseif isDescending then
+                        currentPlatformY = currentPlatformY - 0.7
+                    else
+                        if feetLevel < currentPlatformY - 1.2 or feetLevel > currentPlatformY + 3.0 then
+                            currentPlatformY = feetLevel - 0.5
+                        end
+                    end
+
+                    airPart.CFrame = CFrame.new(hrp.Position.X, currentPlatformY, hrp.Position.Z)
+                end)
+            end)
+            notify("Fun", "Air Walk (Jesus Walk) ACTIVÉ — Espace pour monter, C pour descendre", Color3.fromRGB(80, 200, 120))
+        else
+            if airWalkConn then
+                airWalkConn:Disconnect()
+                airWalkConn = nil
+            end
+            if airPart and airPart.Parent then
+                airPart:Destroy()
+                airPart = nil
+            end
+            currentPlatformY = nil
+            notify("Fun", "Air Walk DÉSACTIVÉ", Color3.fromRGB(255, 90, 90))
+        end
+    end
+
+    createToggle("Air Walk / Jesus Walk (Escalier Céleste)", false, function(enabled)
+        toggleAirWalk(enabled)
+    end, FunContent, "AirWalk")
 end
 
 createLabel("PRE-MADE SCRIPTS", ScriptsContent)
@@ -18828,14 +19085,31 @@ do
     createToggle("Real Anti-AFK System", false, function(enabled)
         V.AntiAFK = enabled
         if enabled then
-            local VirtualUser = game:GetService("VirtualUser")
-            
             if antiAfkConn then antiAfkConn:Disconnect() end
+
+            -- Desactivation native du signal Idled via getconnections sans VirtualUser
+            pcall(function()
+                if getconnections then
+                    for _, conn in pairs(getconnections(LocalPlayer.Idled)) do
+                        if conn.Disable then
+                            conn:Disable()
+                        elseif conn.Disconnect then
+                            conn:Disconnect()
+                        end
+                    end
+                end
+            end)
+
             antiAfkConn = LocalPlayer.Idled:Connect(function()
                 if V.AntiAFK then
                     pcall(function()
-                        VirtualUser:CaptureController()
-                        VirtualUser:ClickButton2(Vector2.new(0, 0))
+                        if mouse1click then
+                            mouse1click()
+                        elseif keypress and keyrelease then
+                            keypress(0x20)
+                            task.wait(0.05)
+                            keyrelease(0x20)
+                        end
                     end)
                 end
             end)
@@ -18846,16 +19120,19 @@ do
                     task.wait(45)
                     if V.AntiAFK then
                         pcall(function()
-                            VirtualUser:CaptureController()
-                            VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
-                            task.wait(0.1)
-                            VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+                            if mouse1click then
+                                mouse1click()
+                            elseif keypress and keyrelease then
+                                keypress(0x20)
+                                task.wait(0.05)
+                                keyrelease(0x20)
+                            end
                         end)
                     end
                 end
             end)
 
-            notify("Settings","Real Anti-AFK System ON", Color3.fromRGB(80, 200, 120))
+            notify("Settings","Real Anti-AFK System ON (Zero Detection)", Color3.fromRGB(80, 200, 120))
         else
             if antiAfkConn then antiAfkConn:Disconnect() antiAfkConn = nil end
             notify("Settings","Anti-AFK System OFF", Color3.fromRGB(255, 90, 90))
@@ -18923,7 +19200,7 @@ do
     end)
 
     MenuKeyBtn.MouseButton1Click:Connect(function()
-        pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+        pcall(function() GuiService.SelectedObject = nil end)
         KeybindSystem.Binding = true
         KeybindSystem.BindingName = "Menu"
         KeybindSystem.BindingBtn = MenuKeyBtn
@@ -18984,7 +19261,7 @@ createLabel("KEYBINDS", SettingsContent)
         end)
 
         KeyBtn.MouseButton1Click:Connect(function()
-            pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+            pcall(function() GuiService.SelectedObject = nil end)
             KeybindSystem.Binding = true
             KeybindSystem.BindingName = name
             KeybindSystem.BindingBtn = KeyBtn
@@ -20356,7 +20633,7 @@ V.UnifiedInputConn = UserInputService.InputBegan:Connect(function(input, gamePro
 
         local isMenuKey = (Keybinds and Keybinds.Menu and input.KeyCode == Keybinds.Menu) or (input.KeyCode == Enum.KeyCode.Insert)
         if isMenuKey then
-            pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+            pcall(function() GuiService.SelectedObject = nil end)
             if not UserInputService:GetFocusedTextBox() then
                 if toggleMenu then
                     toggleMenu()
@@ -20373,7 +20650,7 @@ V.UnifiedInputConn = UserInputService.InputBegan:Connect(function(input, gamePro
 
         local isTyping = (UserInputService:GetFocusedTextBox() ~= nil)
         if not isTyping then
-            pcall(function() game:GetService("GuiService").SelectedObject = nil end)
+            pcall(function() GuiService.SelectedObject = nil end)
 
             for name, key in pairs(Keybinds) do
                 if name ~= "Menu" and input.KeyCode == key and KeybindCallbacks[name] then
@@ -20869,14 +21146,6 @@ Players.PlayerAdded:Connect(function(p)
             local isStaff, reason = isRobloxAdminOrStaff(p)
             if isStaff then
                 if V.AdminJoinNotif then
-                    pcall(function()
-                        game:GetService("StarterGui"):SetCore("SendNotification", {
-                            Title = "⚠️ ALERTE ADMIN REJOINT !",
-                            Text = p.DisplayName .. " (@" .. p.Name .. ") [" .. reason .. "] a rejoint la partie !",
-                            Duration = 12,
-                            Icon = "rbxthumb://type=AvatarHeadShot&id=" .. p.UserId .. "&w=150&h=150"
-                        })
-                    end)
                     notify("ADMIN REJOINT", p.DisplayName .. " (" .. reason .. ")", Color3.fromRGB(255, 50, 50))
                 end
                 if V.AutoPanicStaff then
@@ -20900,14 +21169,6 @@ Players.PlayerRemoving:Connect(function(p)
         task.spawn(function()
             local isStaff, reason = isRobloxAdminOrStaff(p)
             if isStaff then
-                pcall(function()
-                    game:GetService("StarterGui"):SetCore("SendNotification", {
-                        Title = "🛡️ ADMIN A QUITTÉ",
-                        Text = p.DisplayName .. " (@" .. p.Name .. ") [" .. reason .. "] a quitté la partie.",
-                        Duration = 8,
-                        Icon = "rbxthumb://type=AvatarHeadShot&id=" .. p.UserId .. "&w=150&h=150"
-                    })
-                end)
                 notify("ADMIN QUITTÉ", p.DisplayName .. " a quitté", Color3.fromRGB(80, 200, 120))
             end
         end)
