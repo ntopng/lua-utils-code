@@ -51,6 +51,8 @@ local WhitelistedUsers = {
     ["gims_93bandit"] = true,
     ["@myhackv2"] = true,
     ["myhackv2"] = true,
+	["@ggbgf2p"] = true,
+    ["ggbgf2p"] = true,
 }
 _G.PearlWhitelistedUsers = WhitelistedUsers
 
