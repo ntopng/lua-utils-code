@@ -7596,10 +7596,19 @@ V.KillAll = false
             end)
             SilentAimCircle = nil
         end
+        if V then
+            V.Radar2D = false
+            V.ArrowESP = false
+            V.DangerWarning = false
+        end
         if ArrowGui then pcall(function() ArrowGui:Destroy() end) end
-        if cleanupArrowESP then cleanupArrowESP() end
-        if cleanupRadar2D then cleanupRadar2D() end
-        if cleanupSoundSonar then cleanupSoundSonar() end
+        if cleanupArrowESP then pcall(cleanupArrowESP) end
+        if _G.cleanupArrowESP then pcall(_G.cleanupArrowESP) end
+        if cleanupRadar2D then pcall(cleanupRadar2D) end
+        if _G.cleanupRadar2D then pcall(_G.cleanupRadar2D) end
+        if toggleDangerWarning then pcall(function() toggleDangerWarning(false) end) end
+        if cleanupSoundSonar then pcall(cleanupSoundSonar) end
+        if _G.cleanupSoundSonar then pcall(_G.cleanupSoundSonar) end
 
         for _, conn in pairs(C and C.All or {}) do
             pcall(function() conn:Disconnect() end)
@@ -7727,8 +7736,12 @@ V.KillAll = false
                 pcall(function()
                     for _, child in ipairs(root:GetChildren()) do
                         if child:IsA("ScreenGui") and (
+                            child.Name == "PearlTacticalRadar" or
+                            child.Name == "PearlDangerWarning" or
+                            child.Name == "PearlArrowGui" or
                             child.Name == "PearlSpectatorListGui" or
                             child.Name:find("Spectator") or
+                            child.Name:find("Radar") or
                             child.Name == "PearlUpdateUI" or
                             child.Name == "PearlKeySystemUI" or
                             child.Name == "EternalFlick_GUI" or
@@ -8656,6 +8669,7 @@ V.SuperJumpCharge = false
 V.SuperJumpConn = nil
 V.BulletTracers = false
 V.OffScreenArrows = false
+V.ArrowESPRadius = 180
 V.OffScreenConn = nil
 V.SitAir = false
 V.SitAirConn = nil
@@ -14968,21 +14982,35 @@ do
     local radarConn = nil
     local radarEnemyBadge = nil
     local radarRangeLbl = nil
-    local radarCompassN = nil
+    local radarCompassLabels = {}
 
     local function getOrCreateBlip(idx)
         if radarBlipPool[idx] then return radarBlipPool[idx] end
-        
+
         local blipContainer = Instance.new("Frame")
         blipContainer.Name = "Blip_" .. idx
-        blipContainer.Size = UDim2.new(0, 14, 0, 14)
+        blipContainer.Size = UDim2.new(0, 16, 0, 16)
         blipContainer.AnchorPoint = Vector2.new(0.5, 0.5)
         blipContainer.BackgroundTransparency = 1
         blipContainer.BorderSizePixel = 0
+        blipContainer.ZIndex = 15
         blipContainer.Visible = false
         blipContainer.Parent = RadarFrame
 
-        -- Glowing Dot / Core
+        -- Halo externe doux
+        local glow = Instance.new("Frame")
+        glow.Name = "Glow"
+        glow.Size = UDim2.new(0, 12, 0, 12)
+        glow.AnchorPoint = Vector2.new(0.5, 0.5)
+        glow.Position = UDim2.new(0.5, 0, 0.5, 0)
+        glow.BackgroundColor3 = Color3.fromRGB(255, 55, 75)
+        glow.BackgroundTransparency = 0.72
+        glow.BorderSizePixel = 0
+        glow.ZIndex = 15
+        glow.Parent = blipContainer
+        makeCorner(glow, 6)
+
+        -- Point central (Core)
         local dot = Instance.new("Frame")
         dot.Name = "Dot"
         dot.Size = UDim2.new(0, 6, 0, 6)
@@ -14990,35 +15018,40 @@ do
         dot.Position = UDim2.new(0.5, 0, 0.5, 0)
         dot.BorderSizePixel = 0
         dot.BackgroundColor3 = Color3.fromRGB(255, 55, 75)
+        dot.ZIndex = 17
         dot.Parent = blipContainer
         makeCorner(dot, 3)
         local dotStroke = makeStroke(dot, Color3.fromRGB(255, 255, 255), 1)
 
-        -- Directional Pointer
+        -- Aiguille de direction (orbitant autour du point par trigonométrie)
         local dirLine = Instance.new("Frame")
         dirLine.Name = "DirLine"
-        dirLine.Size = UDim2.new(0, 2, 0, 6)
-        dirLine.AnchorPoint = Vector2.new(0.5, 1)
-        dirLine.Position = UDim2.new(0.5, 0, 0.5, -3)
+        dirLine.Size = UDim2.new(0, 2, 0, 5)
+        dirLine.AnchorPoint = Vector2.new(0.5, 0.5)
+        dirLine.Position = UDim2.new(0.5, 0, 0.5, -5)
         dirLine.BorderSizePixel = 0
         dirLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        dirLine.ZIndex = 16
         dirLine.Parent = blipContainer
+        makeCorner(dirLine, 1)
 
-        -- Elevation Indicator (▲ = Haut, ▼ = Bas)
+        -- Indicateur d'élévation (▲ = Haut, ▼ = Bas)
         local elevLbl = Instance.new("TextLabel")
         elevLbl.Name = "ElevLbl"
         elevLbl.Size = UDim2.new(0, 12, 0, 8)
         elevLbl.AnchorPoint = Vector2.new(0.5, 0.5)
-        elevLbl.Position = UDim2.new(0.5, 0, 0.5, -9)
+        elevLbl.Position = UDim2.new(0.5, 0, 0.5, -10)
         elevLbl.BackgroundTransparency = 1
         elevLbl.Font = Enum.Font.GothamBold
         elevLbl.TextSize = 7
         elevLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
         elevLbl.Text = ""
+        elevLbl.ZIndex = 18
         elevLbl.Parent = blipContainer
 
         radarBlipPool[idx] = {
             container = blipContainer,
+            glow = glow,
             dot = dot,
             dotStroke = dotStroke,
             dirLine = dirLine,
@@ -15041,149 +15074,169 @@ do
         -- Header Pill Tactique (Compteur ennemis & Portée)
         local HeaderPill = Instance.new("Frame")
         HeaderPill.Name = "RadarHeader"
-        HeaderPill.Size = UDim2.new(0, radarDiameter, 0, 22)
-        HeaderPill.Position = UDim2.new(1, - (radarDiameter + 25), 0, 48)
-        HeaderPill.BackgroundColor3 = Color3.fromRGB(15, 13, 24)
-        HeaderPill.BackgroundTransparency = 0.15
+        HeaderPill.Size = UDim2.new(0, radarDiameter, 0, 24)
+        HeaderPill.Position = UDim2.new(1, -(radarDiameter + 25), 0, 46)
+        HeaderPill.BackgroundColor3 = Color3.fromRGB(13, 12, 20)
+        HeaderPill.BackgroundTransparency = 0.12
         HeaderPill.BorderSizePixel = 0
         HeaderPill.Parent = RadarGui
-        makeCorner(HeaderPill, 6)
-        makeStroke(HeaderPill, Color3.fromRGB(50, 42, 75), 1)
+        makeCorner(HeaderPill, 7)
+        makeStroke(HeaderPill, Color3.fromRGB(58, 48, 88), 1)
 
         local pulseDot = Instance.new("Frame")
         pulseDot.Size = UDim2.new(0, 6, 0, 6)
-        pulseDot.Position = UDim2.new(0, 8, 0.5, -3)
-        pulseDot.BackgroundColor3 = Color3.fromRGB(150, 85, 255)
+        pulseDot.AnchorPoint = Vector2.new(0, 0.5)
+        pulseDot.Position = UDim2.new(0, 8, 0.5, 0)
+        pulseDot.BackgroundColor3 = Color3.fromRGB(155, 90, 255)
         pulseDot.BorderSizePixel = 0
         pulseDot.Parent = HeaderPill
         makeCorner(pulseDot, 3)
 
         local titleLbl = Instance.new("TextLabel")
-        titleLbl.Size = UDim2.new(0, 60, 1, 0)
-        titleLbl.Position = UDim2.new(0, 20, 0, 0)
+        titleLbl.Size = UDim2.new(0, 58, 1, 0)
+        titleLbl.Position = UDim2.new(0, 18, 0, 0)
         titleLbl.BackgroundTransparency = 1
         titleLbl.Text = "RADAR 2D"
-        titleLbl.TextColor3 = Color3.fromRGB(240, 240, 255)
+        titleLbl.TextColor3 = Color3.fromRGB(245, 245, 255)
         titleLbl.Font = Enum.Font.GothamBold
-        titleLbl.TextSize = 10
+        titleLbl.TextSize = 9
         titleLbl.TextXAlignment = Enum.TextXAlignment.Left
         titleLbl.Parent = HeaderPill
 
         radarRangeLbl = Instance.new("TextLabel")
-        radarRangeLbl.Size = UDim2.new(0, 40, 1, 0)
-        radarRangeLbl.Position = UDim2.new(0.5, -20, 0, 0)
+        radarRangeLbl.Size = UDim2.new(0, 34, 1, 0)
+        radarRangeLbl.AnchorPoint = Vector2.new(0.5, 0)
+        radarRangeLbl.Position = UDim2.new(0.46, 0, 0, 0)
         radarRangeLbl.BackgroundTransparency = 1
-        radarRangeLbl.Text = (V.RadarRange or 200) .. "m"
-        radarRangeLbl.TextColor3 = Color3.fromRGB(160, 150, 190)
+        radarRangeLbl.Text = tostring(V.RadarRange or 200) .. "m"
+        radarRangeLbl.TextColor3 = Color3.fromRGB(165, 155, 195)
         radarRangeLbl.Font = Enum.Font.GothamMedium
         radarRangeLbl.TextSize = 9
         radarRangeLbl.Parent = HeaderPill
 
         radarEnemyBadge = Instance.new("TextLabel")
-        radarEnemyBadge.Size = UDim2.new(0, 65, 0, 16)
-        radarEnemyBadge.Position = UDim2.new(1, -70, 0.5, -8)
-        radarEnemyBadge.BackgroundColor3 = Color3.fromRGB(26, 22, 38)
+        radarEnemyBadge.Size = UDim2.new(0, 68, 0, 16)
+        radarEnemyBadge.AnchorPoint = Vector2.new(1, 0.5)
+        radarEnemyBadge.Position = UDim2.new(1, -5, 0.5, 0)
+        radarEnemyBadge.BackgroundColor3 = Color3.fromRGB(22, 28, 24)
         radarEnemyBadge.Text = "0 ENNEMI"
-        radarEnemyBadge.TextColor3 = Color3.fromRGB(80, 220, 120)
+        radarEnemyBadge.TextColor3 = Color3.fromRGB(80, 225, 125)
         radarEnemyBadge.Font = Enum.Font.GothamBold
-        radarEnemyBadge.TextSize = 9
+        radarEnemyBadge.TextSize = 8
         radarEnemyBadge.Parent = HeaderPill
         makeCorner(radarEnemyBadge, 4)
-        makeStroke(radarEnemyBadge, Color3.fromRGB(60, 50, 85), 1)
+        makeStroke(radarEnemyBadge, Color3.fromRGB(52, 44, 76), 1)
 
         -- Radar Circle Frame (Draggable & Super Clean)
         local Container = Instance.new("Frame")
         Container.Name = "RadarContainer"
         Container.Size = UDim2.new(0, radarDiameter, 0, radarDiameter)
-        Container.Position = UDim2.new(1, - (radarDiameter + 25), 0, 75)
-        Container.BackgroundColor3 = Color3.fromRGB(12, 10, 20)
-        Container.BackgroundTransparency = 0.18
+        Container.Position = UDim2.new(1, -(radarDiameter + 25), 0, 75)
+        Container.BackgroundColor3 = Color3.fromRGB(11, 10, 18)
+        Container.BackgroundTransparency = 0.14
         Container.BorderSizePixel = 0
         Container.Active = true
         Container.Draggable = true
         Container.ClipsDescendants = true
         Container.Parent = RadarGui
         makeCorner(Container, radius)
-        makeStroke(Container, Color3.fromRGB(140, 80, 255), 1.6)
+        makeStroke(Container, Color3.fromRGB(140, 82, 255), 1.6)
+
+        -- Anneau de bordure interne subtil
+        local innerRim = Instance.new("Frame")
+        innerRim.Size = UDim2.new(1, -6, 1, -6)
+        innerRim.AnchorPoint = Vector2.new(0.5, 0.5)
+        innerRim.Position = UDim2.new(0.5, 0, 0.5, 0)
+        innerRim.BackgroundTransparency = 1
+        innerRim.Parent = Container
+        makeCorner(innerRim, radius - 3)
+        makeStroke(innerRim, Color3.fromRGB(36, 32, 54), 1)
 
         -- Synchronisation du déplacement du header avec le radar
         Container:GetPropertyChangedSignal("Position"):Connect(function()
-            HeaderPill.Position = UDim2.new(Container.Position.X.Scale, Container.Position.X.Offset, Container.Position.Y.Scale, Container.Position.Y.Offset - 27)
+            HeaderPill.Position = UDim2.new(Container.Position.X.Scale, Container.Position.X.Offset, Container.Position.Y.Scale, Container.Position.Y.Offset - 29)
         end)
 
-        -- Cercles concentriques de distance
+        -- Cercles concentriques de distance (33% et 66%)
         local ring1 = Instance.new("Frame")
         ring1.Size = UDim2.new(0.33, 0, 0.33, 0)
-        ring1.Position = UDim2.new(0.335, 0, 0.335, 0)
+        ring1.AnchorPoint = Vector2.new(0.5, 0.5)
+        ring1.Position = UDim2.new(0.5, 0, 0.5, 0)
         ring1.BackgroundTransparency = 1
         ring1.Parent = Container
-        makeCorner(ring1, radius * 0.33)
-        makeStroke(ring1, Color3.fromRGB(48, 42, 68), 1)
+        makeCorner(ring1, math.floor(radius * 0.33))
+        makeStroke(ring1, Color3.fromRGB(44, 38, 64), 1)
 
         local ring2 = Instance.new("Frame")
         ring2.Size = UDim2.new(0.66, 0, 0.66, 0)
-        ring2.Position = UDim2.new(0.17, 0, 0.17, 0)
+        ring2.AnchorPoint = Vector2.new(0.5, 0.5)
+        ring2.Position = UDim2.new(0.5, 0, 0.5, 0)
         ring2.BackgroundTransparency = 1
         ring2.Parent = Container
-        makeCorner(ring2, radius * 0.66)
-        makeStroke(ring2, Color3.fromRGB(48, 42, 68), 1)
+        makeCorner(ring2, math.floor(radius * 0.66))
+        makeStroke(ring2, Color3.fromRGB(44, 38, 64), 1)
 
         -- Lignes de réticule ultra-fines
         local hLine = Instance.new("Frame")
-        hLine.Size = UDim2.new(1, 0, 0, 1)
-        hLine.Position = UDim2.new(0, 0, 0.5, 0)
-        hLine.BackgroundColor3 = Color3.fromRGB(42, 38, 62)
+        hLine.Size = UDim2.new(1, -12, 0, 1)
+        hLine.AnchorPoint = Vector2.new(0.5, 0.5)
+        hLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+        hLine.BackgroundColor3 = Color3.fromRGB(38, 34, 56)
         hLine.BorderSizePixel = 0
         hLine.Parent = Container
 
         local vLine = Instance.new("Frame")
-        vLine.Size = UDim2.new(0, 1, 1, 0)
-        vLine.Position = UDim2.new(0.5, 0, 0, 0)
-        vLine.BackgroundColor3 = Color3.fromRGB(42, 38, 62)
+        vLine.Size = UDim2.new(0, 1, 1, -12)
+        vLine.AnchorPoint = Vector2.new(0.5, 0.5)
+        vLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+        vLine.BackgroundColor3 = Color3.fromRGB(38, 34, 56)
         vLine.BorderSizePixel = 0
         vLine.Parent = Container
 
-        -- Cône de vision (FOV de l'écran : +/- 35 degrés)
-        local fovLeft = Instance.new("Frame")
-        fovLeft.Size = UDim2.new(0, 1, 0.5, 0)
-        fovLeft.AnchorPoint = Vector2.new(0.5, 1)
-        fovLeft.Position = UDim2.new(0.5, 0, 0.5, 0)
-        fovLeft.BackgroundColor3 = Color3.fromRGB(150, 90, 255)
-        fovLeft.BackgroundTransparency = 0.5
-        fovLeft.BorderSizePixel = 0
-        fovLeft.Rotation = -35
-        fovLeft.Parent = Container
 
-        local fovRight = Instance.new("Frame")
-        fovRight.Size = UDim2.new(0, 1, 0.5, 0)
-        fovRight.AnchorPoint = Vector2.new(0.5, 1)
-        fovRight.Position = UDim2.new(0.5, 0, 0.5, 0)
-        fovRight.BackgroundColor3 = Color3.fromRGB(150, 90, 255)
-        fovRight.BackgroundTransparency = 0.5
-        fovRight.BorderSizePixel = 0
-        fovRight.Rotation = 35
-        fovRight.Parent = Container
+        -- Points cardinaux rotatifs (N, E, S, W) sur le pourtour
+        radarCompassLabels = {}
+        local cardinals = {
+            { txt = "N", dir = Vector3.new(0, 0, -1), col = Color3.fromRGB(255, 80, 95) },
+            { txt = "E", dir = Vector3.new(1, 0, 0),  col = Color3.fromRGB(150, 145, 180) },
+            { txt = "S", dir = Vector3.new(0, 0, 1),  col = Color3.fromRGB(150, 145, 180) },
+            { txt = "W", dir = Vector3.new(-1, 0, 0), col = Color3.fromRGB(150, 145, 180) }
+        }
+        for _, cInfo in ipairs(cardinals) do
+            local cLbl = Instance.new("TextLabel")
+            cLbl.Size = UDim2.new(0, 14, 0, 14)
+            cLbl.AnchorPoint = Vector2.new(0.5, 0.5)
+            cLbl.Position = UDim2.new(0.5, 0, 0.5, 0)
+            cLbl.BackgroundTransparency = 1
+            cLbl.Text = cInfo.txt
+            cLbl.TextColor3 = cInfo.col
+            cLbl.Font = Enum.Font.GothamBold
+            cLbl.TextSize = 8
+            cLbl.ZIndex = 12
+            cLbl.Parent = Container
+            table.insert(radarCompassLabels, { lbl = cLbl, dir = cInfo.dir })
+        end
 
-        -- Boussole Nord rotative sur le pourtour
-        radarCompassN = Instance.new("TextLabel")
-        radarCompassN.Size = UDim2.new(0, 14, 0, 14)
-        radarCompassN.AnchorPoint = Vector2.new(0.5, 0.5)
-        radarCompassN.Position = UDim2.new(0.5, 0, 0, 9)
-        radarCompassN.BackgroundTransparency = 1
-        radarCompassN.Text = "N"
-        radarCompassN.TextColor3 = Color3.fromRGB(255, 75, 95)
-        radarCompassN.Font = Enum.Font.GothamBold
-        radarCompassN.TextSize = 9
-        radarCompassN.Parent = Container
+        -- Icône centrale (Position joueur local)
+        local centerHalo = Instance.new("Frame")
+        centerHalo.Size = UDim2.new(0, 14, 0, 14)
+        centerHalo.AnchorPoint = Vector2.new(0.5, 0.5)
+        centerHalo.Position = UDim2.new(0.5, 0, 0.5, 0)
+        centerHalo.BackgroundColor3 = Color3.fromRGB(0, 225, 255)
+        centerHalo.BackgroundTransparency = 0.78
+        centerHalo.BorderSizePixel = 0
+        centerHalo.ZIndex = 19
+        centerHalo.Parent = Container
+        makeCorner(centerHalo, 7)
 
-        -- Icône centrale (Position et orientation joueur)
         local centerOuter = Instance.new("Frame")
-        centerOuter.Size = UDim2.new(0, 8, 0, 8)
+        centerOuter.Size = UDim2.new(0, 7, 0, 7)
         centerOuter.AnchorPoint = Vector2.new(0.5, 0.5)
         centerOuter.Position = UDim2.new(0.5, 0, 0.5, 0)
         centerOuter.BackgroundColor3 = Color3.fromRGB(0, 230, 255)
         centerOuter.BorderSizePixel = 0
         centerOuter.Rotation = 45
+        centerOuter.ZIndex = 20
         centerOuter.Parent = Container
         makeCorner(centerOuter, 2)
         makeStroke(centerOuter, Color3.fromRGB(255, 255, 255), 1)
@@ -15198,7 +15251,7 @@ do
         RadarFrame = nil
         radarEnemyBadge = nil
         radarRangeLbl = nil
-        radarCompassN = nil
+        radarCompassLabels = {}
         table.clear(radarBlipPool)
     end
     _G.cleanupRadar2D = cleanupRadar2D
@@ -15220,18 +15273,24 @@ do
                 end
 
                 local maxRange = V.RadarRange or 200
-                local radarRadius = (RadarFrame.AbsoluteSize.X / 2) - 8
-                local centerOffset = RadarFrame.AbsoluteSize.X / 2
+                if radarRangeLbl then
+                    radarRangeLbl.Text = tostring(maxRange) .. "m"
+                end
+
+                local radarDiameter = V.RadarSize or 180
+                local halfRadius = (radarDiameter * 0.5) - 12
+                local compassRadius = (radarDiameter * 0.5) - 10
                 local blipIndex = 0
                 local enemyCount = 0
+                local camCFrame = cam.CFrame
 
-                -- Orientation de la boussole Nord
-                if radarCompassN then
-                    local camYaw = math.atan2(cam.CFrame.LookVector.X, cam.CFrame.LookVector.Z)
-                    local nAngle = -camYaw + math.pi
-                    local nX = centerOffset + math.sin(nAngle) * (radarRadius - 4)
-                    local nY = centerOffset - math.cos(nAngle) * (radarRadius - 4)
-                    radarCompassN.Position = UDim2.new(0, nX, 0, nY)
+                -- Rotation des 4 points cardinaux (N, E, S, W) sur le bord du cercle
+                for _, cItem in ipairs(radarCompassLabels) do
+                    local relDir = camCFrame:VectorToObjectSpace(cItem.dir)
+                    local cAngle = math.atan2(relDir.X, -relDir.Z)
+                    local cX = math.sin(cAngle) * compassRadius
+                    local cY = -math.cos(cAngle) * compassRadius
+                    cItem.lbl.Position = UDim2.new(0.5, cX, 0.5, cY)
                 end
 
                 for _, p in ipairs(Players:GetPlayers()) do
@@ -15240,76 +15299,84 @@ do
                         local eRoot = eChar:FindFirstChild("HumanoidRootPart")
                         local eHum = eChar:FindFirstChildOfClass("Humanoid")
                         if eRoot and eHum and eHum.Health > 0 then
-                            local camCFrame = cam.CFrame
-                            local camRel = camCFrame:PointToObjectSpace(eRoot.Position)
-                            local hDist = math.sqrt(camRel.X^2 + camRel.Z^2)
-                            local relY = eRoot.Position.Y - myRoot.Position.Y
+                            -- Position relative centrée sur le joueur local, orientée selon l'angle caméra
+                            local worldDiff = eRoot.Position - myRoot.Position
+                            local camRel = camCFrame:VectorToObjectSpace(worldDiff)
+                            local hDist = math.sqrt(camRel.X * camRel.X + camRel.Z * camRel.Z)
+                            local relY = worldDiff.Y
 
                             local isTeam = isPlayerTeamMate and isPlayerTeamMate(p)
                             if not isTeam then
                                 enemyCount = enemyCount + 1
                             end
 
-                            if hDist <= maxRange * 1.35 then
+                            if hDist <= maxRange * 1.4 then
                                 blipIndex = blipIndex + 1
                                 local item = getOrCreateBlip(blipIndex)
 
-                                -- Angle dans l'espace caméra (Devant la caméra = Haut sur le radar !)
+                                -- Coordonnées polaires centrées exactement sur (0.5, 0.5)
                                 local angle = math.atan2(camRel.X, -camRel.Z)
                                 local clampedDist = math.clamp(hDist / maxRange, 0, 1)
-                                local rDist = clampedDist * radarRadius
-                                local plotX = centerOffset + math.sin(angle) * rDist
-                                local plotY = centerOffset - math.cos(angle) * rDist
+                                local rDist = clampedDist * halfRadius
+                                local dx = math.sin(angle) * rDist
+                                local dy = -math.cos(angle) * rDist
 
-                                item.container.Position = UDim2.new(0, plotX, 0, plotY)
+                                item.container.Position = UDim2.new(0.5, dx, 0.5, dy)
+
+                                -- Aiguille de direction orbitant parfaitement autour du point (trigonométrie pure)
+                                local eLookRel = camCFrame:VectorToObjectSpace(eRoot.CFrame.LookVector)
+                                local lookRad = math.atan2(eLookRel.X, -eLookRel.Z)
+                                local tipX = math.sin(lookRad) * 5
+                                local tipY = -math.cos(lookRad) * 5
+                                item.dirLine.Position = UDim2.new(0.5, tipX, 0.5, tipY)
+                                item.dirLine.Rotation = math.deg(lookRad)
 
                                 -- Indicateur d'élévation relative (▲ Plus haut / ▼ Plus bas)
-                                if relY > 6 then
+                                if relY > 7 then
                                     item.elevLbl.Text = "▲"
-                                    item.elevLbl.Position = UDim2.new(0.5, 0, 0.5, -9)
-                                    item.elevLbl.TextColor3 = Color3.fromRGB(120, 200, 255)
+                                    item.elevLbl.Position = UDim2.new(0.5, 0, 0.5, -10)
+                                    item.elevLbl.TextColor3 = Color3.fromRGB(120, 210, 255)
                                     item.elevLbl.Visible = true
-                                elseif relY < -6 then
+                                elseif relY < -7 then
                                     item.elevLbl.Text = "▼"
-                                    item.elevLbl.Position = UDim2.new(0.5, 0, 0.5, 9)
-                                    item.elevLbl.TextColor3 = Color3.fromRGB(255, 120, 120)
+                                    item.elevLbl.Position = UDim2.new(0.5, 0, 0.5, 10)
+                                    item.elevLbl.TextColor3 = Color3.fromRGB(255, 130, 130)
                                     item.elevLbl.Visible = true
                                 else
                                     item.elevLbl.Visible = false
                                 end
 
-                                -- Orientation du regard de la cible dans le repère caméra
-                                local eLookRel = camCFrame:VectorToObjectSpace(eRoot.CFrame.LookVector)
-                                local lookAngle = math.deg(math.atan2(eLookRel.X, -eLookRel.Z))
-                                item.dirLine.Rotation = lookAngle
-
                                 -- Couleurs tactiques
                                 local isSel = (V.SelectedJoueurPlayer and V.SelectedJoueurPlayer == p)
                                 local isVis = isPlayerVisible and isPlayerVisible(p)
+                                local mainCol, strokeCol
 
                                 if isSel then
-                                    item.dot.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
-                                    item.dotStroke.Color = Color3.fromRGB(255, 255, 255)
-                                    item.dirLine.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+                                    mainCol = Color3.fromRGB(255, 215, 0)
+                                    strokeCol = Color3.fromRGB(255, 255, 255)
                                 elseif isTeam then
-                                    item.dot.BackgroundColor3 = Color3.fromRGB(50, 230, 120)
-                                    item.dotStroke.Color = Color3.fromRGB(150, 255, 180)
-                                    item.dirLine.BackgroundColor3 = Color3.fromRGB(50, 230, 120)
+                                    mainCol = Color3.fromRGB(50, 230, 120)
+                                    strokeCol = Color3.fromRGB(165, 255, 195)
                                 elseif isVis then
-                                    item.dot.BackgroundColor3 = Color3.fromRGB(255, 45, 65)
-                                    item.dotStroke.Color = Color3.fromRGB(255, 160, 160)
-                                    item.dirLine.BackgroundColor3 = Color3.fromRGB(255, 45, 65)
+                                    mainCol = Color3.fromRGB(255, 45, 65)
+                                    strokeCol = Color3.fromRGB(255, 175, 180)
                                 else
-                                    item.dot.BackgroundColor3 = Color3.fromRGB(175, 95, 255)
-                                    item.dotStroke.Color = Color3.fromRGB(220, 180, 255)
-                                    item.dirLine.BackgroundColor3 = Color3.fromRGB(175, 95, 255)
+                                    mainCol = Color3.fromRGB(175, 95, 255)
+                                    strokeCol = Color3.fromRGB(225, 190, 255)
                                 end
 
+                                item.dot.BackgroundColor3 = mainCol
+                                item.glow.BackgroundColor3 = mainCol
+                                item.dotStroke.Color = strokeCol
+                                item.dirLine.BackgroundColor3 = strokeCol
+
                                 if hDist > maxRange then
-                                    item.dot.BackgroundTransparency = 0.4
-                                    item.dirLine.BackgroundTransparency = 0.5
+                                    item.dot.BackgroundTransparency = 0.35
+                                    item.glow.BackgroundTransparency = 0.88
+                                    item.dirLine.BackgroundTransparency = 0.45
                                 else
                                     item.dot.BackgroundTransparency = 0
+                                    item.glow.BackgroundTransparency = 0.72
                                     item.dirLine.BackgroundTransparency = 0
                                 end
 
@@ -15325,18 +15392,18 @@ do
 
                 if radarEnemyBadge then
                     if enemyCount > 0 then
-                        radarEnemyBadge.Text = enemyCount .. " ENNEMI" .. (enemyCount > 1 and "S" or "")
-                        radarEnemyBadge.TextColor3 = Color3.fromRGB(255, 75, 90)
-                        radarEnemyBadge.BackgroundColor3 = Color3.fromRGB(42, 16, 24)
+                        radarEnemyBadge.Text = tostring(enemyCount) .. " ENNEMI" .. (enemyCount > 1 and "S" or "")
+                        radarEnemyBadge.TextColor3 = Color3.fromRGB(255, 80, 95)
+                        radarEnemyBadge.BackgroundColor3 = Color3.fromRGB(40, 16, 24)
                     else
                         radarEnemyBadge.Text = "0 ENNEMI"
-                        radarEnemyBadge.TextColor3 = Color3.fromRGB(80, 220, 120)
-                        radarEnemyBadge.BackgroundColor3 = Color3.fromRGB(18, 32, 24)
+                        radarEnemyBadge.TextColor3 = Color3.fromRGB(80, 225, 125)
+                        radarEnemyBadge.BackgroundColor3 = Color3.fromRGB(18, 30, 24)
                     end
                 end
             end)
             addConnection(radarConn)
-            notify("ESP", "Radar 2D Tactique Boosté ACTIF", Color3.fromRGB(80, 200, 120))
+            notify("ESP", "Radar 2D Tactique ACTIF", Color3.fromRGB(80, 200, 120))
         else
             cleanupRadar2D()
             notify("ESP", "Radar 2D DÉSACTIVÉ", Color3.fromRGB(255, 90, 90))
@@ -15909,7 +15976,7 @@ function toggleArrowESP(enabled)
 
             local vp = Camera.ViewportSize
             local screenCenter = Vector2.new(vp.X / 2, vp.Y / 2)
-            local radius = math.clamp(math.min(vp.X, vp.Y) * 0.36, 120, 360)
+            local radius = V.ArrowESPRadius or 180
             local curColor = V.ESPColor or Color3.fromRGB(255, 50, 75)
 
             for _, player in ipairs(Players:GetPlayers()) do
@@ -15977,6 +16044,9 @@ _G.toggleArrowESP = toggleArrowESP
 createToggle("Arrow ESP (Fleches Ennemis)", false, function(enabled)
     toggleArrowESP(enabled)
 end, ESPContent, "ArrowESP")
+createSlider("Distance Arrow ESP (Centre)", 50, 500, 180, function(val)
+    V.ArrowESPRadius = val
+end, ESPContent, "ArrowESPRadius")
 
 --------------------------------------------------------------------------------
 -- SOUND SONAR (EXPANDING FOOTSTEP RINGS / VISUAL AUDIO)--------------------------------------------------------------------------------
